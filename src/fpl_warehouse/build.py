@@ -178,8 +178,19 @@ CREATE TABLE IF NOT EXISTS fact_manager_squad (
 )
 """
 
+DIM_GAMEWEEKS_DDL = """
+CREATE TABLE IF NOT EXISTS dim_gameweeks (
+    gw_id           INTEGER PRIMARY KEY,
+    deadline_time   TEXT,
+    finished        INTEGER,
+    is_current      INTEGER,
+    is_next         INTEGER
+)
+"""
+
 ALL_DDL = [
-    DIM_TEAMS_DDL, DIM_PLAYERS_DDL, FACT_PLAYER_GW_DDL,
+    DIM_TEAMS_DDL, DIM_PLAYERS_DDL, DIM_GAMEWEEKS_DDL,
+    FACT_PLAYER_GW_DDL,
     FACT_SHOTS_DDL, FACT_FIXTURES_DDL, FACT_MATCH_STATS_DDL,
     FACT_MANAGER_SQUAD_DDL,
 ]
@@ -236,6 +247,33 @@ def build_dim_teams(fpl_db: str, warehouse_db: str) -> Dict[str, int]:
     wh.close()
     logger.info("dim_teams: %d rows", len(mapping))
     return mapping
+
+
+def build_dim_gameweeks(fpl_db: str, warehouse_db: str) -> int:
+    """Copy gameweek metadata from FPL events table. Returns row count."""
+    fpl = _connect(fpl_db)
+    rows = fpl.execute(
+        "SELECT id, deadline_time, finished, is_current, is_next FROM events"
+    ).fetchall()
+    fpl.close()
+
+    wh = _connect(warehouse_db)
+    for r in rows:
+        wh.execute(
+            """INSERT INTO dim_gameweeks (gw_id, deadline_time, finished, is_current, is_next)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(gw_id) DO UPDATE SET
+                   deadline_time=excluded.deadline_time,
+                   finished=excluded.finished,
+                   is_current=excluded.is_current,
+                   is_next=excluded.is_next""",
+            (r["id"], r["deadline_time"], r["finished"], r["is_current"], r["is_next"]),
+        )
+    wh.commit()
+    count = len(rows)
+    wh.close()
+    logger.info("dim_gameweeks: %d rows", count)
+    return count
 
 
 def build_dim_players(
@@ -982,13 +1020,14 @@ def build_all(
 
     # Dimensions
     team_lookup = build_dim_teams(fpl_db, warehouse_db)
+    gw_count = build_dim_gameweeks(fpl_db, warehouse_db)
     matched = build_dim_players(fpl_db, understat_db, warehouse_db, team_lookup, threshold)
 
     # Fixture bridge (Understat match_id → FPL fixture_id + event)
     bridge = _build_fixture_bridge(fpl_db, understat_db)
 
     # Facts
-    gw_count = build_fact_player_gw(fpl_db, warehouse_db)
+    player_gw_count = build_fact_player_gw(fpl_db, warehouse_db)
     shots_count = build_fact_shots(understat_db, warehouse_db)
     fixtures_count = build_fact_fixtures(fpl_db, warehouse_db)
     match_stats_count = build_fact_match_stats(fpl_db, understat_db, warehouse_db, bridge)
@@ -1014,8 +1053,9 @@ def build_all(
 
     results = {
         "dim_teams": len(team_lookup),
+        "dim_gameweeks": gw_count,
         "dim_players_matched": matched,
-        "fact_player_gw": gw_count,
+        "fact_player_gw": player_gw_count,
         "fact_player_gw_xg_enriched": xg_enriched,
         "fact_shots": shots_count,
         "fact_fixtures": fixtures_count,
