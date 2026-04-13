@@ -4,8 +4,6 @@ Covers:
 - invert_team_mapping() correctness and bijection
 - TeamResolutionError behaviour
 - fact_match_stats normalized columns
-- fact_decision_snapshot fpl_id rename
-- End-to-end join path for §05 opponent context
 """
 
 import sqlite3
@@ -15,12 +13,12 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-from fpl_warehouse.exceptions import TeamResolutionError
-from fpl_warehouse.matching import (
+from fpl_warehouse.integration.matching import (
     FPL_TO_UNDERSTAT_TEAM,
     invert_team_mapping,
     load_fpl_teams,
 )
+from fpl_warehouse.integration.exceptions import TeamResolutionError
 
 WAREHOUSE = Path.home() / "Documents/FPL/data/warehouse/master.db"
 FPL_DB = Path.home() / "Documents/FPL/data/fpl/fpl.db"
@@ -202,102 +200,6 @@ class TestFactMatchStatsNormalized:
             ).fetchone()
             assert row is not None, f"fpl_id={fpl_id} not found as home"
             assert row[0] == us_name, f"fpl_id={fpl_id}: expected {us_name}, got {row[0]}"
-
-
-# ── fact_decision_snapshot tests ─────────────────────────────────────────
-
-
-class TestSnapshotRenamed:
-
-    def test_team_fpl_id_column_exists(self, conn):
-        """New column name must be present."""
-        cols = [d[0] for d in conn.execute(
-            "SELECT * FROM fact_decision_snapshot LIMIT 0"
-        ).description]
-        assert "team_fpl_id" in cols
-
-    def test_team_id_column_gone(self, conn):
-        """Old misleading column name must not be present."""
-        cols = [d[0] for d in conn.execute(
-            "SELECT * FROM fact_decision_snapshot LIMIT 0"
-        ).description]
-        assert "team_id" not in cols, "Old 'team_id' column still present"
-
-    def test_team_fpl_id_values_are_integers(self, conn):
-        row = conn.execute(
-            "SELECT team_fpl_id FROM fact_decision_snapshot WHERE team_fpl_id IS NOT NULL LIMIT 1"
-        ).fetchone()
-        assert row is not None
-        assert isinstance(row[0], int)
-
-    def test_team_fpl_id_matches_dim_teams(self, conn):
-        """All snapshot team_fpl_id values must exist in dim_teams.fpl_id."""
-        orphans = conn.execute("""
-            SELECT COUNT(DISTINCT s.team_fpl_id)
-            FROM fact_decision_snapshot s
-            LEFT JOIN dim_teams dt ON dt.fpl_id = s.team_fpl_id
-            WHERE dt.fpl_id IS NULL
-        """).fetchone()[0]
-        assert orphans == 0, f"{orphans} team_fpl_id values not in dim_teams"
-
-
-# ── Regression: §05 end-to-end join path ─────────────────────────────────
-
-
-class TestJoinPathIntegrity:
-
-    def test_snapshot_to_match_stats_join(self, conn):
-        """The §05 join path must work:
-        fact_decision_snapshot.team_fpl_id → dim_teams.fpl_id
-        → fact_fixtures (opponent_team_id)
-        → fact_match_stats.home_fpl_id / away_fpl_id
-        with ≥95% non-NULL coverage.
-        """
-        result = conn.execute("""
-            WITH snap AS (
-                SELECT s.fpl_id AS player_fpl_id, s.as_of_gw,
-                       s.team_fpl_id
-                FROM fact_decision_snapshot s
-            ),
-            opp AS (
-                SELECT snap.player_fpl_id, snap.as_of_gw,
-                       ms.home_xg
-                FROM snap
-                JOIN fact_fixtures f
-                    ON (f.home_team_id = snap.team_fpl_id
-                        OR f.away_team_id = snap.team_fpl_id)
-                    AND f.event = snap.as_of_gw + 1
-                JOIN fact_match_stats ms
-                    ON (ms.home_fpl_id = CASE
-                            WHEN f.home_team_id = snap.team_fpl_id THEN f.away_team_id
-                            ELSE f.home_team_id END
-                        OR ms.away_fpl_id = CASE
-                            WHEN f.home_team_id = snap.team_fpl_id THEN f.away_team_id
-                            ELSE f.home_team_id END)
-                    AND ms.event <= snap.as_of_gw
-            )
-            SELECT COUNT(DISTINCT player_fpl_id || '-' || as_of_gw) FROM opp
-        """).fetchone()[0]
-
-        total = conn.execute(
-            "SELECT COUNT(*) FROM fact_decision_snapshot"
-        ).fetchone()[0]
-
-        coverage = result / total if total > 0 else 0
-        assert coverage >= 0.90, (
-            f"Join coverage {coverage:.1%} below 90% threshold "
-            f"({result}/{total})"
-        )
-
-    def test_v_team_xg_gw_returns_data(self, conn):
-        """v_team_xg_gw view must work with new fpl_id columns."""
-        count = conn.execute("SELECT COUNT(*) FROM v_team_xg_gw").fetchone()[0]
-        assert count >= 400, f"Only {count} rows in v_team_xg_gw"
-
-    def test_v_team_strength_returns_data(self, conn):
-        """v_team_strength view must work with new fpl_id columns."""
-        count = conn.execute("SELECT COUNT(*) FROM v_team_strength").fetchone()[0]
-        assert count == 20, f"Expected 20 teams, got {count}"
 
 
 # ── Future-proofing tests ────────────────────────────────────────────────

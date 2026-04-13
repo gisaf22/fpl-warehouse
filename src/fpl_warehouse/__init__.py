@@ -1,8 +1,8 @@
 """fpl-warehouse — Merges FPL and Understat into a unified warehouse."""
 
 from .build import build_all
-from .exceptions import TeamResolutionError
-from .matching import FPL_TO_UNDERSTAT_TEAM, invert_team_mapping, match_players
+from .integration.matching import FPL_TO_UNDERSTAT_TEAM, invert_team_mapping, match_players
+from .integration.exceptions import TeamResolutionError
 
 __all__ = [
     "build_all",

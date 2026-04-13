@@ -9,7 +9,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from fpl_warehouse.matching import (
+from fpl_warehouse.integration.matching import (
     FPL_TO_UNDERSTAT_TEAM,
     UNDERSTAT_TO_FPL_TEAM,
     _normalise,
