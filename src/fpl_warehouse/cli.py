@@ -8,25 +8,36 @@ import sys
 from pathlib import Path
 
 from .build import build_all
-from .warehouse.db import DEFAULT_FPL_DB, DEFAULT_UNDERSTAT_DB, DEFAULT_WAREHOUSE_DB
+from .warehouse.db import (
+    _load_fpl_env,
+    _DEFAULT_FPL_PATH,
+    _DEFAULT_UNDERSTAT_PATH,
+    _DEFAULT_WAREHOUSE_PATH,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the fpl-warehouse CLI. Materialises warehouse tables from ingestion databases."""
+    import os
+    _load_fpl_env()
+    fpl_db = os.environ.get("FPL_DB_PATH", str(_DEFAULT_FPL_PATH))
+    understat_db = os.environ.get("UNDERSTAT_DB_PATH", str(_DEFAULT_UNDERSTAT_PATH))
+    warehouse_db = os.environ.get("WAREHOUSE_DB_PATH", str(_DEFAULT_WAREHOUSE_PATH))
+
     parser = argparse.ArgumentParser(
         description="Build FPL warehouse from FPL + Understat source databases."
     )
     parser.add_argument(
-        "--fpl-db", default=DEFAULT_FPL_DB,
-        help=f"Path to FPL source database (default: {DEFAULT_FPL_DB})",
+        "--fpl-db", default=fpl_db,
+        help=f"Path to FPL source database (default: {fpl_db})",
     )
     parser.add_argument(
-        "--understat-db", default=DEFAULT_UNDERSTAT_DB,
-        help=f"Path to Understat source database (default: {DEFAULT_UNDERSTAT_DB})",
+        "--understat-db", default=understat_db,
+        help=f"Path to Understat source database (default: {understat_db})",
     )
     parser.add_argument(
-        "--warehouse-db", default=DEFAULT_WAREHOUSE_DB,
-        help=f"Path to warehouse output database (default: {DEFAULT_WAREHOUSE_DB})",
+        "--warehouse-db", default=warehouse_db,
+        help=f"Path to warehouse output database (default: {warehouse_db})",
     )
     parser.add_argument(
         "--threshold", type=int, default=75,

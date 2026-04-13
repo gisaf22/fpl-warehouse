@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS dim_players (
     team_id         INTEGER,
     element_type    INTEGER,
     confidence      INTEGER,
+    match_tier      TEXT,
     chance_of_playing_next_round REAL,
     news            TEXT,
     news_updated    TEXT,

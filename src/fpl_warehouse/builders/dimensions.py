@@ -8,8 +8,10 @@ from typing import Dict
 
 from ..integration.matching import (
     FPL_TO_UNDERSTAT_TEAM,
+    load_fpl_player_codes,
     load_fpl_players,
     load_fpl_teams,
+    load_reep_map,
     load_understat_players,
     match_players,
 )
@@ -76,8 +78,8 @@ def _upsert_matched_players(
         conn.execute(
             """INSERT INTO dim_players
                (fpl_id, understat_id, web_name, fpl_name, understat_name,
-                team_id, element_type, confidence)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                team_id, element_type, confidence, match_tier)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(fpl_id) DO UPDATE SET
                    understat_id=excluded.understat_id,
                    web_name=excluded.web_name,
@@ -85,7 +87,8 @@ def _upsert_matched_players(
                    understat_name=excluded.understat_name,
                    team_id=excluded.team_id,
                    element_type=excluded.element_type,
-                   confidence=excluded.confidence""",
+                   confidence=excluded.confidence,
+                   match_tier=excluded.match_tier""",
             (
                 match["fpl_id"],
                 match["understat_id"],
@@ -95,6 +98,7 @@ def _upsert_matched_players(
                 warehouse_team_id,
                 element_type_lookup.get(match["fpl_id"]),
                 match["confidence"],
+                match["match_tier"],
             ),
         )
         count += 1
@@ -117,8 +121,8 @@ def _insert_unmatched_players(
         conn.execute(
             """INSERT INTO dim_players
                (fpl_id, understat_id, web_name, fpl_name, understat_name,
-                team_id, element_type, confidence)
-               VALUES (?, NULL, ?, ?, NULL, ?, ?, NULL)
+                team_id, element_type, confidence, match_tier)
+               VALUES (?, NULL, ?, ?, NULL, ?, ?, NULL, NULL)
                ON CONFLICT(fpl_id) DO NOTHING""",
             (
                 player["id"],
@@ -209,8 +213,12 @@ def build_dim_players(
     fpl_players = load_fpl_players(fpl_db)
     fpl_teams = load_fpl_teams(fpl_db)
     us_players = load_understat_players(understat_db)
+    fpl_player_codes = load_fpl_player_codes(fpl_db)
+    reep_map = load_reep_map()
 
-    matched = match_players(fpl_players, fpl_teams, us_players, threshold=threshold)
+    matched = match_players(
+        fpl_players, fpl_teams, us_players, fpl_player_codes, reep_map, threshold=threshold
+    )
     etype_lookup = {fp["id"]: fp.get("element_type") for fp in fpl_players}
 
     wh = connect_warehouse(warehouse_db)

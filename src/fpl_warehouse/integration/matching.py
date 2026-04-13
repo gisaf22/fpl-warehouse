@@ -9,23 +9,20 @@ Tiered matching strategy:
 
 from __future__ import annotations
 
+import csv
 import html
 import logging
 import sqlite3
 import unicodedata
 from collections import Counter
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import requests
 from rapidfuzz import fuzz
 
 logger = logging.getLogger(__name__)
 
-MANUAL_OVERRIDES: Dict[int, int] = {
-    511: 13068,
-    518: 12766,
-    612: 7365,
-    646: 11384,
-}
 
 FPL_TO_UNDERSTAT_TEAM: Dict[str, str] = {
     "Arsenal": "Arsenal",
@@ -165,13 +162,13 @@ def load_understat_players(understat_db: str) -> List[Dict[str, Any]]:
     return list(player_data.values())
 
 
-def match_players(
+def _match_players_fuzzy(
     fpl_players: List[Dict[str, Any]],
     fpl_teams: Dict[int, Dict[str, Any]],
     understat_players: List[Dict[str, Any]],
     threshold: int = 85,
 ) -> List[Dict[str, Any]]:
-    """Match FPL players to Understat players using tiered strategy."""
+    """Match FPL players to Understat players using tiered fuzzy strategy."""
     results: List[Dict[str, Any]] = []
     matched_fpl: Set[int] = set()
     matched_us: Set[int] = set()
@@ -206,15 +203,6 @@ def match_players(
     us_by_id: Dict[int, Dict[str, Any]] = {
         understat_player["player_id"]: understat_player for understat_player in understat_players
     }
-    for fpl_player in fpl_players:
-        us_player_id = MANUAL_OVERRIDES.get(fpl_player["id"])
-        if us_player_id and us_player_id in us_by_id and us_player_id not in matched_us:
-            _add_match(fpl_player, us_by_id[us_player_id], 100, "manual")
-
-    tier0 = len(results)
-    if tier0:
-        logger.info("Tier 0 (manual overrides): %d matched", tier0)
-
     for fpl_player in fpl_players:
         if fpl_player["id"] in matched_fpl:
             continue
@@ -388,3 +376,175 @@ def match_players(
         len(results), tier1, tier2, tier3, tier4, tier5, unmatched,
     )
     return results
+
+
+# ---------------------------------------------------------------------------
+# Reep-based deterministic matching
+# ---------------------------------------------------------------------------
+
+_REEP_URL = "https://raw.githubusercontent.com/withqwerty/reep/main/data/people.csv"
+_REEP_CACHE_DEFAULT = Path.home() / ".cache" / "fpl_warehouse" / "reep_people.csv"
+
+
+def load_reep_map(cache_path: Optional[str] = None) -> Dict[int, int]:
+    """Return {key_opta_numeric: key_understat} from the reep people CSV.
+
+    Downloads the CSV on first call and caches it at cache_path. Delete the
+    cache file to force a fresh download.
+
+    Args:
+        cache_path: Local path for the cached CSV. Defaults to
+            ~/.cache/fpl_warehouse/reep_people.csv.
+
+    Returns:
+        Mapping of FPL player code (Opta numeric) to Understat player_id.
+        Only rows where both keys are present and parseable as integers are
+        included.
+    """
+    path = Path(cache_path) if cache_path else _REEP_CACHE_DEFAULT
+
+    if not path.exists():
+        logger.info("Downloading reep people CSV from %s", _REEP_URL)
+        response = requests.get(_REEP_URL, timeout=30)
+        response.raise_for_status()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(response.text, encoding="utf-8")
+        logger.info("Cached reep people CSV to %s", path)
+    else:
+        logger.info("Using cached reep people CSV from %s", path)
+
+    reep_map: Dict[int, int] = {}
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            opta_raw = (row.get("key_opta_numeric") or "").strip()
+            us_raw = (row.get("key_understat") or "").strip()
+            if not opta_raw or not us_raw:
+                continue
+            try:
+                reep_map[int(float(opta_raw))] = int(float(us_raw))
+            except ValueError:
+                continue
+
+    logger.info("Reep map: %d entries loaded", len(reep_map))
+    return reep_map
+
+
+def load_fpl_player_codes(fpl_db: str) -> Dict[int, int]:
+    """Return {fpl_id: code} from the FPL players table.
+
+    Separate from load_fpl_players so the existing pipeline is unaffected.
+    Rows where code IS NULL or 0 are excluded.
+    """
+    conn = sqlite3.connect(fpl_db)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, code FROM players WHERE code IS NOT NULL AND code != 0"
+    ).fetchall()
+    conn.close()
+    return {row["id"]: row["code"] for row in rows}
+
+
+def build_reep_matches(
+    fpl_players: List[Dict[str, Any]],
+    fpl_teams: Dict[int, Dict[str, Any]],
+    understat_players: List[Dict[str, Any]],
+    fpl_player_codes: Dict[int, int],
+    reep_map: Dict[int, int],
+) -> List[Dict[str, Any]]:
+    """Match FPL players to Understat players via the reep lookup table.
+
+    Produces match dicts with the same schema as match_players(). Only players
+    whose FPL code resolves to an Understat player_id present in
+    understat_players are included; all others are left for the fuzzy fallback.
+
+    Args:
+        fpl_players: Output of load_fpl_players().
+        fpl_teams: Output of load_fpl_teams().
+        understat_players: Output of load_understat_players().
+        fpl_player_codes: Output of load_fpl_player_codes() — {fpl_id: code}.
+        reep_map: Output of load_reep_map() — {fpl_code: understat_player_id}.
+
+    Returns:
+        List of match dicts for players resolved deterministically via reep.
+    """
+    us_by_id: Dict[int, Dict[str, Any]] = {
+        p["player_id"]: p for p in understat_players
+    }
+    matched_us: Set[int] = set()
+    results: List[Dict[str, Any]] = []
+
+    for fp in fpl_players:
+        fpl_code = fpl_player_codes.get(fp["id"])
+        if not fpl_code:
+            continue
+        us_id = reep_map.get(fpl_code)
+        if us_id is None:
+            continue
+        up = us_by_id.get(us_id)
+        if up is None or us_id in matched_us:
+            continue
+
+        team_info = fpl_teams.get(fp["team"])
+        fpl_team_name = team_info["name"] if team_info else ""
+        us_team_name = FPL_TO_UNDERSTAT_TEAM.get(fpl_team_name, "")
+
+        results.append({
+            "fpl_id": fp["id"],
+            "understat_id": up["player_id"],
+            "web_name": fp.get("web_name", ""),
+            "fpl_name": f"{fp['first_name']} {fp['second_name']}",
+            "understat_name": up["player"],
+            "fpl_team": fpl_team_name,
+            "understat_team": us_team_name,
+            "confidence": 100,
+            "match_tier": "reep",
+        })
+        matched_us.add(us_id)
+
+    logger.info("Reep tier: %d matched", len(results))
+    return results
+
+
+def match_players(
+    fpl_players: List[Dict[str, Any]],
+    fpl_teams: Dict[int, Dict[str, Any]],
+    understat_players: List[Dict[str, Any]],
+    fpl_player_codes: Dict[int, int],
+    reep_map: Dict[int, int],
+    threshold: int = 85,
+) -> List[Dict[str, Any]]:
+    """Match FPL players to Understat players using reep lookup with fuzzy fallback.
+
+    Reep provides a deterministic {fpl_code: understat_id} mapping. Players
+    resolved via reep are excluded from the fuzzy pass so they cannot be
+    double-claimed.
+
+    Args:
+        fpl_players: Output of load_fpl_players().
+        fpl_teams: Output of load_fpl_teams().
+        understat_players: Output of load_understat_players().
+        fpl_player_codes: Output of load_fpl_player_codes() — {fpl_id: code}.
+        reep_map: Output of load_reep_map() — {fpl_code: understat_player_id}.
+        threshold: Minimum fuzzy score for the fallback tiers.
+
+    Returns:
+        Combined list of reep matches followed by fuzzy fallback matches.
+    """
+    reep_matches = build_reep_matches(
+        fpl_players, fpl_teams, understat_players, fpl_player_codes, reep_map
+    )
+    reep_fpl_ids: Set[int] = {m["fpl_id"] for m in reep_matches}
+    reep_us_ids: Set[int] = {m["understat_id"] for m in reep_matches}
+
+    remainder = [fp for fp in fpl_players if fp["id"] not in reep_fpl_ids]
+
+    fuzzy_matches = _match_players_fuzzy(remainder, fpl_teams, understat_players, threshold)
+    fuzzy_filtered = [m for m in fuzzy_matches if m["understat_id"] not in reep_us_ids]
+
+    total = len(reep_matches) + len(fuzzy_filtered)
+    logger.info(
+        "match_players total: %d (%d reep, %d fuzzy fallback)",
+        total, len(reep_matches), len(fuzzy_filtered),
+    )
+    return reep_matches + fuzzy_filtered

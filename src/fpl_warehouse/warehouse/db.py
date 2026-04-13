@@ -20,22 +20,15 @@ def _load_fpl_env() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-_load_fpl_env()
-
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_DEFAULT_WAREHOUSE_PATH = _REPO_ROOT / "data" / "warehouse" / "master.db"
+_DEFAULT_WAREHOUSE_PATH = Path.home() / "Documents/FPL/data/warehouse/master.db"
 _DEFAULT_FPL_PATH = Path.home() / "Documents/FPL/data/fpl/fpl.db"
 _DEFAULT_UNDERSTAT_PATH = Path.home() / "Documents/FPL/data/understat/understat.db"
 
-DEFAULT_WAREHOUSE_DB: str = str(
-    os.environ.get("WAREHOUSE_DB_PATH", _DEFAULT_WAREHOUSE_PATH)
-)
-DEFAULT_FPL_DB: str = str(
-    os.environ.get("FPL_DB_PATH", _DEFAULT_FPL_PATH)
-)
-DEFAULT_UNDERSTAT_DB: str = str(
-    os.environ.get("UNDERSTAT_DB_PATH", _DEFAULT_UNDERSTAT_PATH)
-)
+# Resolved at import time — callers that need .env values (e.g. the CLI) must call
+# _load_fpl_env() before this module is imported, or pass paths explicitly.
+DEFAULT_WAREHOUSE_DB: str = os.environ.get("WAREHOUSE_DB_PATH", str(_DEFAULT_WAREHOUSE_PATH))
+DEFAULT_FPL_DB: str = os.environ.get("FPL_DB_PATH", str(_DEFAULT_FPL_PATH))
+DEFAULT_UNDERSTAT_DB: str = os.environ.get("UNDERSTAT_DB_PATH", str(_DEFAULT_UNDERSTAT_PATH))
 
 
 def _configure_connection(conn: sqlite3.Connection) -> None:
