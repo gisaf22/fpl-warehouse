@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: fpl_raw
+    description: >
+      fpl-ingest's verbatim raw capture tree. Objects are written under
+      `{raw_root}/{source}/{endpoint}/{extraction_date}/{run_id}/payload.json`
+      (see fpl_ingest.extract.http.raw_keys). `element-summary/{player_id}` is
+      one endpoint identity per player, not an extra path level, so a player's
+      captures live at `.../element-summary/{player_id}/{date}/{run_id}/`.
+
+      Read in place rather than loaded — `external_location` points DuckDB's
+      JSON reader at the raw objects, so nothing is copied into the warehouse.
+      `raw_root` defaults to the S3 bucket and is overridable for a local
+      capture when no AWS session is available.
+
+    tables:
+      - name: element_summary
+        description: >
+          Per-player element-summary payload. Each object is one JSON document
+          with three top-level keys: `fixtures` (upcoming), `history`
+          (per-fixture rows for the season so far — the canonical
+          player-gameweek source), and `history_past` (prior seasons).
+        meta:
+          external_location: >-
+            read_json(
+              '{{ var('raw_root') }}/fpl/element-summary/*/*/*/payload.json',
+              union_by_name = true
+            )

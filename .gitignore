@@ -13,3 +13,12 @@ __pycache__/
 # Ensure Python bytecode ignored everywhere
 **/__pycache__/
 **/*.pyc
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Local raw capture used when no AWS session is available
+.local/

@@ -1,0 +1,21 @@
+fpl_warehouse:
+  target: dev
+  outputs:
+    # In-memory DuckDB reading fpl-ingest's raw tree in place from S3.
+    #
+    # Credentials are never stored here — the `credential_chain` provider
+    # defers to DuckDB's own AWS chain (env vars, then ~/.aws), so this file
+    # stays safe to commit. Refresh an expired session with `aws login`.
+    dev:
+      type: duckdb
+      path: ":memory:"
+      threads: 4
+      extensions:
+        - httpfs
+        - json
+        - aws
+      secrets:
+        - type: s3
+          provider: credential_chain
+          chain: "env"
+          region: us-east-1

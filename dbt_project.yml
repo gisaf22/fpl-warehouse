@@ -1,0 +1,24 @@
+name: fpl_warehouse
+version: 0.1.0
+config-version: 2
+
+profile: fpl_warehouse
+
+model-paths: ["models"]
+test-paths: ["dbt_tests"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Root of fpl-ingest's raw capture tree. Defaults to the S3 bucket; override
+  # with `--vars '{raw_root: .local/raw}'` to build against a local capture
+  # when no AWS session is available.
+  raw_root: "s3://fpl-data-safari/raw"
+
+models:
+  fpl_warehouse:
+    staging:
+      +materialized: view
