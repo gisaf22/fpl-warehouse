@@ -21,9 +21,33 @@ sources:
           with three top-level keys: `fixtures` (upcoming), `history`
           (per-fixture rows for the season so far — the canonical
           player-gameweek source), and `history_past` (prior seasons).
+
+          `filename = true` surfaces the object's own key, which is the only
+          carrier of capture identity — the payload body has no extraction
+          timestamp. `{extraction_date}/{run_id}` is parsed out of it in
+          staging so the served layer can order competing captures.
         meta:
           external_location: >-
             read_json(
               '{{ var('raw_root') }}/fpl/element-summary/*/*/*/payload.json',
-              union_by_name = true
+              union_by_name = true,
+              filename = true
+            )
+
+      - name: bootstrap_static
+        description: >
+          Whole-game reference payload. `elements` is the authoritative current
+          player list and `events` the 38-gameweek calendar — together the
+          basis of the player-gameweek spine, which must not be derived from
+          which fixtures happened to be captured.
+
+          One object per run, so all captures are read and the latest is
+          selected downstream by the same `{extraction_date}/{run_id}` key
+          fields used for element-summary.
+        meta:
+          external_location: >-
+            read_json(
+              '{{ var('raw_root') }}/fpl/bootstrap-static/*/*/payload.json',
+              union_by_name = true,
+              filename = true
             )

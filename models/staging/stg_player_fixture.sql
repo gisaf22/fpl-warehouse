@@ -33,16 +33,35 @@
 --   `team_fpl_id` is deliberately absent — the raw history row carries only
 --   `opponent_team` and `was_home`, never the player's own team. Resolving it
 --   at build time is the known as-of bug this rebuild must not reintroduce.
+--
+-- Capture identity:
+--   The payload body carries no extraction timestamp, so `extraction_date`,
+--   `run_id` and `extracted_at` are parsed from the object's own key —
+--   `.../element-summary/{fpl_id}/{extraction_date}/{run_id}/payload.json`.
+--   `run_id` is `{YYYYMMDDTHHMMSSZ}-{short hash}`; its prefix is the run's
+--   start instant, which is what `extracted_at` casts. These are the only
+--   real ordering fields available, and the served layer needs them to
+--   resolve competing captures of the same (fpl_id, fixture_id).
 -- =============================================================================
 
 with raw as (
 
-    select unnest(history) as h
+    select
+        filename,
+        unnest(history) as h
     from {{ source('fpl_raw', 'element_summary') }}
 
 )
 
 select
+    -- Capture identity
+    cast(str_split(filename, '/')[-3] as date) as extraction_date,
+    str_split(filename, '/')[-2]               as run_id,
+    strptime(
+        split_part(str_split(filename, '/')[-2], '-', 1),
+        '%Y%m%dT%H%M%SZ'
+    )                                          as extracted_at,
+
     -- Keys
     cast(h.element             as integer)   as fpl_id,
     cast(h.fixture             as integer)   as fixture_id,

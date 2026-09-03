@@ -22,3 +22,9 @@ models:
   fpl_warehouse:
     staging:
       +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      # Served models are materialized so consumers read them without
+      # re-reading the raw tree, and so the dedup window function runs once.
+      +materialized: table
