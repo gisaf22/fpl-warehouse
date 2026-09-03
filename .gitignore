@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# Ensure Python bytecode ignored everywhere
+**/__pycache__/
+**/*.pyc
