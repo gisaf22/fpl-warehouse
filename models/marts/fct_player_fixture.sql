@@ -9,8 +9,14 @@
 --   capture that reflects the ratified result.
 --
 -- Grain:
---   One row per (fpl_id, fixture_id). Asserted by
+--   One row per (season, fpl_id, fixture_id). Asserted by
 --   dbt_tests/fct_test_player_fixture_grain_uniqueness.sql.
+--
+--   `season` is in the grain from the outset so adding a second season later is
+--   a data change, not a breaking rebuild of every downstream consumer. It is
+--   stamped from the `season` var because fpl-ingest's raw key layout carries no
+--   season segment yet — every raw object read here belongs to one season. See
+--   CLAUDE.md, "Season is part of the grain".
 --
 -- Dedup rule — provisional vs ratified:
 --   A capture taken before a round's scores are ratified carries NULL
@@ -117,6 +123,8 @@ ranked as (
 
 )
 
-select * exclude (capture_rank)
+select
+    '{{ var('season') }}' as season,
+    * exclude (capture_rank)
 from ranked
 where capture_rank = 1

@@ -13,22 +13,25 @@
 with blank_keys as (
 
     select
+        spine.season,
         spine.fpl_id,
         spine.round
     from {{ ref('int_player_gameweek_spine') }} as spine
     left join {{ ref('fct_player_fixture') }} as fct
-        on fct.fpl_id = spine.fpl_id
+        on fct.season = spine.season
+       and fct.fpl_id = spine.fpl_id
        and fct.round  = spine.round
-    group by spine.fpl_id, spine.round
+    group by spine.season, spine.fpl_id, spine.round
     having count(fct.fixture_id) = 0
 
 )
 
 select
+    blank_keys.season,
     blank_keys.fpl_id,
     blank_keys.round,
     agg.fixture_count
 from blank_keys
-left join {{ ref('agg_player_gameweek') }} as agg using (fpl_id, round)
+left join {{ ref('fct_player_gameweek') }} as agg using (season, fpl_id, round)
 where agg.fpl_id is null
    or agg.fixture_count <> 0

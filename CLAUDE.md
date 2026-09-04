@@ -25,9 +25,25 @@ and states it can be deleted on migration.
 - `player_histories` (per-fixture) is the canonical player-gameweek source. The old
   `gameweeks` table is gone (deleted upstream in fpl-ingest).
 - Build `fct_player_fixture` at **per-fixture grain** first.
-- Derive `agg_player_gameweek` from it, spine-joined, with an explicit `fixture_count`
+- Derive `fct_player_gameweek` from it, spine-joined, with an explicit `fixture_count`
   column: `0` = blank gameweek, `1` = normal, `2+` = double.
 - **Never model at gameweek grain directly from raw data.**
+- **`season` is part of the grain project-wide** — `fct_player_fixture` is
+  `(season, fpl_id, fixture_id)`, `int_player_gameweek_spine` and `fct_player_gameweek` are
+  `(season, fpl_id, round)`. It is stamped from the `season` var in `dbt_project.yml`
+  (currently `2026-27`) because fpl-ingest's raw key layout has no season segment, so every
+  raw object read belongs to one season. Multi-season joining is therefore not yet
+  exercised; the column exists now so adding a second season is a data change rather than a
+  breaking rebuild of every downstream consumer. **Extending the raw key layout with a
+  season segment is an open item for fpl-ingest, not fpl-warehouse** — until it lands, the
+  constant is the only available source of the value.
+- **ASSUMED, not verified: the double-gameweek rule for the event-level fields.**
+  `fct_player_gameweek` takes `value`, `selected` and the `transfers_*` family from the
+  round's last fixture (`max_by(..., kickoff_time)` — last write wins) on the basis that FPL
+  states them per event, so both rows of a double would repeat the same number and summing
+  would double-count. **No double gameweek has occurred in the captured data, so this has
+  never been observed.** Re-verify at the first real double before trusting these columns
+  across one.
 
 ---
 
@@ -103,7 +119,8 @@ not silently corrected.
   no joins.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
-- Only the served `fct_` / `agg_` models are for external consumption.
+- Only the served `fct_` models are for external consumption. There is no `agg_` layer:
+  `fct_player_gameweek` is a fact table at gameweek grain, not a separate category.
 
 ## Served contract
 
@@ -136,8 +153,8 @@ covers `fixture_count`.
 
 The concrete action is **extending that same pattern to the new served models**, which have
 no such coverage yet:
-- row-uniqueness on the grain of `fct_player_fixture` and `agg_player_gameweek`;
-- a check on `agg_player_gameweek` that `fixture_count` matches the real number of fixtures
+- row-uniqueness on the grain of `fct_player_fixture` and `fct_player_gameweek`;
+- a check on `fct_player_gameweek` that `fixture_count` matches the real number of fixtures
   (stronger than the existing non-negativity assertion it is modelled on).
 
 ---
@@ -175,13 +192,15 @@ element-summary tree takes ~8 minutes, and because `stg_player_fixture` is mater
 a view, *every* consumer re-reads it: the fact model, then each test that references
 staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's lifetime
 partway through and failed with `ExpiredToken`. Materializing staging as a table makes the
-same build read S3 once (~8 min total, all downstream nodes then sub-second). Phase 2 was
-verified that way; the committed config still says `view`. **Unresolved — decide before
-Phase 5 wires up CI**, since CI cannot re-export credentials mid-run either.
+same build read S3 once (~8 min total, all downstream nodes then sub-second). **Resolved:
+`dbt_project.yml` now sets `staging: +materialized: table`.** Do not revert it to a view —
+the `ExpiredToken` failure returns immediately, and CI cannot re-export credentials mid-run
+either.
 
 Also note the read is memory-hungry: loading all element-summary payloads in one
-`read_json` OOM'd at 12.7 GiB on default settings. `preserve_insertion_order: false` (and
-a `memory_limit`) in the profile's `settings:` block avoids it.
+`read_json` OOM'd at 12.7 GiB on default settings. **Resolved: `preserve_insertion_order:
+false` in `profiles.yml`'s `settings:` block** — confirmed root cause. Nothing in this
+project depends on raw row order; every model orders explicitly.
 
 ---
 

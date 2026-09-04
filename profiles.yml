@@ -10,6 +10,12 @@ fpl_warehouse:
       type: duckdb
       path: ":memory:"
       threads: 4
+      settings:
+        # Loading the whole element-summary tree in one read_json OOM'd at
+        # 12.7 GiB with insertion order preserved; dropping the guarantee is the
+        # confirmed fix. Nothing here depends on raw row order — every model
+        # orders explicitly.
+        preserve_insertion_order: false
       extensions:
         - httpfs
         - json

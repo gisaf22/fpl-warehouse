@@ -18,10 +18,21 @@ vars:
   # when no AWS session is available.
   raw_root: "s3://fpl-data-safari/raw"
 
+  # Season label stamped onto the served grain. fpl-ingest's raw key layout has
+  # no season segment yet, so every raw object belongs to the current season and
+  # this constant is the only available source of the value. When fpl-ingest
+  # adds a season segment, this var is replaced by a parsed column — the grain
+  # itself does not change.
+  season: "2026-27"
+
 models:
   fpl_warehouse:
     staging:
-      +materialized: view
+      # Table, not view: staging reads ~25k S3 objects and a view makes every
+      # downstream node (fact, then each test) repeat that read, which blew past
+      # the exported credential's lifetime with ExpiredToken. As a table the raw
+      # tree is read once.
+      +materialized: table
     intermediate:
       +materialized: view
     marts:

@@ -8,14 +8,15 @@
 -- whose index does not reconcile with its own components.
 
 select
+    agg.season,
     agg.fpl_id,
     agg.round,
     agg.total_points,
     fct.total_points as fct_total_points,
     agg.ict_index,
     fct.ict_index    as fct_ict_index
-from {{ ref('agg_player_gameweek') }} as agg
-inner join {{ ref('fct_player_fixture') }} as fct using (fpl_id, round)
+from {{ ref('fct_player_gameweek') }} as agg
+inner join {{ ref('fct_player_fixture') }} as fct using (season, fpl_id, round)
 where agg.fixture_count = 1
   and (
         agg.minutes      <> fct.minutes

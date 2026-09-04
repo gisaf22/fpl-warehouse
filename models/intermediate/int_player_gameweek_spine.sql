@@ -4,7 +4,7 @@
 -- =============================================================================
 --
 -- Purpose:
---   Every (fpl_id, round) pair that *should* exist, so agg_player_gameweek can
+--   Every (fpl_id, round) pair that *should* exist, so fct_player_gameweek can
 --   be built by LEFT JOIN and a player with no fixture in a round surfaces as
 --   fixture_count = 0 rather than as a missing row.
 --
@@ -16,8 +16,10 @@
 --   and the gameweek calendar only — it never reads fct_player_fixture.
 --
 -- Grain:
---   One row per (fpl_id, round): players from the latest bootstrap-static
---   capture, crossed with every round that capture reports as finished.
+--   One row per (season, fpl_id, round): players from the latest
+--   bootstrap-static capture, crossed with every round that capture reports as
+--   finished. `season` is stamped from the `season` var — see
+--   CLAUDE.md, "Season is part of the grain".
 --
 -- Round range:
 --   `finished` is the boundary. A round in progress or still upcoming has no
@@ -65,6 +67,7 @@ rounds as (
 )
 
 select
+    '{{ var('season') }}' as season,
     players.fpl_id,
     rounds.round,
     players.web_name,

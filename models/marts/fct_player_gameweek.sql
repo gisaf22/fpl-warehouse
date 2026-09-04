@@ -1,6 +1,6 @@
 -- =============================================================================
--- Layer: agg_ (served)
--- Model: agg_player_gameweek
+-- Layer: fct_ (served)
+-- Model: fct_player_gameweek
 -- =============================================================================
 --
 -- Purpose:
@@ -9,7 +9,9 @@
 --   does exist. Never model this grain directly from raw data.
 --
 -- Grain:
---   One row per (fpl_id, round), one-for-one with the spine.
+--   One row per (season, fpl_id, round), one-for-one with the spine. `season`
+--   is carried from the spine, which stamps it from the `season` var — see
+--   CLAUDE.md, "Season is part of the grain".
 --
 -- fixture_count:
 --   0 = blank gameweek (spine row with no fixture), 1 = normal, 2+ = double.
@@ -69,6 +71,7 @@ fixtures as (
 
 select
     -- Keys
+    spine.season,
     spine.fpl_id,
     spine.round,
 
@@ -133,9 +136,11 @@ select
 
 from spine
 left join fixtures
-    on fixtures.fpl_id = spine.fpl_id
+    on fixtures.season = spine.season
+   and fixtures.fpl_id = spine.fpl_id
    and fixtures.round  = spine.round
 group by
+    spine.season,
     spine.fpl_id,
     spine.round,
     spine.web_name,
