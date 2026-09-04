@@ -124,9 +124,41 @@ not silently corrected.
 
 ## Served contract
 
-fpl-intelligence must never query staging directly — only the two served models. Once
-implemented: `access: private` plus a `group` on staging and intermediate models;
-`contract: enforced` on the served models.
+fpl-intelligence must never query staging directly — only `fct_player_fixture` and
+`fct_player_gameweek`.
+
+**Enforced (dbt refuses to parse or build on violation):**
+
+- Every model belongs to the `warehouse_internal` group (`models/groups.yml`).
+- `stg_player_fixture`, `stg_player`, `stg_gameweek` and `int_player_gameweek_spine` are
+  `access: private`. Any model outside the group that `ref()`s one fails **at parse time**.
+  Verified 2026-09-03 with a throwaway model in `models/marts/`:
+  `attempted to reference node model.fpl_warehouse.int_player_gameweek_spine, which is not
+  allowed because the referenced node is private to the 'warehouse_internal' group`.
+- The two `fct_` models are `access: public` with `contract: enforced: true` and a full
+  explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
+  retyping a served column now fails the build until the contract is updated, which makes
+  every breaking change to the served shape a deliberate, reviewed edit.
+- Singular tests are subject to the same rule. The four tests in `dbt_tests/` that `ref()`
+  a staging or intermediate model carry `{{ config(group='warehouse_internal') }}`; without
+  it dbt refuses to parse them. Any new test that reads staging needs the same line.
+- The `fct_` models are group members themselves — dbt allows a `ref()` of a private model
+  only from inside the same group, and they must read staging to be built at all. Their
+  `access: public` is what keeps them referenceable from outside.
+
+**Documented only, NOT enforced:**
+
+- **Raw SQL access to staging is not blocked.** The access modifier governs dbt `ref()`
+  resolution at parse time; it is not a database grant. `stg_player_fixture` is a real
+  table in the same DuckDB schema, and fpl-intelligence connects with raw SQL rather than
+  as a dbt project, so nothing here stops it from running
+  `select * from main.stg_player_fixture`. The boundary is enforced against dbt models and
+  is a convention for everything else. Making it real would need database-level grants (or
+  a separate served schema/database that consumers get access to), which this project does
+  not do today.
+- The `fpl_intelligence` exposure in `models/exposures.yml` declares the two `fct_` models
+  as its dependencies. That documents the contract and puts it in the DAG; it enforces
+  nothing.
 
 ---
 

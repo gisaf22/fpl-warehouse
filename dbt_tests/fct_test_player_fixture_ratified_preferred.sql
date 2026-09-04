@@ -1,3 +1,8 @@
+{{ config(group='warehouse_internal') }}
+-- Group membership is required, not cosmetic: this test ref()s
+-- stg_player_fixture, which is access: private to warehouse_internal.
+-- Without it dbt refuses to parse the test. See CLAUDE.md, "Served contract".
+
 -- Dedup must never keep a provisional capture when a ratified one exists for
 -- the same key.
 --

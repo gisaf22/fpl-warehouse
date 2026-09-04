@@ -1,0 +1,22 @@
+version: 2
+
+exposures:
+  - name: fpl_intelligence
+    type: application
+    maturity: medium
+    description: >
+      fpl-intelligence, the downstream decision layer. It reads the two served
+      `fct_` models and nothing else — staging and intermediate models are
+      `access: private` and outside the served contract.
+
+      This exposure documents the dependency and makes it visible in the DAG
+      and in `dbt ls --select +exposure:fpl_intelligence`. It does not enforce
+      anything at runtime: fpl-intelligence connects to the warehouse with raw
+      SQL, not through dbt, so nothing here prevents it from selecting from a
+      staging table. See CLAUDE.md, "Served contract".
+    owner:
+      name: Safari Gisa
+      email: safari.gisa@gmail.com
+    depends_on:
+      - ref('fct_player_fixture')
+      - ref('fct_player_gameweek')
