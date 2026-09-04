@@ -18,6 +18,8 @@
 --   It is COUNT(fixture_id) over the joined fact, so it is the real number of
 --   fixtures, not an assumption. Live data holds no double gameweek yet; the
 --   aggregation below is written so one aggregates correctly when it lands.
+--   CAST to INTEGER for the same reason as the additive columns: COUNT()
+--   returns BIGINT, and the real range of this column is 0-3.
 --
 -- Aggregation classes:
 --
@@ -40,6 +42,14 @@
 --   formula gives 1.7). Recomputing reproduces FPL's season total for only
 --   538 of 626 players, so the published index is the authority and the
 --   inconsistency is carried rather than silently corrected.
+--
+--   Every additive integer column is CAST back to INTEGER. DuckDB's SUM()
+--   widens INTEGER to HUGEINT by default, which would otherwise put a 128-bit
+--   type in the served contract for quantities whose real ceiling is two
+--   digits (observed maxima 2026-09-03: minutes 90, bps 87, recoveries 22,
+--   everything else under 25; a full prior season totals 3,420 minutes and
+--   822 bps). INTEGER also keeps these columns the same type they have at
+--   fixture grain in fct_player_fixture.
 --
 --   Point-in-time — value, selected and the transfers family are stated by FPL
 --   per event, not per fixture: both rows of a double gameweek repeat the same
@@ -78,7 +88,7 @@ select
     -- Gameweek context
     spine.web_name,
     spine.deadline_time,
-    count(fixtures.fixture_id)                          as fixture_count,
+    cast(count(fixtures.fixture_id) as integer)         as fixture_count,
     min(fixtures.kickoff_time)                          as first_kickoff_time,
     max(fixtures.kickoff_time)                          as last_kickoff_time,
 
@@ -86,30 +96,41 @@ select
     bool_and(fixtures.is_ratified)                      as is_ratified,
 
     -- Appearance (additive)
-    coalesce(sum(fixtures.minutes), 0)                  as minutes,
-    coalesce(sum(fixtures.starts), 0)                   as starts,
+    cast(coalesce(sum(fixtures.minutes), 0) as integer) as minutes,
+    cast(coalesce(sum(fixtures.starts), 0) as integer)  as starts,
 
     -- Scoring (additive)
-    coalesce(sum(fixtures.total_points), 0)             as total_points,
-    coalesce(sum(fixtures.bonus), 0)                    as bonus,
-    coalesce(sum(fixtures.bps), 0)                      as bps,
-    coalesce(sum(fixtures.goals_scored), 0)             as goals_scored,
-    coalesce(sum(fixtures.assists), 0)                  as assists,
-    coalesce(sum(fixtures.clean_sheets), 0)             as clean_sheets,
-    coalesce(sum(fixtures.goals_conceded), 0)           as goals_conceded,
-    coalesce(sum(fixtures.own_goals), 0)                as own_goals,
-    coalesce(sum(fixtures.penalties_saved), 0)          as penalties_saved,
-    coalesce(sum(fixtures.penalties_missed), 0)         as penalties_missed,
-    coalesce(sum(fixtures.yellow_cards), 0)             as yellow_cards,
-    coalesce(sum(fixtures.red_cards), 0)                as red_cards,
-    coalesce(sum(fixtures.saves), 0)                    as saves,
+    cast(coalesce(sum(fixtures.total_points), 0) as integer)
+                                                        as total_points,
+    cast(coalesce(sum(fixtures.bonus), 0) as integer)   as bonus,
+    cast(coalesce(sum(fixtures.bps), 0) as integer)     as bps,
+    cast(coalesce(sum(fixtures.goals_scored), 0) as integer)
+                                                        as goals_scored,
+    cast(coalesce(sum(fixtures.assists), 0) as integer) as assists,
+    cast(coalesce(sum(fixtures.clean_sheets), 0) as integer)
+                                                        as clean_sheets,
+    cast(coalesce(sum(fixtures.goals_conceded), 0) as integer)
+                                                        as goals_conceded,
+    cast(coalesce(sum(fixtures.own_goals), 0) as integer)
+                                                        as own_goals,
+    cast(coalesce(sum(fixtures.penalties_saved), 0) as integer)
+                                                        as penalties_saved,
+    cast(coalesce(sum(fixtures.penalties_missed), 0) as integer)
+                                                        as penalties_missed,
+    cast(coalesce(sum(fixtures.yellow_cards), 0) as integer)
+                                                        as yellow_cards,
+    cast(coalesce(sum(fixtures.red_cards), 0) as integer)
+                                                        as red_cards,
+    cast(coalesce(sum(fixtures.saves), 0) as integer)   as saves,
 
     -- Defensive contribution family (additive)
-    coalesce(sum(fixtures.clearances_blocks_interceptions), 0)
+    cast(coalesce(sum(fixtures.clearances_blocks_interceptions), 0) as integer)
                                                         as clearances_blocks_interceptions,
-    coalesce(sum(fixtures.recoveries), 0)               as recoveries,
-    coalesce(sum(fixtures.tackles), 0)                  as tackles,
-    coalesce(sum(fixtures.defensive_contribution), 0)   as defensive_contribution,
+    cast(coalesce(sum(fixtures.recoveries), 0) as integer)
+                                                        as recoveries,
+    cast(coalesce(sum(fixtures.tackles), 0) as integer) as tackles,
+    cast(coalesce(sum(fixtures.defensive_contribution), 0) as integer)
+                                                        as defensive_contribution,
 
     -- Expected values (additive)
     coalesce(sum(fixtures.expected_goals), 0)           as expected_goals,
