@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: int_player_gameweek_spine
+    description: >
+      Complete player x gameweek grid, stamped with the season var. Exists so
+      fct_player_gameweek has a row for every gameweek a player should have,
+      including blanks. Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private

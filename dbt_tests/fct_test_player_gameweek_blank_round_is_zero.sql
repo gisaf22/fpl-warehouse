@@ -1,3 +1,8 @@
+{{ config(group='warehouse_internal') }}
+-- Group membership is required, not cosmetic: this test ref()s
+-- int_player_gameweek_spine, which is access: private to warehouse_internal.
+-- Without it dbt refuses to parse the test. See CLAUDE.md, "Served contract".
+
 -- A gameweek in which a player has no fixture must appear as a row with
 -- fixture_count = 0 — never as an absent row.
 --

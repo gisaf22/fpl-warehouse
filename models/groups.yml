@@ -1,0 +1,17 @@
+version: 2
+
+groups:
+  - name: warehouse_internal
+    owner:
+      name: Safari Gisa
+      email: safari.gisa@gmail.com
+    description: >
+      Every model in this project. The group is the access boundary: staging
+      and intermediate models are `access: private`, so only models inside the
+      group may `ref()` them, which in practice means only the two served
+      `fct_` models.
+
+      The `fct_` models are members too — dbt permits a `ref()` of a private
+      model only from within the same group, and they must read staging to be
+      built at all — but they carry `access: public` and an enforced contract,
+      so they are the only models a consumer may reference.

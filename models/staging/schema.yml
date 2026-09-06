@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: stg_player_fixture
+    description: >
+      1:1 with the element-summary `history` array — typing and renaming only.
+      Carries every capture ever taken, including provisional and retracted
+      rows; dedup is fct_player_fixture's job. Internal: not part of the
+      served contract.
+    group: warehouse_internal
+    access: private
+
+  - name: stg_player
+    description: >
+      1:1 with bootstrap-static `elements`. Internal: not part of the served
+      contract.
+    group: warehouse_internal
+    access: private
+
+  - name: stg_gameweek
+    description: >
+      1:1 with bootstrap-static `events` — the 38-gameweek calendar. Internal:
+      not part of the served contract.
+    group: warehouse_internal
+    access: private

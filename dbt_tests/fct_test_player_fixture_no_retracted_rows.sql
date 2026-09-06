@@ -1,3 +1,8 @@
+{{ config(group='warehouse_internal') }}
+-- Group membership is required, not cosmetic: this test ref()s
+-- stg_player_fixture, which is access: private to warehouse_internal.
+-- Without it dbt refuses to parse the test. See CLAUDE.md, "Served contract".
+
 -- fct_player_fixture must not carry a (fpl_id, fixture_id) that FPL has since
 -- removed from the player's history.
 --
