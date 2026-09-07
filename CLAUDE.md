@@ -139,7 +139,7 @@ fpl-intelligence must never query staging directly — only `fct_player_fixture`
   explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
   retyping a served column now fails the build until the contract is updated, which makes
   every breaking change to the served shape a deliberate, reviewed edit.
-- Singular tests are subject to the same rule. The four tests in `dbt_tests/` that `ref()`
+- Singular tests are subject to the same rule. The tests in `tests/` that `ref()`
   a staging or intermediate model carry `{{ config(group='warehouse_internal') }}`; without
   it dbt refuses to parse them. Any new test that reads staging needs the same line.
 - The `fct_` models are group members themselves — dbt allows a `ref()` of a private model
