@@ -11,8 +11,19 @@ sources:
 
       Read in place rather than loaded — `external_location` points DuckDB's
       JSON reader at the raw objects, so nothing is copied into the warehouse.
-      `raw_root` defaults to the S3 bucket and is overridable for a local
-      capture when no AWS session is available.
+
+      Where it points depends on the target. `dev` reads the live bucket via
+      the `raw_root` var (overridable to a local capture when no AWS session is
+      available). `fixtures` reads the checked-in capture under
+      tests/fixtures/raw instead, so the unit and integration tiers build
+      without credentials and without a ~26k-object production read — see
+      tests/fixtures/build_fixtures.py for what that tree holds and why.
+
+      The switch is on `target.name` rather than on the var, so `--target
+      fixtures` is a complete invocation: the target and the root it reads
+      cannot be selected independently, and neither can be paired with the
+      wrong one. The consequence is that `--vars '{raw_root: ...}'` has no
+      effect under the `fixtures` target; it applies to `dev` only.
 
     tables:
       - name: element_summary
@@ -29,7 +40,7 @@ sources:
         meta:
           external_location: >-
             read_json(
-              '{{ var('raw_root') }}/fpl/element-summary/*/*/*/payload.json',
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/element-summary/*/*/*/payload.json',
               union_by_name = true,
               filename = true
             )
@@ -47,7 +58,7 @@ sources:
         meta:
           external_location: >-
             read_json(
-              '{{ var('raw_root') }}/fpl/bootstrap-static/*/*/payload.json',
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/bootstrap-static/*/*/payload.json',
               union_by_name = true,
               filename = true
             )

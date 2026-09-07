@@ -16,6 +16,13 @@ vars:
   # Root of fpl-ingest's raw capture tree. Defaults to the S3 bucket; override
   # with `--vars '{raw_root: .local/raw}'` to build against a local capture
   # when no AWS session is available.
+  #
+  # This var is the *live* root only. The `fixtures` target does not go through
+  # it — models.staging.sources.yml switches on the target name and reads the
+  # checked-in tree under tests/fixtures/raw instead, so `--target fixtures` is
+  # a complete invocation and cannot be paired with the wrong root. See the
+  # comment on `external_location` there, and tests/fixtures/build_fixtures.py
+  # for what that tree covers.
   raw_root: "s3://fpl-data-safari/raw"
 
   # Season label stamped onto the served grain. fpl-ingest's raw key layout has
