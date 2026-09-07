@@ -50,19 +50,39 @@ jobs:
 
           TIERS = {"unit", "integration", "e2e"}
           bad = []
+          counts = {t: 0 for t in TIERS}
+          seen = 0
           with open("/tmp/tests.json") as fh:
               for line in fh:
                   line = line.strip()
                   if not line.startswith("{"):
                       continue
                   node = json.loads(line)
+                  seen += 1
                   tiers = TIERS & set(node.get("tags", []))
                   if len(tiers) != 1:
                       bad.append((node["name"], sorted(tiers) or "none"))
+                  for t in tiers:
+                      counts[t] += 1
+
+          # Without this the check passes vacuously on an empty listing, and a
+          # green result would mean "found nothing to complain about" rather
+          # than "verified every test".
+          if seen == 0:
+              print("::error::no test nodes found — dbt ls returned nothing, so "
+                    "this check verified nothing")
+              sys.exit(1)
 
           for name, tiers in bad:
               print(f"::error::{name} has tier tags {tiers}; expected exactly one "
                     f"of unit / integration / e2e")
+
+          # Printed on success too, so the log shows what was actually checked
+          # rather than leaving a silent green.
+          print(f"{seen} test nodes: "
+                + ", ".join(f"{t}={counts[t]}" for t in sorted(counts))
+                + (f", untiered or multi-tiered={len(bad)}" if bad
+                   else " — every one with exactly one tier tag"))
           sys.exit(1 if bad else 0)
           PY
 
