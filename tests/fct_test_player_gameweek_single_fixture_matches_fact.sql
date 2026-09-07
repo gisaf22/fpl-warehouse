@@ -1,3 +1,11 @@
+-- Layer: fct
+-- Tests: fct_player_gameweek
+-- Asserts: where a round holds exactly one fixture, the aggregate reproduces that
+--          fixture's values verbatim — aggregation is the identity on one row.
+-- Origin: new in Phase 2
+-- Tier: integration
+{{ config(tags=['integration']) }}
+
 -- Where a gameweek holds exactly one fixture, the aggregate must reproduce that
 -- fixture's values verbatim. Aggregation is only meant to combine fixtures, so
 -- with one fixture it must be the identity.

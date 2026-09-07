@@ -139,7 +139,7 @@ fpl-intelligence must never query staging directly — only `fct_player_fixture`
   explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
   retyping a served column now fails the build until the contract is updated, which makes
   every breaking change to the served shape a deliberate, reviewed edit.
-- Singular tests are subject to the same rule. The four tests in `dbt_tests/` that `ref()`
+- Singular tests are subject to the same rule. The tests in `tests/` that `ref()`
   a staging or intermediate model carry `{{ config(group='warehouse_internal') }}`; without
   it dbt refuses to parse them. Any new test that reads staging needs the same line.
 - The `fct_` models are group members themselves — dbt allows a `ref()` of a private model
@@ -174,20 +174,69 @@ fpl-intelligence must never query staging directly — only `fct_player_fixture`
 
 ## Tests
 
-The 31 SQL assertion files under `tests/*/sql/` already follow dbt's singular-test
-convention (zero rows on pass). **Port them as dbt tests rather than rewriting them.**
+```bash
+dbt test --select tag:unit          # fast default, with integration
+dbt test --select tag:integration   # fast default, with unit
+dbt test --select tag:e2e           # opt-in only — needs a build from the live raw tree
+dbt build                           # models plus every tier, in DAG order
+```
 
-Grain-uniqueness and `fixture_count` assertions are an established pattern in this repo,
-not a concept to invent: `fact_test_grain_uniqueness.sql` / `fct_test_grain_uniqueness.sql`
-exist under `tests/availability/`, `tests/market/`, `tests/performance/` and
-`tests/team_fixture/`, and `tests/team_fixture/sql/fct_test_fixture_count_nonneg.sql`
-covers `fixture_count`.
+Every test needs the models built first, and the build reads S3 — see "S3 credentials for
+local dbt runs" below. The DuckDB database is a file under `.local/`, not `:memory:`, so
+one build serves all three tier commands; with an in-memory database each `dbt test`
+invocation starts empty and forces a full rebuild. Against a warm database the unit and
+integration tiers each finish in about two seconds.
 
-The concrete action is **extending that same pattern to the new served models**, which have
-no such coverage yet:
-- row-uniqueness on the grain of `fct_player_fixture` and `fct_player_gameweek`;
-- a check on `fct_player_gameweek` that `fixture_count` matches the real number of fixtures
-  (stronger than the existing non-negativity assertion it is modelled on).
+**`dbt test` needs the AWS session too, even though it reads only local tables.**
+`profiles.yml` creates the S3 secret when the connection opens, and `chain: "env"` fails
+outright with `Secret Validation Failure` if no credentials are in the environment. So the
+`eval "$(aws configure export-credentials --format env)"` step below is required before
+*any* dbt command here, not just a build.
+
+**Tiers are dbt tags, and the vocabulary matches fpl-ingest's** so the two repos' CI
+tiers mean the same thing:
+
+| Tier | What it covers | Cost |
+|---|---|---|
+| `unit` | Single-model grain and structure — PK uniqueness, `not_null`, range and cross-column bounds within one row. No cross-model logic. | Fast |
+| `integration` | Cross-model and business logic — dedup correctness, ratified-preference, retracted rows, spine completeness, `fixture_count` against the real fixtures. Runs against whatever is already built. | Fast |
+| `e2e` | The full build against live S3 from scratch. Slow, hits real infrastructure, excluded from the default run. | ~8 min |
+
+**Every test carries exactly one tier tag**, and CI fails if one carries none or two — a
+tag-less test runs in no tier and is silently never enforced. Prefer a generic test in
+`schema.yml` (`unique` / `not_null` / `relationships` / `accepted_values`) over a singular
+`.sql` wherever the assertion is expressible that way.
+
+Tag generic tests explicitly rather than through a project-level default: dbt **merges**
+tag configs rather than overriding them, so a `data_tests: +tags: [unit]` default in
+`dbt_project.yml` would also stamp `unit` onto the integration and e2e tests.
+
+Singular tests live flat in `tests/` (dbt's default `test-paths`) and are named
+`<layer>_test_<subject>_<assertion>.sql` — layer `stg` or `fct`, subject the model,
+assertion the claim. Each opens with a header stating its layer, model, the claim in one
+sentence, its origin, and its tier:
+
+```sql
+-- Layer: fct
+-- Tests: fct_player_gameweek
+-- Asserts: fixture_count equals the real number of fct_player_fixture rows for
+--          that (season, fpl_id, round).
+-- Origin: new in Phase 2, modelled on
+--         tests/team_fixture/sql/fct_test_fixture_count_nonneg.sql
+-- Tier: integration
+```
+
+There is no separate test-tracking document — the header is it. The 31 pre-dbt SQL
+assertion files that used to sit under `tests/*/sql/` were triaged and either ported,
+found duplicate, or retired in commit `c1f820a`, whose message carries the full
+disposition of each one.
+
+**The e2e tier is not just the slow tier.** `stg_test_player_fixture_multiple_captures_present`
+asserts staging holds more than one capture of the same key, which is true only of a build
+against the real accumulated raw tree. Every dedup assertion in the integration tier passes
+vacuously on a single-capture build — such as the documented
+`--vars '{raw_root: .local/raw}'` fallback — so this test exists to fail there rather than
+let a green suite claim something it never checked.
 
 ---
 
@@ -219,15 +268,27 @@ A local build is therefore **not self-contained**; the export is a required firs
 To build without any AWS session at all, override the raw root to a local capture:
 `dbt run --select stg_player_fixture --vars '{raw_root: .local/raw}'`.
 
-**Build cost — staging is a view over ~25k S3 objects.** One pass over the
-element-summary tree takes ~8 minutes, and because `stg_player_fixture` is materialized as
-a view, *every* consumer re-reads it: the fact model, then each test that references
-staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's lifetime
-partway through and failed with `ExpiredToken`. Materializing staging as a table makes the
-same build read S3 once (~8 min total, all downstream nodes then sub-second). **Resolved:
-`dbt_project.yml` now sets `staging: +materialized: table`.** Do not revert it to a view —
-the `ExpiredToken` failure returns immediately, and CI cannot re-export credentials mid-run
-either.
+**Build cost — staging reads ~26k S3 objects.** Because `stg_player_fixture` was once
+materialized as a view, *every* consumer re-read it: the fact model, then each test that
+references staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's
+lifetime partway through and failed with `ExpiredToken`. Materializing staging as a table
+makes the same build read S3 once. **Resolved: `dbt_project.yml` sets
+`staging: +materialized: table`.** Do not revert it to a view — the `ExpiredToken` failure
+returns immediately, and CI cannot re-export credentials mid-run either.
+
+**`ExpiredToken` returned on 2026-09-07, and the table fix alone no longer covers it.**
+The credential source is the constraint: `aws configure export-credentials`, backed by
+`aws login`, issues **15-minute** tokens, and there is no static key in `~/.aws` to fall
+back on. At DuckDB's default of one thread per core the element-summary read had grown to
+901s — 15.0 minutes — so it raced the token and lost mid-read.
+
+The read is bound by HTTP round-trip latency, not CPU, so the number of concurrent
+requests is what matters. Measured over an 8,436-object subset: **474s at 4 threads, 49s
+at 32.** **Resolved: `profiles.yml` sets `threads: 32` in its `settings:` block** — DuckDB's
+own thread count, distinct from the `threads: 4` above it that sets dbt's model
+concurrency. A full `dbt build` then completes in **7m53s**, comfortably inside the token
+window. Treat that setting as a correctness requirement rather than a speed preference:
+lowering it puts the build back in a race with the credential lifetime.
 
 Also note the read is memory-hungry: loading all element-summary payloads in one
 `read_json` OOM'd at 12.7 GiB on default settings. **Resolved: `preserve_insertion_order:
@@ -238,6 +299,24 @@ project depends on raw row order; every model orders explicitly.
 
 ## CI
 
-CI currently runs only `uv run pytest -m unit` (`.github/workflows/ci.yml`), so the SQL
-suite is never enforced. Once dbt is set up, CI must run `dbt build` — which runs tests in
-DAG order — and block publishing on failure.
+`.github/workflows/ci.yml` has two jobs.
+
+**`validate`** is the required check on every PR and runs without credentials, because it
+executes no model: `dbt parse` plus the tier-tag check. The access boundary is genuinely
+enforced here — group membership and `access: private` are resolved at parse time, so a
+model or test that reads staging without declaring its group fails this job. The column
+contracts are *not*: dbt compares a served model's real columns against its declared ones
+when the model is built, so a contract violation surfaces in `data-tests` instead.
+
+**`data-tests`** runs the three tiers and is `workflow_dispatch` only. It cannot be a PR
+check yet: every data test needs the models built, building them means reading the raw tree
+from S3, and this repo has no route to that bucket from Actions. The only OIDC role in the
+account (`github-actions-fpl-ingest`) trusts `repo:gisaf22/fpl-ingest:ref:refs/heads/main`
+and nothing else, and fpl-warehouse has no repository variables or secrets set. The job
+fails immediately with an explanatory message when `vars.AWS_ROLE_ARN` is unset.
+
+**Making the fast tiers a real PR check is the open item.** Two routes: stand up an IAM
+role trusting this repo (the Phase 5 automation item), or commit a raw fixture capture and
+build against it with `--vars`. The fixture route needs a *multi-capture* fixture to be
+worth anything — a single-capture one passes every dedup assertion vacuously, which is the
+failure mode the e2e tier exists to catch.

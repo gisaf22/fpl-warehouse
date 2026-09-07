@@ -15,16 +15,11 @@ package = false
 
 [dependency-groups]
 dev = [
-    "pytest",
     "ruff>=0.15.10",
     "vulture>=2.16",
 ]
 
-[tool.pytest.ini_options]
-addopts = "--import-mode=importlib"
-testpaths = ["tests"]
-markers = [
-    "unit: pure unit tests — in-memory fixtures, no DB, no network",
-    "integration: tests against real master.db — skip if DB not found",
-    "smoke: end-to-end tests with real API — requires TEAM_ID env var",
-]
+# No pytest config: this project has no Python source and no Python tests. The
+# whole suite is dbt tests under `tests/`, tiered by tag — see CLAUDE.md,
+# "Tests". The pre-migration pytest suite tested `fpl_warehouse.*`, deleted in
+# Phase 1.

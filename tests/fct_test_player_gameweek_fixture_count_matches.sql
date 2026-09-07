@@ -1,3 +1,12 @@
+-- Layer: fct
+-- Tests: fct_player_gameweek
+-- Asserts: fixture_count equals the real number of fct_player_fixture rows for
+--          that (season, fpl_id, round).
+-- Origin: new in Phase 2, modelled on
+--         tests/team_fixture/sql/fct_test_fixture_count_nonneg.sql
+-- Tier: integration
+{{ config(tags=['integration']) }}
+
 -- fixture_count must equal the real number of fct_player_fixture rows for that
 -- (season, fpl_id, round) — 0 for a blank gameweek, 1 normally, 2+ for a double.
 --

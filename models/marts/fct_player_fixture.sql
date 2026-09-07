@@ -10,7 +10,7 @@
 --
 -- Grain:
 --   One row per (season, fpl_id, fixture_id). Asserted by
---   dbt_tests/fct_test_player_fixture_grain_uniqueness.sql.
+--   tests/fct_test_player_fixture_grain_uniqueness.sql.
 --
 --   `season` is in the grain from the outset so adding a second season later is
 --   a data change, not a breaking rebuild of every downstream consumer. It is

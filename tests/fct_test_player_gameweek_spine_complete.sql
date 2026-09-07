@@ -1,4 +1,11 @@
-{{ config(group='warehouse_internal') }}
+-- Layer: fct
+-- Tests: fct_player_gameweek
+-- Asserts: the fact is exactly one row per spine key — none missing, none invented
+--          beyond the spine.
+-- Origin: new in Phase 2
+-- Tier: integration
+{{ config(group='warehouse_internal', tags=['integration']) }}
+
 -- Group membership is required, not cosmetic: this test ref()s
 -- int_player_gameweek_spine, which is access: private to warehouse_internal.
 -- Without it dbt refuses to parse the test. See CLAUDE.md, "Served contract".

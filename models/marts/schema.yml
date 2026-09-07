@@ -1,5 +1,20 @@
 version: 2
 
+# Generic tests carry the `unit` tier tag explicitly rather than inheriting a
+# project-level default: dbt *merges* tag configs rather than overriding them,
+# so a `data_tests: +tags: [unit]` default in dbt_project.yml would also stamp
+# `unit` onto the integration and e2e singular tests and break tier selection.
+# The tag block is written once as a YAML anchor and aliased thereafter.
+#
+# The not_null coverage below is the ported form of two of the retired SQL
+# assertions — see the triage in commit "refactor(tests): delete dead Python
+# suite, move dbt tests to tests/":
+#   tests/availability/sql/fact_test_keys_not_null.sql      -> the grain columns
+#   tests/availability/sql/fact_test_column_coverage.sql    -> the COALESCEd measures
+# Their team_fpl_id clause is deliberately not carried: this warehouse holds no
+# team identifier, because resolving one at build time is the as-of bug the
+# rebuild exists to remove.
+
 models:
   - name: fct_player_fixture
     description: >
@@ -16,6 +31,10 @@ models:
     columns:
       - name: season
         data_type: VARCHAR
+        data_tests: &unit_not_null
+          - not_null:
+              config:
+                tags: [unit]
       - name: extraction_date
         data_type: DATE
       - name: run_id
@@ -24,10 +43,13 @@ models:
         data_type: TIMESTAMP
       - name: fpl_id
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: fixture_id
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: round
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: opponent_team_fpl_id
         data_type: INTEGER
       - name: was_home
@@ -122,16 +144,25 @@ models:
     columns:
       - name: season
         data_type: VARCHAR
+        data_tests: *unit_not_null
       - name: fpl_id
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: round
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: web_name
         data_type: VARCHAR
+        data_tests: *unit_not_null
       - name: deadline_time
         data_type: TIMESTAMP
+        data_tests: *unit_not_null
       - name: fixture_count
         data_type: INTEGER
+        data_tests: *unit_not_null
+      # Legitimately NULL for a blank gameweek — no fixture states them — so
+      # they are excluded from the not_null sweep below, which exists to catch
+      # a COALESCE being dropped from the additive measures.
       - name: first_kickoff_time
         data_type: TIMESTAMP
       - name: last_kickoff_time
@@ -140,58 +171,87 @@ models:
         data_type: BOOLEAN
       - name: minutes
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: starts
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: total_points
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: bonus
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: bps
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: goals_scored
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: assists
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: clean_sheets
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: goals_conceded
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: own_goals
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: penalties_saved
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: penalties_missed
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: yellow_cards
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: red_cards
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: saves
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: clearances_blocks_interceptions
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: recoveries
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: tackles
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: defensive_contribution
         data_type: INTEGER
+        data_tests: *unit_not_null
       - name: expected_goals
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: expected_assists
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: expected_goal_involvements
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: expected_goals_conceded
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: influence
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: creativity
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: threat
         data_type: DOUBLE
+        data_tests: *unit_not_null
       - name: ict_index
         data_type: DOUBLE
+        data_tests: *unit_not_null
+      # Event-level, taken from the round's last fixture, so NULL for a blank
+      # gameweek for the same reason as the kickoff times above.
       - name: value
         data_type: INTEGER
       - name: selected

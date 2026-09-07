@@ -5,7 +5,7 @@ config-version: 2
 profile: fpl_warehouse
 
 model-paths: ["models"]
-test-paths: ["dbt_tests"]
+test-paths: ["tests"]
 macro-paths: ["macros"]
 seed-paths: ["seeds"]
 

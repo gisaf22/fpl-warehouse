@@ -1,4 +1,11 @@
-{{ config(group='warehouse_internal') }}
+-- Layer: fct
+-- Tests: fct_player_fixture
+-- Asserts: no (fpl_id, fixture_id) survives in the fact once FPL has dropped it
+--          from the player's most recent capture in stg_player_fixture.
+-- Origin: new in Phase 2
+-- Tier: integration
+{{ config(group='warehouse_internal', tags=['integration']) }}
+
 -- Group membership is required, not cosmetic: this test ref()s
 -- stg_player_fixture, which is access: private to warehouse_internal.
 -- Without it dbt refuses to parse the test. See CLAUDE.md, "Served contract".
