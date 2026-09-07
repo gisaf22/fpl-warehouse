@@ -5,9 +5,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
-  test:
+  # Required check. Everything here runs without credentials, because nothing
+  # here executes a model — `dbt parse` builds the manifest and stops.
+  #
+  # That is not a formality in this project. The access boundary is enforced at
+  # parse time: the `warehouse_internal` group and the `access: private`
+  # modifiers on staging and intermediate models are resolved here, so a model
+  # or singular test that reads staging without declaring group membership
+  # fails in this job rather than in review. Every ref() and the contract
+  # declarations are resolved here too.
+  #
+  # What this job does NOT check is the contracts themselves. dbt compares a
+  # served model's real columns against its declared ones when the model is
+  # built, so a contract violation surfaces in `data-tests`, not here.
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,5 +33,101 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run unit tests
-        run: uv run pytest -m unit
+      # Resolves every ref() and the group/access boundary. No warehouse
+      # connection, so no AWS session needed.
+      - name: Parse project
+        run: uv run dbt parse
+
+      # Keeps the tier taxonomy honest as tests are added: a test with no tier
+      # tag runs in no tier and is silently never enforced, and one with two
+      # tiers runs in both. Neither is visible without this check.
+      - name: Check every test carries exactly one tier tag
+        run: |
+          uv run dbt ls --resource-type test --output json --output-keys name tags \
+            > /tmp/tests.json
+          uv run python - <<'PY'
+          import json, sys
+
+          TIERS = {"unit", "integration", "e2e"}
+          bad = []
+          with open("/tmp/tests.json") as fh:
+              for line in fh:
+                  line = line.strip()
+                  if not line.startswith("{"):
+                      continue
+                  node = json.loads(line)
+                  tiers = TIERS & set(node.get("tags", []))
+                  if len(tiers) != 1:
+                      bad.append((node["name"], sorted(tiers) or "none"))
+
+          for name, tiers in bad:
+              print(f"::error::{name} has tier tags {tiers}; expected exactly one "
+                    f"of unit / integration / e2e")
+          sys.exit(1 if bad else 0)
+          PY
+
+  # Not a PR check, because it cannot be one yet.
+  #
+  # Every data test needs the models built, and building them means reading
+  # fpl-ingest's raw tree from S3 — there is no fixture capture in this repo to
+  # build against. This repo has no route to that bucket from Actions today:
+  # the only OIDC role in the account (github-actions-fpl-ingest) trusts
+  # `repo:gisaf22/fpl-ingest:ref:refs/heads/main` and nothing else, and
+  # fpl-warehouse has no repository variables or secrets set. Standing up a
+  # role for this repo is the Phase 5 automation item CLAUDE.md parks under
+  # "S3 credentials for local dbt runs"; until it lands this job is manual.
+  #
+  # The tiers are wired the way they are meant to run once it does:
+  # tag:unit + tag:integration are the fast pair that becomes the required PR
+  # check, and e2e stays a separate step. e2e is excluded from the fast pair on
+  # purpose and not merely for speed — it asserts that staging was built from
+  # the real accumulated raw tree, so it is the one test that a fixture or
+  # single-capture build is supposed to fail. Same definition as fpl-ingest's
+  # e2e tier, which is likewise excluded from its default run.
+  data-tests:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require an AWS role to be configured
+        run: |
+          if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
+            echo "::error::Set the AWS_ROLE_ARN repository variable to an IAM \
+          role whose trust policy admits repo:${{ github.repository }}. Until \
+          then this job cannot reach the raw capture bucket and no data test \
+          can run. See CLAUDE.md, 'S3 credentials for local dbt runs'."
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      # Models only. The tiers are run as their own steps below so a failure
+      # names the tier it came from.
+      - name: Build models
+        run: uv run dbt run
+
+      - name: Fast tier — unit
+        run: uv run dbt test --select tag:unit
+
+      - name: Fast tier — integration
+        run: uv run dbt test --select tag:integration
+
+      - name: e2e tier
+        run: uv run dbt test --select tag:e2e

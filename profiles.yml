@@ -1,14 +1,21 @@
 fpl_warehouse:
   target: dev
   outputs:
-    # In-memory DuckDB reading fpl-ingest's raw tree in place from S3.
+    # File-backed DuckDB reading fpl-ingest's raw tree in place from S3.
+    #
+    # The database is a file, not `:memory:`, so a build survives the process
+    # that made it and `dbt test --select tag:<tier>` can be run as its own
+    # command against it. With an in-memory database every such invocation
+    # starts empty and every test errors on a missing relation, which makes the
+    # tiers unrunnable separately and forces an ~8 minute S3 rebuild per tier.
+    # The path is under .local/, which is gitignored.
     #
     # Credentials are never stored here — the `credential_chain` provider
     # defers to DuckDB's own AWS chain (env vars, then ~/.aws), so this file
     # stays safe to commit. Refresh an expired session with `aws login`.
     dev:
       type: duckdb
-      path: ":memory:"
+      path: ".local/warehouse.duckdb"
       threads: 4
       settings:
         # Loading the whole element-summary tree in one read_json OOM'd at
@@ -16,6 +23,21 @@ fpl_warehouse:
         # confirmed fix. Nothing here depends on raw row order — every model
         # orders explicitly.
         preserve_insertion_order: false
+
+        # DuckDB's own thread count, not dbt's model concurrency above.
+        #
+        # Reading ~26k small S3 objects is bound by HTTP round-trip latency,
+        # not CPU, so this is the number of requests in flight and
+        # oversubscribing the 10 cores is the point. Measured 2026-09-07 over
+        # an 8,436-object subset: 474s at 4 threads, 49s at 32.
+        #
+        # This is a correctness requirement, not a speed preference. The only
+        # local credential source (`aws configure export-credentials`, backed by
+        # `aws login`) issues 15-minute tokens, and at DuckDB's default of one
+        # thread per core the full read took 901s — it failed mid-read with
+        # ExpiredToken, having outgrown the staging-as-a-table fix that had
+        # previously resolved the same error. See CLAUDE.md, "S3 credentials".
+        threads: 32
       extensions:
         - httpfs
         - json
