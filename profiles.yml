@@ -47,3 +47,51 @@ fpl_warehouse:
           provider: credential_chain
           chain: "env"
           region: us-east-1
+
+    # Credential-free target for the fast tiers.
+    #
+    # Builds against tests/fixtures/raw — a checked-in capture of real S3
+    # objects, three runs over five players (see
+    # tests/fixtures/build_fixtures.py, which documents every edge case the
+    # tree covers and regenerates it). models/staging/sources.yml switches
+    # `external_location` on the target name, so `--target fixtures` is the
+    # whole invocation and the target cannot be paired with the wrong root:
+    #
+    #     dbt build --target fixtures --exclude tag:e2e
+    #
+    # This exists because `dev` above cannot run without AWS credentials, and
+    # not merely because a build from S3 is slow. Its `secrets:` block is
+    # created when the connection opens and `chain: "env"` fails outright with
+    # `Secret Validation Failure` when no credentials are in the environment —
+    # so under `dev` even `dbt test`, which reads only local tables, needs a
+    # session. That put a full production read of ~26k objects on the
+    # PR-blocking path just to run tests that should be hermetic.
+    #
+    # So this target declares no `secrets:` and loads only `json`. Note what
+    # that does and does not buy: omitting `httpfs` is not itself a barrier,
+    # because DuckDB autoloads it on demand and will pick up ambient AWS_*
+    # environment credentials without any declared secret (verified
+    # 2026-09-07 — a bare connection read the bucket successfully with
+    # credentials exported, and failed 403 without them). The guarantee is
+    # upstream of that: under this target sources.yml resolves
+    # `external_location` to a local relative path, so no s3:// URL is ever
+    # issued and no request is made. What this block adds is that the
+    # connection carries no credential of its own, so on a machine or runner
+    # with no AWS session there is nothing to fall back to. CI closes the last
+    # gap by asserting no AWS_* variable is set at all.
+    #
+    # The e2e tier still runs under `dev` against live S3, unchanged.
+    #
+    # Its own database file, so a fixture build never overwrites the live one
+    # sitting next to it under .local/ and the two can coexist.
+    fixtures:
+      type: duckdb
+      path: ".local/fixtures.duckdb"
+      threads: 4
+      settings:
+        # Same rationale as `dev`: nothing in this project depends on raw row
+        # order, every model orders explicitly. Kept identical so the fixture
+        # build exercises the same DuckDB behaviour as the live one.
+        preserve_insertion_order: false
+      extensions:
+        - json

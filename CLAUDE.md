@@ -175,32 +175,66 @@ fpl-intelligence must never query staging directly — only `fct_player_fixture`
 ## Tests
 
 ```bash
-dbt test --select tag:unit          # fast default, with integration
-dbt test --select tag:integration   # fast default, with unit
-dbt test --select tag:e2e           # opt-in only — needs a build from the live raw tree
-dbt build                           # models plus every tier, in DAG order
+# Fast tiers — no AWS session, no S3. Build once, then run either tier.
+dbt run  --target fixtures                            # build from tests/fixtures/raw
+dbt test --target fixtures --select tag:unit
+dbt test --target fixtures --select tag:integration
+dbt build --target fixtures --exclude tag:e2e         # both tiers, in DAG order
+
+# e2e — the only tier that reads live S3. Needs credentials; see below.
+eval "$(aws configure export-credentials --format env)"
+dbt build                                             # models plus every tier
+dbt test --select tag:e2e
 ```
 
-Every test needs the models built first, and the build reads S3 — see "S3 credentials for
-local dbt runs" below. The DuckDB database is a file under `.local/`, not `:memory:`, so
-one build serves all three tier commands; with an in-memory database each `dbt test`
-invocation starts empty and forces a full rebuild. Against a warm database the unit and
-integration tiers each finish in about two seconds.
+**`unit` and `integration` build against a checked-in fixture, not against S3.**
+`--target fixtures` points the raw source at `tests/fixtures/raw` — three real captures
+over five players, ~430 KB — instead of the live bucket's ~26k objects. The tree is real
+captured data, trimmed; `tests/fixtures/build_fixtures.py` documents every edge case it
+covers and regenerates it from S3 when one needs adding.
 
-**`dbt test` needs the AWS session too, even though it reads only local tables.**
+What makes that hermetic is the path, not the connection: under `--target fixtures` the
+source resolves to a local relative path, so no `s3://` URL is ever issued. Do not read
+the target's missing `httpfs`/`aws` extensions as the barrier — DuckDB autoloads `httpfs`
+on demand and will use ambient `AWS_*` environment credentials with no declared secret
+(verified 2026-09-07: a bare connection read the bucket with credentials exported, and
+failed 403 without them). The target contributing no credential of its own is a second
+layer, and CI asserting no `AWS_*` variable is set is the third.
+
+The whole pair builds and runs in a few seconds with no AWS session at all, which is what
+makes them a viable PR check — see "CI" below.
+
+The switch is on the target name, not on the `raw_root` var, so `--target fixtures` is a
+complete invocation and the target cannot be paired with the wrong root. `--vars
+'{raw_root: ...}'` therefore applies to `dev` only.
+
+**The `dev` target still needs an AWS session for every command, including `dbt test`.**
 `profiles.yml` creates the S3 secret when the connection opens, and `chain: "env"` fails
-outright with `Secret Validation Failure` if no credentials are in the environment. So the
-`eval "$(aws configure export-credentials --format env)"` step below is required before
-*any* dbt command here, not just a build.
+outright with `Secret Validation Failure` if no credentials are in the environment — so
+the `eval "$(aws configure export-credentials --format env)"` step below is required
+before *any* `dev` command, not just a build. That constraint is exactly why the fast
+tiers moved off `dev`: it put a full production read on the PR-blocking path to run tests
+that should be hermetic.
+
+Each target has its own database file under `.local/`, so a fixture build and a live build
+coexist and one build serves all the tier commands run against it. The files are not
+`:memory:` for that reason — with an in-memory database each `dbt test` invocation starts
+empty and forces a full rebuild.
 
 **Tiers are dbt tags, and the vocabulary matches fpl-ingest's** so the two repos' CI
 tiers mean the same thing:
 
-| Tier | What it covers | Cost |
-|---|---|---|
-| `unit` | Single-model grain and structure — PK uniqueness, `not_null`, range and cross-column bounds within one row. No cross-model logic. | Fast |
-| `integration` | Cross-model and business logic — dedup correctness, ratified-preference, retracted rows, spine completeness, `fixture_count` against the real fixtures. Runs against whatever is already built. | Fast |
-| `e2e` | The full build against live S3 from scratch. Slow, hits real infrastructure, excluded from the default run. | ~8 min |
+| Tier | What it covers | Builds against | Cost |
+|---|---|---|---|
+| `unit` | Single-model grain and structure — PK uniqueness, `not_null`, range and cross-column bounds within one row. No cross-model logic. | Fixture | Seconds, no credentials |
+| `integration` | Cross-model and business logic — dedup correctness, ratified-preference, retracted rows, spine completeness, `fixture_count` against the real fixtures. Runs against whatever is already built. | Fixture | Seconds, no credentials |
+| `e2e` | The full build against live S3 from scratch. Hits real infrastructure, excluded from the default run. | Live S3 | ~8 min, needs a session |
+
+**That split is the standard one, and it was not before.** `unit` and `integration` are
+supposed to be fast and hermetic; until the fixture tree landed both required a full
+production read of ~26k objects before a single assertion could run, which made every PR
+check a read of live data and made the tiers unusable in CI at all. Only `e2e` is meant to
+touch real infrastructure, and now only `e2e` does.
 
 **Every test carries exactly one tier tag**, and CI fails if one carries none or two — a
 tag-less test runs in no tier and is silently never enforced. Prefer a generic test in
@@ -232,15 +266,27 @@ found duplicate, or retired in commit `c1f820a`, whose message carries the full
 disposition of each one.
 
 **The e2e tier is not just the slow tier.** `stg_test_player_fixture_multiple_captures_present`
-asserts staging holds more than one capture of the same key, which is true only of a build
-against the real accumulated raw tree. Every dedup assertion in the integration tier passes
-vacuously on a single-capture build — such as the documented
-`--vars '{raw_root: .local/raw}'` fallback — so this test exists to fail there rather than
-let a green suite claim something it never checked.
+asserts staging holds more than one capture of the same key — the precondition that makes
+every dedup assertion mean something, rather than an invariant. On a single-capture build,
+such as the documented `--vars '{raw_root: .local/raw}'` fallback, the whole integration
+tier passes vacuously because there is nothing to collapse, and this test exists to fail
+there rather than let a green suite claim something it never checked.
+
+The fixture tree is deliberately multi-capture for the same reason — three runs of the
+same keys, so ratified-preference and retracted-row dedup are genuinely exercised on a PR.
+One consequence is worth knowing: this test now also passes against the fixture build, so
+it no longer distinguishes a fixture build from a live one on its own. It is only ever run
+against `dev`, where that distinction is not needed. If a stronger live-only assertion is
+ever wanted, the scale of the accumulated tree — thousands of keys, dozens of runs — is
+the thing to assert.
 
 ---
 
 ## S3 credentials for local dbt runs
+
+**Only the `dev` target needs any of this.** The `unit` and `integration` tiers run under
+`--target fixtures` against the checked-in capture and never open an S3 connection — see
+"Tests" above. What follows applies to a live build and to the `e2e` tier.
 
 DuckDB does **not** inherit the AWS CLI session. `profiles.yml` names a credential chain
 only — it holds no secrets and is safe to commit — but the chain alone does not resolve an
@@ -265,8 +311,11 @@ A local build is therefore **not self-contained**; the export is a required firs
 `aws configure export-credentials` session to export from. Solving that properly is a
 **Phase 5 (automation) item — not solved yet.**
 
-To build without any AWS session at all, override the raw root to a local capture:
-`dbt run --select stg_player_fixture --vars '{raw_root: .local/raw}'`.
+To build without any AWS session at all, use `--target fixtures` (the checked-in capture,
+which is what the fast tiers do). For an ad-hoc build against some other local tree,
+`dev` still takes `dbt run --select stg_player_fixture --vars '{raw_root: .local/raw}'` —
+but note that a single-capture tree passes every dedup assertion vacuously, which is what
+the fixture tree exists to avoid.
 
 **Build cost — staging reads ~26k S3 objects.** Because `stg_player_fixture` was once
 materialized as a view, *every* consumer re-read it: the fact model, then each test that
@@ -299,24 +348,31 @@ project depends on raw row order; every model orders explicitly.
 
 ## CI
 
-`.github/workflows/ci.yml` has two jobs.
+`.github/workflows/ci.yml` has three jobs. **The PR-blocking path is `validate` plus
+`fixture-tests`, and neither touches AWS** — no OIDC role, no repository variables, no
+`id-token` permission.
 
-**`validate`** is the required check on every PR and runs without credentials, because it
-executes no model: `dbt parse` plus the tier-tag check. The access boundary is genuinely
-enforced here — group membership and `access: private` are resolved at parse time, so a
-model or test that reads staging without declaring its group fails this job. The column
-contracts are *not*: dbt compares a served model's real columns against its declared ones
-when the model is built, so a contract violation surfaces in `data-tests` instead.
+**`validate`** runs without credentials because it executes no model: `dbt parse` plus the
+tier-tag check. The access boundary is genuinely enforced here — group membership and
+`access: private` are resolved at parse time, so a model or test that reads staging
+without declaring its group fails this job. The column contracts are *not*: dbt compares a
+served model's real columns against its declared ones when the model is built, so a
+contract violation surfaces in `fixture-tests` instead.
 
-**`data-tests`** runs the three tiers and is `workflow_dispatch` only. It cannot be a PR
-check yet: every data test needs the models built, building them means reading the raw tree
-from S3, and this repo has no route to that bucket from Actions. The only OIDC role in the
-account (`github-actions-fpl-ingest`) trusts `repo:gisaf22/fpl-ingest:ref:refs/heads/main`
-and nothing else, and fpl-warehouse has no repository variables or secrets set. The job
-fails immediately with an explanatory message when `vars.AWS_ROLE_ARN` is unset.
+**`fixture-tests`** is the required check that actually builds and asserts. It runs
+`dbt run --target fixtures` and then the `unit` and `integration` tiers against the
+checked-in capture, in seconds. A step asserts no `AWS_*` variable is in the environment,
+so "this job needs no credentials" is verified on every run rather than assumed — if a
+change ever puts a production read back on the PR path, the job fails loudly.
 
-**Making the fast tiers a real PR check is the open item.** Two routes: stand up an IAM
-role trusting this repo (the Phase 5 automation item), or commit a raw fixture capture and
-build against it with `--vars`. The fixture route needs a *multi-capture* fixture to be
-worth anything — a single-capture one passes every dedup assertion vacuously, which is the
-failure mode the e2e tier exists to catch.
+**`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It
+still cannot be a PR check, and that is now fine rather than blocking: reaching the bucket
+from Actions needs an IAM role trusting this repo, and there is none — the only OIDC role
+in the account (`github-actions-fpl-ingest`) trusts
+`repo:gisaf22/fpl-ingest:ref:refs/heads/main` and nothing else, and fpl-warehouse has no
+repository variables or secrets set. The job fails immediately with an explanatory message
+when `vars.AWS_ROLE_ARN` is unset. Standing that role up remains the Phase 5 automation
+item, but it now buys a scheduled live check rather than unblocking PRs.
+
+Branch protection is repository configuration, not code: after this change `fixture-tests`
+needs adding to the required-checks list alongside `validate`.
