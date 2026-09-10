@@ -24,11 +24,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
-          python-version-file: "pyproject.toml"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: uv sync
@@ -120,11 +120,11 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
-          python-version-file: "pyproject.toml"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: uv sync
@@ -184,7 +184,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Require an AWS role to be configured
         run: |
@@ -196,9 +196,9 @@ jobs:
             exit 1
           fi
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
-          python-version-file: "pyproject.toml"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: uv sync
