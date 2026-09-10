@@ -55,10 +55,11 @@ permissions:
   id-token: write
   contents: read
 
-# A build reads ~26k S3 objects and takes ~8 minutes. Overlapping runs would
-# race on nothing shared, but they would double the read for no benefit, so
-# queue them instead. Not cancel-in-progress: a run that is already most of the
-# way through a full read should be allowed to finish and report.
+# A build reads ~26k S3 objects and takes ~10 minutes (measured 2026-09-10,
+# run 34501607108). Overlapping runs would race on nothing shared, but they
+# would double the read for no benefit, so queue them instead. Not
+# cancel-in-progress: a run already most of the way through a full read should
+# be allowed to finish and report.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -73,8 +74,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # The build is ~8 minutes. This bounds a hung S3 read rather than letting
-    # it burn the 6-hour default.
+    # The build is ~10 minutes measured (run 34501607108, 9m57s of dbt plus
+    # setup). This bounds a hung S3 read rather than letting it burn the
+    # 6-hour default, while leaving 3x headroom over the real figure.
     timeout-minutes: 30
 
     steps:
@@ -110,7 +112,8 @@ jobs:
       # default), not the 15-minute `aws login` export that forced the
       # threads: 32 setting locally — so the build is not racing its
       # credentials here. Keep threads: 32 anyway; it is what makes this job
-      # ~8 minutes instead of ~15.
+      # ~10 minutes rather than far longer — the ~26k-object read in
+      # stg_player_fixture is 593s of the 597s total.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
