@@ -1,0 +1,139 @@
+# Scheduled live build — the recurring proof that the project still builds and
+# every tier still passes against the real accumulated raw tree.
+#
+# This is the counterpart to fpl-ingest's scheduled_run_daily.yml: that job
+# writes new raw captures to S3 twice a day, and this one reads them back
+# through the whole DAG shortly afterwards. Between them, a break anywhere —
+# a raw shape change, a dedup edge case a new capture exposes, a served
+# contract drift — surfaces within hours instead of at the next manual run.
+#
+# WHAT THIS IS NOT: it does not publish anything. The `dev` target writes
+# .local/warehouse.duckdb on the runner, which is destroyed with the runner, so
+# the built tables go nowhere and fpl-intelligence does not read them. See
+# CLAUDE.md, "Served contract" — consumers read the DuckDB file directly and
+# there is no shared served database to write to today. This workflow is a
+# validation signal, not a deployment.
+#
+# Scheduling is deliberately a cron offset rather than a repository_dispatch
+# fired by fpl-ingest on completion. A true trigger-on-completion is the
+# stronger design and remains the upgrade path, but it needs a dispatch step
+# and a cross-repo token in fpl-ingest, and the measured timing (below) leaves
+# enough margin that it buys nothing yet.
+
+name: Scheduled Build
+
+on:
+  schedule:
+    # 07:45 and 19:45 UTC — 45 minutes after fpl-ingest's daily 07:00/19:00.
+    #
+    # The offset is sized against GitHub's scheduler, not against the ingest
+    # job's runtime, because the scheduler is by far the larger term. Measured
+    # over 26 scheduled fpl-ingest runs (2026-08-28 → 2026-09-10):
+    #
+    #   ingest job duration        median  3.2m   p90  8.6m   max  9.0m
+    #   delay from cron to start   median 14.9m   p90 23.6m   max 24.5m
+    #   ingest FINISHED at cron+   median 18.6m   p90 27.7m   max 32.0m
+    #
+    # So the naive 30-minute offset is not safe: ingest has been observed still
+    # running 32 minutes past its nominal cron time. 45 minutes clears the
+    # worst observed finish by 13 minutes even in the pessimistic case where
+    # this workflow's own scheduler delay is zero — and in practice this run
+    # inherits a comparable 10-25 minute delay of its own, so the real gap is
+    # wider. :45 is also off the top of the hour, where the queueing that
+    # causes those delays is heaviest.
+    #
+    # Re-check this if fpl-ingest's runtime grows: the number to beat is its
+    # max "finished at cron+", not its duration.
+    - cron: "45 7,19 * * *"
+
+  # Manual trigger, for testing this workflow and for an on-demand rebuild
+  # without waiting for the schedule:
+  #   gh workflow run scheduled_build.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# A build reads ~26k S3 objects and takes ~8 minutes. Overlapping runs would
+# race on nothing shared, but they would double the read for no benefit, so
+# queue them instead. Not cancel-in-progress: a run that is already most of the
+# way through a full read should be allowed to finish and report.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # NOT a required check, and must not become one. This job depends on live S3
+  # and on fpl-ingest's output, so it fails for reasons that have nothing to do
+  # with whatever is in an open pull request — a bad capture upstream would
+  # otherwise block every unrelated merge. The PR-blocking path stays exactly
+  # `validate` plus `fixture-tests` from ci.yml, both credential-free. A
+  # failure here is informational: it pages a human, it does not gate code.
+  build:
+    runs-on: ubuntu-latest
+
+    # The build is ~8 minutes. This bounds a hung S3 read rather than letting
+    # it burn the 6-hour default.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same guard as ci.yml's live-tests job, and for the same reason: with no
+      # AWS_ROLE_ARN the aws-actions step fails with an opaque credentials
+      # error. This says what to actually do about it.
+      - name: Require an AWS role to be configured
+        run: |
+          if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
+            echo "::error::Set the AWS_ROLE_ARN repository variable to an IAM \
+          role whose trust policy admits repo:${{ github.repository }} on \
+          refs/heads/main. Until then this workflow cannot reach the raw \
+          capture bucket. See CLAUDE.md, 'Scheduled build'."
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      # A scheduled run's OIDC subject is the ref form —
+      # repo:gisaf22/fpl-warehouse:ref:refs/heads/main — because a schedule
+      # always runs on the default branch. There is no distinct `schedule`
+      # subject format, so the role's existing main entry covers this workflow
+      # and no trust-policy change is needed for the schedule as such.
+      #
+      # The session is an AssumeRoleWithWebIdentity session (1 hour by
+      # default), not the 15-minute `aws login` export that forced the
+      # threads: 32 setting locally — so the build is not racing its
+      # credentials here. Keep threads: 32 anyway; it is what makes this job
+      # ~8 minutes instead of ~15.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      # profiles.yml puts the dev database at .local/warehouse.duckdb, and
+      # .local/ is gitignored so it does not exist on a fresh checkout.
+      - name: Create the local database directory
+        run: mkdir -p .local
+
+      # `dbt build`, not `dbt run` then `dbt test`: build interleaves each
+      # model with its own tests in DAG order, so a model whose tests fail does
+      # not have its dependents built on top of it. All three tiers run,
+      # including e2e, which is the tier that only means anything here — it
+      # asserts staging was built from the real accumulated raw tree, which is
+      # exactly what the fixture target cannot stand in for.
+      #
+      # Failure is loud by construction: dbt exits 1 when any model errors or
+      # any test fails, Actions' default `bash -e` propagates that, and the run
+      # is marked failed — which is the notification. Verified 2026-09-10: a
+      # deliberately failing test returned exit 1 from `dbt build`. Every test
+      # in the project is error severity (no `severity: warn` anywhere), so
+      # there is no path where a real failure lands as a passing warning.
+      - name: Build and test against live S3
+        run: uv run dbt build

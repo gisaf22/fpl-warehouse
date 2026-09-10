@@ -376,3 +376,63 @@ item, but it now buys a scheduled live check rather than unblocking PRs.
 
 Branch protection is repository configuration, not code: after this change `fixture-tests`
 needs adding to the required-checks list alongside `validate`.
+
+---
+
+## Scheduled build
+
+`.github/workflows/scheduled_build.yml` runs `dbt build` — all models, all three tiers,
+against live S3 — at **07:45 and 19:45 UTC**, plus `workflow_dispatch` for manual runs.
+
+**It is informational, not blocking.** It is deliberately absent from the `protect-main`
+required-checks list, which stays `validate` + `fixture-tests` (both credential-free). This
+job depends on live S3 and on fpl-ingest's output, so it fails for reasons unrelated to any
+open pull request; making it required would let a bad upstream capture block every
+unrelated merge. A failure here pages a human via GitHub's own run-failure notification —
+there is no custom alerting, by design.
+
+**The offset is sized against GitHub's scheduler, not against ingest's runtime.** The
+scheduler is the larger term by far. Measured over 26 scheduled fpl-ingest daily runs
+(2026-08-28 → 2026-09-10):
+
+| | median | p90 | max |
+|---|---|---|---|
+| ingest job duration | 3.2m | 8.6m | 9.0m |
+| delay from cron to actual start | 14.9m | 23.6m | 24.5m |
+| **ingest finished at cron+** | **18.6m** | **27.7m** | **32.0m** |
+
+So a 30-minute offset is *not* safe — ingest has been seen still running at cron+32. The
+45-minute offset clears the worst observed finish by 13 minutes even assuming this
+workflow's own scheduler delay is zero, and in practice it inherits a comparable 10–25
+minute delay of its own. `:45` also sits off the top of the hour, where the queueing that
+causes those delays is heaviest. **Re-check this if fpl-ingest's runtime grows: the number
+to beat is its max "finished at cron+", not its duration.**
+
+This is a cron offset rather than a `repository_dispatch` fired by fpl-ingest on
+completion. Trigger-on-completion is the stronger design and remains the upgrade path, but
+it needs a dispatch step and a cross-repo token in fpl-ingest, and the measured margin
+above leaves it buying nothing yet.
+
+**Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
+fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
+2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
+test in the project is `error` severity — there is no `severity: warn` anywhere — so no
+real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
+`dbt test` so each model's tests gate its own dependents in DAG order.
+
+**What it does not do: publish.** The `dev` target writes `.local/warehouse.duckdb` on the
+runner, which dies with the runner. Nothing downstream reads the result — see "Served
+contract", where consumers read the DuckDB file directly and there is no shared served
+database to write to. This workflow proves the project still builds and every assertion
+still holds against real accumulated data. Persisting that build for fpl-intelligence is a
+separate, unsolved question.
+
+**Credentials.** Same OIDC pattern as `live-tests`: `vars.AWS_ROLE_ARN` plus
+`aws-actions/configure-aws-credentials@v4`, guarded by an explicit check that names the
+missing variable. A scheduled run's OIDC subject is the ref form
+(`repo:gisaf22/fpl-warehouse:ref:refs/heads/main`) because a schedule always runs on the
+default branch — there is no distinct `schedule` subject format, so a role trust policy
+that already admits main covers this workflow with no change. Note the session is an
+`AssumeRoleWithWebIdentity` session (1 hour by default), not the 15-minute `aws login`
+export that forced `threads: 32` locally, so this build is not racing its credentials.
+Keep `threads: 32` regardless — it is what makes the job ~8 minutes instead of ~15.
