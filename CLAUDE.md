@@ -365,14 +365,95 @@ checked-in capture, in seconds. A step asserts no `AWS_*` variable is in the env
 so "this job needs no credentials" is verified on every run rather than assumed — if a
 change ever puts a production read back on the PR path, the job fails loudly.
 
-**`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It
-still cannot be a PR check, and that is now fine rather than blocking: reaching the bucket
-from Actions needs an IAM role trusting this repo, and there is none — the only OIDC role
-in the account (`github-actions-fpl-ingest`) trusts
-`repo:gisaf22/fpl-ingest:ref:refs/heads/main` and nothing else, and fpl-warehouse has no
-repository variables or secrets set. The job fails immediately with an explanatory message
-when `vars.AWS_ROLE_ARN` is unset. Standing that role up remains the Phase 5 automation
-item, but it now buys a scheduled live check rather than unblocking PRs.
+**`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It is
+not a PR check, and as of 2026-09-10 that is a deliberate choice rather than a limitation: a
+job that reads live S3 fails for reasons that have nothing to do with the pull request in
+front of it, so it should not gate merges. The same reasoning keeps the scheduled build off
+the required list.
 
-Branch protection is repository configuration, not code: after this change `fixture-tests`
-needs adding to the required-checks list alongside `validate`.
+**The OIDC role now exists — this closes the Phase 5 credential item.**
+`arn:aws:iam::737634035092:role/github-actions-fpl-warehouse` is set as the `AWS_ROLE_ARN`
+repository variable (confirmed present 2026-09-10 via `gh variable list`). Its trust policy
+was verified by the maintainer the same day: `aud` is `sts.amazonaws.com`, and `sub` admits
+both `repo:gisaf22/fpl-warehouse:ref:refs/heads/main` and
+`repo:gisaf22/fpl-warehouse:pull_request`. The ref entry is what covers the scheduled build,
+whose token carries the ref subject form — see "Scheduled build". This supersedes the
+earlier note that the account's only role was `github-actions-fpl-ingest`.
+
+The `AWS_ROLE_ARN` guard step in both jobs stays regardless. It is no longer describing the
+normal state, but it still gives a fork or a fresh clone with no variable set an explanatory
+failure instead of an opaque credentials error.
+
+Branch protection is repository configuration, not code. The `protect-main` ruleset
+(id `22415012`, active) requires exactly `validate` and `fixture-tests` — verified
+2026-09-10. Nothing else is required, and the scheduled build deliberately stays off that
+list; see "Scheduled build".
+
+---
+
+## Scheduled build
+
+`.github/workflows/scheduled_build.yml` runs `dbt build` — all models, all three tiers,
+against live S3 — at **07:45 and 19:45 UTC**, plus `workflow_dispatch` for manual runs.
+
+**It is informational, not blocking.** It is deliberately absent from the `protect-main`
+required-checks list, which stays `validate` + `fixture-tests` (both credential-free). This
+job depends on live S3 and on fpl-ingest's output, so it fails for reasons unrelated to any
+open pull request; making it required would let a bad upstream capture block every
+unrelated merge. A failure here pages a human via GitHub's own run-failure notification —
+there is no custom alerting, by design.
+
+**The offset is sized against GitHub's scheduler, not against ingest's runtime.** The
+scheduler is the larger term by far. Measured over 26 scheduled fpl-ingest daily runs
+(2026-08-28 → 2026-09-10):
+
+| | median | p90 | max |
+|---|---|---|---|
+| ingest job duration | 3.2m | 8.6m | 9.0m |
+| delay from cron to actual start | 14.9m | 23.6m | 24.5m |
+| **ingest finished at cron+** | **18.6m** | **27.7m** | **32.0m** |
+
+So a 30-minute offset is *not* safe — ingest has been seen still running at cron+32. The
+45-minute offset clears the worst observed finish by 13 minutes even assuming this
+workflow's own scheduler delay is zero, and in practice it inherits a comparable 10–25
+minute delay of its own. `:45` also sits off the top of the hour, where the queueing that
+causes those delays is heaviest. **Re-check this if fpl-ingest's runtime grows: the number
+to beat is its max "finished at cron+", not its duration.**
+
+This is a cron offset rather than a `repository_dispatch` fired by fpl-ingest on
+completion. Trigger-on-completion is the stronger design and remains the upgrade path, but
+it needs a dispatch step and a cross-repo token in fpl-ingest, and the measured margin
+above leaves it buying nothing yet.
+
+**Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
+fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
+2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
+test in the project is `error` severity — there is no `severity: warn` anywhere — so no
+real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
+`dbt test` so each model's tests gate its own dependents in DAG order.
+
+**What it does not do: publish — a deferred decision, not a bug.** The `dev` target writes
+`.local/warehouse.duckdb` on the runner, which dies with the runner. Nothing downstream
+reads the result — see "Served contract", where consumers read the DuckDB file directly and
+there is no shared served database to write to. This workflow proves the project still
+builds and every assertion still holds against real accumulated data, and that is the whole
+intended scope of this phase.
+
+Publishing is deliberately out of scope here because **there is nothing to publish to yet.**
+fpl-intelligence integration is the next roadmap item and has not happened, so no consumer
+reads this output today. Writing the built tables to S3 now would mean inventing a served
+layout — location, format, partitioning, atomicity, retention — with no consumer to
+validate it against, and the odds of guessing right are poor. Continuous validation without
+publishing is the correct scope until fpl-intelligence integration defines what it actually
+needs to read; at that point publishing becomes real, specified work rather than
+speculation. Do not read the absent S3 write as an oversight in this workflow.
+
+**Credentials.** Same OIDC pattern as `live-tests`: `vars.AWS_ROLE_ARN` plus
+`aws-actions/configure-aws-credentials@v4`, guarded by an explicit check that names the
+missing variable. A scheduled run's OIDC subject is the ref form
+(`repo:gisaf22/fpl-warehouse:ref:refs/heads/main`) because a schedule always runs on the
+default branch — there is no distinct `schedule` subject format, so a role trust policy
+that already admits main covers this workflow with no change. Note the session is an
+`AssumeRoleWithWebIdentity` session (1 hour by default), not the 15-minute `aws login`
+export that forced `threads: 32` locally, so this build is not racing its credentials.
+Keep `threads: 32` regardless — it is what makes the job ~8 minutes instead of ~15.
