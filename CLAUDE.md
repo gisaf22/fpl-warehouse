@@ -365,14 +365,24 @@ checked-in capture, in seconds. A step asserts no `AWS_*` variable is in the env
 so "this job needs no credentials" is verified on every run rather than assumed — if a
 change ever puts a production read back on the PR path, the job fails loudly.
 
-**`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It
-still cannot be a PR check, and that is now fine rather than blocking: reaching the bucket
-from Actions needs an IAM role trusting this repo, and there is none — the only OIDC role
-in the account (`github-actions-fpl-ingest`) trusts
-`repo:gisaf22/fpl-ingest:ref:refs/heads/main` and nothing else, and fpl-warehouse has no
-repository variables or secrets set. The job fails immediately with an explanatory message
-when `vars.AWS_ROLE_ARN` is unset. Standing that role up remains the Phase 5 automation
-item, but it now buys a scheduled live check rather than unblocking PRs.
+**`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It is
+not a PR check, and as of 2026-09-10 that is a deliberate choice rather than a limitation: a
+job that reads live S3 fails for reasons that have nothing to do with the pull request in
+front of it, so it should not gate merges. The same reasoning keeps the scheduled build off
+the required list.
+
+**The OIDC role now exists — this closes the Phase 5 credential item.**
+`arn:aws:iam::737634035092:role/github-actions-fpl-warehouse` is set as the `AWS_ROLE_ARN`
+repository variable (confirmed present 2026-09-10 via `gh variable list`). Its trust policy
+was verified by the maintainer the same day: `aud` is `sts.amazonaws.com`, and `sub` admits
+both `repo:gisaf22/fpl-warehouse:ref:refs/heads/main` and
+`repo:gisaf22/fpl-warehouse:pull_request`. The ref entry is what covers the scheduled build,
+whose token carries the ref subject form — see "Scheduled build". This supersedes the
+earlier note that the account's only role was `github-actions-fpl-ingest`.
+
+The `AWS_ROLE_ARN` guard step in both jobs stays regardless. It is no longer describing the
+normal state, but it still gives a fork or a fresh clone with no variable set an explanatory
+failure instead of an opaque credentials error.
 
 Branch protection is repository configuration, not code. The `protect-main` ruleset
 (id `22415012`, active) requires exactly `validate` and `fixture-tests` — verified
