@@ -374,8 +374,10 @@ repository variables or secrets set. The job fails immediately with an explanato
 when `vars.AWS_ROLE_ARN` is unset. Standing that role up remains the Phase 5 automation
 item, but it now buys a scheduled live check rather than unblocking PRs.
 
-Branch protection is repository configuration, not code: after this change `fixture-tests`
-needs adding to the required-checks list alongside `validate`.
+Branch protection is repository configuration, not code. The `protect-main` ruleset
+(id `22415012`, active) requires exactly `validate` and `fixture-tests` — verified
+2026-09-10. Nothing else is required, and the scheduled build deliberately stays off that
+list; see "Scheduled build".
 
 ---
 
@@ -420,12 +422,21 @@ test in the project is `error` severity — there is no `severity: warn` anywher
 real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
 
-**What it does not do: publish.** The `dev` target writes `.local/warehouse.duckdb` on the
-runner, which dies with the runner. Nothing downstream reads the result — see "Served
-contract", where consumers read the DuckDB file directly and there is no shared served
-database to write to. This workflow proves the project still builds and every assertion
-still holds against real accumulated data. Persisting that build for fpl-intelligence is a
-separate, unsolved question.
+**What it does not do: publish — a deferred decision, not a bug.** The `dev` target writes
+`.local/warehouse.duckdb` on the runner, which dies with the runner. Nothing downstream
+reads the result — see "Served contract", where consumers read the DuckDB file directly and
+there is no shared served database to write to. This workflow proves the project still
+builds and every assertion still holds against real accumulated data, and that is the whole
+intended scope of this phase.
+
+Publishing is deliberately out of scope here because **there is nothing to publish to yet.**
+fpl-intelligence integration is the next roadmap item and has not happened, so no consumer
+reads this output today. Writing the built tables to S3 now would mean inventing a served
+layout — location, format, partitioning, atomicity, retention — with no consumer to
+validate it against, and the odds of guessing right are poor. Continuous validation without
+publishing is the correct scope until fpl-intelligence integration defines what it actually
+needs to read; at that point publishing becomes real, specified work rather than
+speculation. Do not read the absent S3 write as an oversight in this workflow.
 
 **Credentials.** Same OIDC pattern as `live-tests`: `vars.AWS_ROLE_ARN` plus
 `aws-actions/configure-aws-credentials@v4`, guarded by an explicit check that names the
