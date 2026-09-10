@@ -306,10 +306,17 @@ dbt run --select stg_player_fixture
 Without that `eval` the run fails with `HTTP 403 Forbidden — No credentials are provided`.
 A local build is therefore **not self-contained**; the export is a required first step.
 
-**This will not work as-is in GitHub Actions.** CI authenticates via OIDC (see fpl-ingest's
-`scheduled_run_*.yml`), which populates the environment differently and has no
-`aws configure export-credentials` session to export from. Solving that properly is a
-**Phase 5 (automation) item — not solved yet.**
+**In GitHub Actions none of this is needed — disproven 2026-09-10.** This section
+previously said a live build "will not work as-is" in CI and called it an unsolved Phase 5
+item. That was wrong. `aws-actions/configure-aws-credentials` writes `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` straight into the job environment, which is
+exactly what `chain: "env"` reads — so CI needs no export step at all. The `eval` above is
+a local-only workaround for an SSO session that lives in `~/.aws` rather than in the
+environment.
+
+Verified on two green runs from `main`: ci.yml's `live-tests` (run `34498685397`) and the
+first `scheduled_build.yml` dispatch (run `34501607108`), both building all models and
+running all three tiers against live S3.
 
 To build without any AWS session at all, use `--target fixtures` (the checked-in capture,
 which is what the fast tiers do). For an ad-hoc build against some other local tree,
@@ -456,4 +463,10 @@ default branch — there is no distinct `schedule` subject format, so a role tru
 that already admits main covers this workflow with no change. Note the session is an
 `AssumeRoleWithWebIdentity` session (1 hour by default), not the 15-minute `aws login`
 export that forced `threads: 32` locally, so this build is not racing its credentials.
-Keep `threads: 32` regardless — it is what makes the job ~8 minutes instead of ~15.
+Keep `threads: 32` regardless — without it the S3 read alone was 901s locally.
+
+**Measured CI runtime, 2026-09-10 (run `34501607108`): `dbt build` took 9m57s**, job total
+10.3m — longer than the 7m53s measured locally, so size timeouts against this figure rather
+than the local one. Effectively all of it is one model: `stg_player_fixture` took 593s of
+the 597s, since that is the ~26k-object S3 read. Every other model is sub-second. Still
+comfortable against both the 30-minute job timeout and the 1-hour OIDC session.
