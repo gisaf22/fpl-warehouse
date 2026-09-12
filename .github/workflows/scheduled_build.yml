@@ -100,7 +100,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       # A scheduled run's OIDC subject is the ref form —
       # repo:gisaf22/fpl-warehouse:ref:refs/heads/main — because a schedule
