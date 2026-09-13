@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       # Resolves every ref() and the group/access boundary. No warehouse
       # connection, so no AWS session needed.
@@ -127,7 +127,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       # Turns "this job needs no credentials" from a claim into something the
       # run verifies. If a well-meaning change ever adds an AWS step here, the
@@ -201,7 +201,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4

@@ -12,6 +12,7 @@
 | **FACT** | Verified directly against code, a database, a config file, or a command run during this audit. |
 | **INFERENCE** | Plausible reading of the evidence, not directly confirmed. |
 | **OPEN QUESTION** | Needs a decision or an answer from Fred; cannot be resolved from the repos. |
+| **SUPERSEDED** | Was accurate as audited, but later work has since changed the underlying code. Added after the audit date; the original finding is left intact above it. |
 
 ## Repositories in scope
 
@@ -82,6 +83,8 @@ docs/system/{architecture,build_transformation_spec,data_lineage_map}.md
 **INFERENCE** — A build on a clean machine with no network access, or after that upstream repo moves or deletes the file, would fail at `response.raise_for_status()` rather than degrade to fuzzy matching. The fuzzy path exists but only runs as fallback for players *not* resolved by reep, and is unreachable if the map cannot be loaded at all.
 
 **OPEN QUESTION** — Should the reep CSV be vendored and version-pinned into the repo? It is currently an unpinned external dependency on a third party's `main` branch sitting on the critical build path.
+
+**SUPERSEDED** (2026-09-12, `baf9085`) — Moot for fpl-warehouse. This finding described the repo at `cd90148`, before the dbt migration. Phase 1 deleted every Python module named in this section, `integration/matching.py` included; the only `.py` file left in the repo is `tests/fixtures/build_fixtures.py`. The reep CSV is no longer fetched, and `models/`, `macros/`, `seeds/`, and the workflows contain no remote URLs at all — the build path is S3 plus checked-in fixtures. Not verified for fpl-ingest, which may still carry its own copy of this dependency.
 
 ### The dead FPL API client
 
@@ -515,7 +518,7 @@ Ordered by consequence.
 6. **Should the twice-daily warehouse rebuild be implemented, or the documentation corrected?** The cadence is documented in two places and implemented nowhere. (§1.8)
 7. **Can the stale `~/Documents/FPL/data/warehouse/master.db` be deleted?** Depends on Q3 and Q4. Not safe to delete on current evidence. (§1.6)
 8. **Should `~/Documents/FPL/.env` be replaced by tracked configuration?** It is untracked, machine-local, and load-bearing — it alone keeps the build writing to the live database. (§1.1)
-9. **Should the reep CSV be vendored and pinned?** Unpinned third-party `main`-branch dependency on the critical build path. (§1.1)
+9. ~~**Should the reep CSV be vendored and pinned?**~~ **SUPERSEDED** (2026-09-12) — moot for fpl-warehouse; the Python module that fetched it was deleted in the dbt migration. (§1.1)
 10. **Do `pipeline.run`, `load_fixture_map`, and `load_opponent_map` count as dal's committed public API?** Changes the extraction surface. (§3.2)
 11. **Is the mid-season transfer team-attribution defect acceptable?** `team_fpl_id` is build-time, not as-of-time; silent and worsening. (§1.3)
 12. **Was the brief's "no documentation" premise about architecture docs specifically?** fpl-warehouse has 15 doc files and they are mostly accurate. (§1.0)
