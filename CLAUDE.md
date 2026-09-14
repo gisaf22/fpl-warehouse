@@ -391,6 +391,42 @@ The `AWS_ROLE_ARN` guard step in both jobs stays regardless. It is no longer des
 normal state, but it still gives a fork or a fresh clone with no variable set an explanatory
 failure instead of an opaque credentials error.
 
+### Actions are SHA-pinned, not tag-pinned
+
+Every `uses:` in both workflows names a full 40-character commit SHA with the version tag
+kept as a trailing comment, e.g.
+`uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5`. Pinned 2026-09-13:
+`actions/checkout` v5 → `fbc6f399…`, `astral-sh/setup-uv` v7 → `37802adc…`,
+`aws-actions/configure-aws-credentials` v4 → `7474bc46…`.
+
+The reason is credential access, not tidiness. `live-tests` and the scheduled build assume
+an AWS role via OIDC, so a third-party action runs in a job holding real credentials. A
+version tag is a mutable pointer: whoever controls the action's repository can move `v5` to
+different code at any time, accidentally or through a compromised maintainer account, and
+the workflow would silently run it with that credential access and no diff in this repo. A
+commit SHA cannot be moved.
+
+**The cost is real and falls on future version bumps.** Upgrading an action is no longer a
+one-character edit to the tag — the new SHA has to be looked up live and cross-checked
+before it goes in the file:
+
+```
+gh api repos/<owner>/<repo>/commits/<tag> --jq .sha       # always the commit SHA
+gh api repos/<owner>/<repo>/git/refs/tags/<tag>           # cross-check, see below
+gh api repos/<owner>/<repo>/commits/<sha> --jq .sha       # the SHA is a real commit
+```
+
+Mind the annotated-tag trap on the cross-check. `setup-uv@v7` and
+`configure-aws-credentials@v4` are annotated tags, so `git/refs/tags` returns
+`object.type: tag` and a *tag object* SHA — not the commit, and pinning that value would
+break the workflow. Dereference it with `gh api repos/<owner>/<repo>/git/tags/<tag-object-sha>`
+and confirm it points at the same commit the `/commits/<tag>` call returned.
+`actions/checkout@v5` is a lightweight tag and returns `object.type: commit` directly. Never copy a SHA from
+memory or from another repository. The trailing `# v5` comment is human documentation only —
+editing it changes nothing about which code runs, so a bump that updates the comment and not
+the SHA is a silent no-op. Dependabot can maintain SHA pins if the manual lookup becomes a
+burden.
+
 Branch protection is repository configuration, not code. The `protect-main` ruleset
 (id `22415012`, active) requires exactly `validate` and `fixture-tests` — verified
 2026-09-10. Nothing else is required, and the scheduled build deliberately stays off that
