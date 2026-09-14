@@ -5,7 +5,7 @@ description = "Transforms fpl-ingest's raw S3 JSON into served fact and aggregat
 authors = [
     { name = "gisaf22", email = "safari.gisa@gmail.com" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "dbt-duckdb>=1.9",
 ]
