@@ -7,12 +7,14 @@
 # a raw shape change, a dedup edge case a new capture exposes, a served
 # contract drift — surfaces within hours instead of at the next manual run.
 #
-# WHAT THIS IS NOT: it does not publish anything. The `dev` target writes
-# .local/warehouse.duckdb on the runner, which is destroyed with the runner, so
-# the built tables go nowhere and fpl-intelligence does not read them. See
-# CLAUDE.md, "Served contract" — consumers read the DuckDB file directly and
-# there is no shared served database to write to today. This workflow is a
-# validation signal, not a deployment.
+# It is also the publish path. The `dev` target writes .local/warehouse.duckdb
+# on the runner, which still dies with the runner — but the final step now
+# exports both fct_ tables from it to parquet and uploads them to
+# s3://fpl-data-safari/served/, overwritten in place, alongside a
+# _manifest.json. That is what fpl-intelligence reads, via
+# duckdb.read_parquet() against those stable keys. See CLAUDE.md,
+# "Served contract". So this workflow is both a validation signal and a
+# deployment, and a build that fails its tests publishes nothing.
 #
 # Scheduling is deliberately a cron offset rather than a repository_dispatch
 # fired by fpl-ingest on completion. A true trigger-on-completion is the
@@ -141,3 +143,19 @@ jobs:
       # there is no path where a real failure lands as a passing warning.
       - name: Build and test against live S3
         run: uv run dbt build
+
+      # Publishes the two served fact tables to s3://fpl-data-safari/served/,
+      # overwriting in place — no dated keys, no versioning. Consumers read the
+      # current objects; there is no published history to pin to.
+      #
+      # if: success() is explicit rather than implied. The default for a step is
+      # already success(), so this changes nothing today, but it states the
+      # invariant the publish depends on: a failed or partially-tested build
+      # must never overwrite good served data. Anyone adding continue-on-error
+      # or an always() step above has to step past this line to break it.
+      #
+      # The script's own row-count floor is the second guard, for the case dbt
+      # exits 0 having built a table that is empty for an upstream reason.
+      - name: Publish served tables to S3
+        if: success()
+        run: uv run python scripts/publish_served.py
