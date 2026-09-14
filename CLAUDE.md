@@ -127,6 +127,41 @@ not silently corrected.
 fpl-intelligence must never query staging directly — only `fct_player_fixture` and
 `fct_player_gameweek`.
 
+### Where the served tables live
+
+Both `fct_` models are published as parquet to fixed keys, overwritten in place after every
+successful scheduled build (see "Scheduled build"):
+
+```
+s3://fpl-data-safari/served/fct_player_fixture.parquet
+s3://fpl-data-safari/served/fct_player_gameweek.parquet
+s3://fpl-data-safari/served/_manifest.json
+```
+
+Consumers read them with `duckdb.read_parquet()` against those stable keys — they do not
+connect to a DuckDB database file, and there is no shared served database.
+
+`_manifest.json` describes what is currently published, not a history of publishes. It
+carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
+from, and a `row_counts` object for both tables. A consumer that wants a consistency check
+can compare those counts against what it actually reads.
+
+**No dated or versioned keys, and no staging/promote step.** The keys are stable so
+consumers need no discovery logic, and the objects are overwritten because there is no
+requirement to pin a historical build. The full "only publish on success" guarantee is two
+things and nothing more:
+
+1. `dbt build` interleaves each model with its own tests in DAG order and exits non-zero on
+   any model error or test failure, so the publish step never runs on a build whose
+   assertions did not hold.
+2. `scripts/publish_served.py` re-reads each exported parquet file and exits non-zero if
+   either is below `ROW_FLOOR`, which catches a build that exited 0 having produced an empty
+   or truncated table for an upstream reason.
+
+Neither is atomic across the two objects: they are uploaded by two separate `put_object`
+calls, so a reader can in principle catch one updated and the other not. Accepted for now
+— revisit if a consumer turns out to need a cross-table point-in-time read.
+
 **Enforced (dbt refuses to parse or build on violation):**
 
 - Every model belongs to the `warehouse_internal` group (`models/groups.yml`).
@@ -148,14 +183,14 @@ fpl-intelligence must never query staging directly — only `fct_player_fixture`
 
 **Documented only, NOT enforced:**
 
-- **Raw SQL access to staging is not blocked.** The access modifier governs dbt `ref()`
-  resolution at parse time; it is not a database grant. `stg_player_fixture` is a real
-  table in the same DuckDB schema, and fpl-intelligence connects with raw SQL rather than
-  as a dbt project, so nothing here stops it from running
-  `select * from main.stg_player_fixture`. The boundary is enforced against dbt models and
-  is a convention for everything else. Making it real would need database-level grants (or
-  a separate served schema/database that consumers get access to), which this project does
-  not do today.
+- **The access modifier is not a database grant.** It governs dbt `ref()` resolution at
+  parse time. `stg_player_fixture` is a real table in the same DuckDB schema, so anything
+  holding the built `.duckdb` file can run `select * from main.stg_player_fixture` — the
+  boundary is enforced against dbt models and is a convention for everything else.
+  Publishing narrows this in practice rather than by enforcement: only the two `fct_`
+  parquet files are uploaded, so a consumer reading `served/` has no path to staging at
+  all. That is a property of what the publish step happens to write, not a grant, and it
+  holds only as long as nothing else is added under that prefix.
 - The `fpl_intelligence` exposure in `models/exposures.yml` declares the two `fct_` models
   as its dependencies. That documents the contract and puts it in the DAG; it enforces
   nothing.
@@ -475,21 +510,24 @@ test in the project is `error` severity — there is no `severity: warn` anywher
 real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
 
-**What it does not do: publish — a deferred decision, not a bug.** The `dev` target writes
-`.local/warehouse.duckdb` on the runner, which dies with the runner. Nothing downstream
-reads the result — see "Served contract", where consumers read the DuckDB file directly and
-there is no shared served database to write to. This workflow proves the project still
-builds and every assertion still holds against real accumulated data, and that is the whole
-intended scope of this phase.
+**It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
+runs `scripts/publish_served.py`, which exports both `fct_` tables to parquet and uploads
+them to `s3://fpl-data-safari/served/` alongside a `_manifest.json`. Layout, format and the
+publish-on-success guarantee are specified under "Served contract" — this section covers
+only how the workflow invokes it.
 
-Publishing is deliberately out of scope here because **there is nothing to publish to yet.**
-fpl-intelligence integration is the next roadmap item and has not happened, so no consumer
-reads this output today. Writing the built tables to S3 now would mean inventing a served
-layout — location, format, partitioning, atomicity, retention — with no consumer to
-validate it against, and the odds of guessing right are poor. Continuous validation without
-publishing is the correct scope until fpl-intelligence integration defines what it actually
-needs to read; at that point publishing becomes real, specified work rather than
-speculation. Do not read the absent S3 write as an oversight in this workflow.
+This workflow was previously validation-only, and that was a deliberate scope decision
+rather than an oversight: publishing was deferred because no consumer read the output, and
+inventing a served layout with nothing to validate it against was judged worse than waiting.
+**That decision has been resolved — the layout is now specified and the workflow publishes.**
+Any comment or prose elsewhere arguing the absent S3 write is intentional is stale; the
+`dev` target still writes `.local/warehouse.duckdb` on the runner and that file still dies
+with the runner, but it is now the source for the parquet export rather than the end of the
+line.
+
+**The publish step is gated on `if: success()`**, which is a step's default — stated
+explicitly so that the invariant is visible to anyone adding a `continue-on-error` or an
+`always()` step above it. A failed build cannot overwrite good served data.
 
 **Credentials.** Same OIDC pattern as `live-tests`: `vars.AWS_ROLE_ARN` plus
 `aws-actions/configure-aws-credentials@v4`, guarded by an explicit check that names the
@@ -500,6 +538,30 @@ that already admits main covers this workflow with no change. Note the session i
 `AssumeRoleWithWebIdentity` session (1 hour by default), not the 15-minute `aws login`
 export that forced `threads: 32` locally, so this build is not racing its credentials.
 Keep `threads: 32` regardless — without it the S3 read alone was 901s locally.
+
+**The role reads raw and writes served, under one inline policy.** Publishing needed a
+permission change but **not** a trust-policy change — the distinction is
+authorization versus authentication. The trust policy governs who may assume the role,
+which is unchanged: the same OIDC subject assumes the same role for the same reason. What
+changed is what the role is permitted to do once assumed, which lives in its inline
+permissions policy. Confirmed live via `aws iam get-role-policy` — inline policy
+`fpl-warehouse-s3-read`, three statements:
+
+- `ReadRawCaptures` — read access to `arn:aws:s3:::fpl-data-safari/raw/*`, what the build
+  consumes.
+- `ListBucketForGlobExpansion` — bucket-level `ListBucket`, which DuckDB's glob expansion
+  over the raw tree requires; object-level read alone is not sufficient.
+- `WriteServedOutputs` — `s3:PutObject` on `arn:aws:s3:::fpl-data-safari/served/*`, what the
+  publish step needs.
+
+Note the policy *name* predates the write grant and is now a misnomer: `-s3-read` describes
+what the role originally did, not what it does. The statement names are the accurate
+description. Renaming it is cosmetic and would require updating the role, so it has been
+left alone deliberately — do not read the name as evidence the write grant is missing.
+
+The write grant is scoped to the `served/` prefix, so a bug in the publish step cannot
+overwrite anything under `raw/`. That containment is the reason to keep the two statements
+separate rather than widening one to the whole bucket.
 
 **Measured CI runtime, 2026-09-10 (run `34501607108`): `dbt build` took 9m57s**, job total
 10.3m — longer than the 7m53s measured locally, so size timeouts against this figure rather
