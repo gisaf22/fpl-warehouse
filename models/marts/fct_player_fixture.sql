@@ -26,8 +26,13 @@
 --   and ratified captures of the same fixture — 558 keys have both.
 --
 --   Preference order:
---     1. ratified (both scores non-NULL) over provisional;
+--     1. scored (both scores non-NULL) over provisional;
 --     2. within that, the most recent capture.
+--
+--   This ordering stays score-based deliberately. It ranks two *captures* of
+--   the same fixture, and event-status is round-level — it cannot say which of
+--   them carries the better data. It is unrelated to the `is_ratified` column
+--   below, which no longer derives from scores.
 --
 --   Picking arbitrarily here reintroduces the zeroed-stat corruption class
 --   that fpl-ingest's settlement-transition fix exists to prevent. See
@@ -60,10 +65,38 @@
 --
 -- Columns:
 --   Every stg_player_fixture column passes through unchanged — staging owns
---   the typing — plus `is_ratified`, false when even the surviving capture is
---   still provisional because no ratified one exists yet (a round
---   mid-settlement). Consumers wanting settled data only should filter on it
---   rather than re-deriving it from the scores.
+--   the typing — plus `is_ratified`, false while the round this fixture belongs
+--   to is still mid-settlement. Consumers wanting settled data only should
+--   filter on it rather than re-deriving it from the scores.
+--
+-- is_ratified — sourced, not inferred:
+--   The flag comes from int_round_ratification, which rolls up FPL's own
+--   event-status endpoint. It previously read `both scores are non-NULL`,
+--   using scoreline publication as a proxy for points ratification. Those are
+--   different events: scores appear at full time, bonus points are applied
+--   hours later, so the proxy reported ratified during the settle window while
+--   `bonus` was still 0. It also could not see the rest of the round — a
+--   player whose Saturday fixture finished read ratified while the round's
+--   Monday match was unplayed.
+--
+--   Note the meaning this sharpens: the flag is a property of the *round*,
+--   carried on each of its fixture rows. A fixture with a final score in a
+--   round that has not settled is now false, which is the correction.
+--
+--   Bounded fallback — rounds predating capture history:
+--   event-status serves only the current round's dates, and all three raw
+--   endpoints' capture history begins 2026-08-29, after round 1 of 2026-27 had
+--   already finished and settled. Round 1 therefore appears in zero
+--   event-status captures and its finality is unrecoverable from the source.
+--   For a round absent from event-status entirely whose fixtures kicked off
+--   before that date, a final scoreline is accepted as proof of ratification —
+--   safely, because such a round settled weeks ago.
+--
+--   This is a dated, bounded backfill for one round of one season, not a
+--   revival of the general inference. A round absent from event-status with a
+--   kickoff on or after the cutoff reads false, never fallback. When raw
+--   history for 2026-27 is superseded the clause becomes dead and should be
+--   deleted rather than re-dated. See CLAUDE.md, "Round ratification".
 -- =============================================================================
 
 with captures as (
@@ -108,8 +141,13 @@ ranked as (
 
     select
         captures.*,
-        captures.team_h_score is not null
-            and captures.team_a_score is not null            as is_ratified,
+        coalesce(
+            ratification.is_ratified,
+            -- Bounded fallback for rounds predating capture history; see header.
+            captures.kickoff_time < timestamp '2026-08-29 00:00:00'
+                and captures.team_h_score is not null
+                and captures.team_a_score is not null
+        )                                                   as is_ratified,
         row_number() over (
             partition by captures.fpl_id, captures.fixture_id
             order by
@@ -120,6 +158,8 @@ ranked as (
         ) as capture_rank
     from captures
     inner join current_keys using (fpl_id, fixture_id)
+    left join {{ ref('int_round_ratification') }} as ratification
+        on ratification.round = captures.round
 
 )
 

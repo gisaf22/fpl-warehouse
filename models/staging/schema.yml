@@ -23,3 +23,11 @@ models:
       not part of the served contract.
     group: warehouse_internal
     access: private
+
+  - name: stg_event_status
+    description: >
+      1:1 with the event-status `status` array — one row per (round, match_date)
+      per capture, typing and renaming only. The round-level rollup lives in
+      int_round_ratification. Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private

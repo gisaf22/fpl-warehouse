@@ -1,0 +1,24 @@
+{
+ "_fixture_note": "Verbatim event-status capture \u2014 no filtering and no edits; the payload is small enough to keep whole. Covers round(s) [4]. See EVENT-STATUS CAPTURES in build_fixtures.py for why these dates were chosen.",
+ "leagues": "",
+ "status": [
+  {
+   "bonus_added": false,
+   "date": "2026-09-12",
+   "event": 4,
+   "points": "p"
+  },
+  {
+   "bonus_added": false,
+   "date": "2026-09-13",
+   "event": 4,
+   "points": "p"
+  },
+  {
+   "bonus_added": false,
+   "date": "2026-09-14",
+   "event": 4,
+   "points": "p"
+  }
+ ]
+}

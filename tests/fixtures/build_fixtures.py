@@ -16,6 +16,7 @@ models parse capture identity out of the object key itself:
 
     raw/fpl/element-summary/{fpl_id}/{extraction_date}/{run_id}/payload.json
     raw/fpl/bootstrap-static/{extraction_date}/{run_id}/payload.json
+    raw/fpl/event-status/{extraction_date}/{run_id}/payload.json
 
 CAPTURES
 --------
@@ -35,6 +36,42 @@ Several captures of the same key is the point. A single-capture fixture passes
 every dedup assertion in the integration tier vacuously — there is nothing to
 collapse — which is the failure mode CLAUDE.md warns about under "Making the
 fast tiers a real PR check".
+
+EVENT-STATUS CAPTURES
+---------------------
+event-status is captured on its own axis, NOT on the four runs above, and
+EVENT_STATUS_RUNS below is deliberately a different list. Two reasons:
+
+  1. The endpoint serves only the *current* round's match dates — a finished
+     round rolls out of the window completely. So whether a round is ever seen
+     ratified depends entirely on which dates were captured, and the four runs
+     above happen to land only on in-progress days. Built from those alone, the
+     fixture would report every round unratified and the ratified path would
+     never be exercised.
+
+  2. The endpoint is a different key layout with no player fan-out, so there is
+     nothing tying its captures to the element-summary runs.
+
+The five captures below are all real and unedited, chosen to give the fixture
+one round in each state the served layer must handle:
+
+    round 1  absent from every capture  -> the pre-history fallback
+    round 2  seen ratified  (09-02)     -> ratified via the source
+    round 3  seen ratified  (09-08)     -> ratified via the source
+    round 4  provisional only (09-14)   -> the disagreement case
+
+Round 4 is the regression test for the fix, and it is real rather than
+synthetic. In R4's element-summary capture every round-4 history row already
+carries a final scoreline, so the retired inference (`both scores non-NULL`)
+called round 4 ratified. event-status on the same day reports `points: "p"`
+and `bonus_added: false` — the round was played but bonus points had not been
+applied. A fixture tree without the 09-14 event-status capture would let the
+old and new logic agree everywhere and prove nothing.
+
+The 08-29 and 09-06 captures are included so a round is present in the
+provisional state *before* the capture that ratifies it, which is what makes
+the "ever observed ratified" rollup in int_round_ratification non-vacuous:
+with only the ratified captures, bool_or would have nothing to override.
 
 R4 exists so the departed player (4, below) has finished rounds *after* their
 departure. With R1-R3 alone the only finished rounds were 1 and 2, both of
@@ -173,6 +210,17 @@ RUNS = [
     ("20260831T203609Z-227b9b", "2026-08-31"),
     ("20260906T191056Z-6d5820", "2026-09-06"),
     ("20260914T211204Z-a730c3", "2026-09-14"),
+]
+
+# (run_id, extraction_date) for event-status — a separate axis from RUNS above.
+# See EVENT-STATUS CAPTURES for why these dates and not the four runs.
+EVENT_STATUS_RUNS = [
+    ("20260829T191108Z-b12d19", "2026-08-29"),  # round 2 provisional
+    ("20260902T071919Z-34bc3a", "2026-09-02"),  # round 2 RATIFIED
+    ("20260906T191056Z-6d5820", "2026-09-06"),  # round 3 provisional
+    ("20260908T071742Z-02f914", "2026-09-08"),  # round 3 RATIFIED
+    ("20260914T211204Z-a730c3", "2026-09-14"),  # round 4 provisional — the
+                                                # disagreement case
 ]
 
 # fpl_id -> the note stamped into that player's payloads.
@@ -343,6 +391,21 @@ def main() -> None:
         sys.exit(
             "DEPARTED last_run_id is the final run, so the player is never "
             "actually removed — the fixture would prove nothing"
+        )
+
+    for run_id, date in EVENT_STATUS_RUNS:
+        print(f"{date} {run_id}  event-status")
+        payload = s3_get(f"{RAW_PREFIX}/event-status/{date}/{run_id}/payload.json")
+        rounds = sorted({e["event"] for e in payload["status"]})
+        payload["_fixture_note"] = (
+            "Verbatim event-status capture — no filtering and no edits; the "
+            "payload is small enough to keep whole. Covers round(s) "
+            f"{rounds}. See EVENT-STATUS CAPTURES in build_fixtures.py for why "
+            "these dates were chosen."
+        )
+        write(
+            OUT_ROOT / "event-status" / date / run_id / "payload.json",
+            payload,
         )
 
     for run_id, date in RUNS:

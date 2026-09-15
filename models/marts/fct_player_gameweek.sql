@@ -92,7 +92,12 @@ select
     min(fixtures.kickoff_time)                          as first_kickoff_time,
     max(fixtures.kickoff_time)                          as last_kickoff_time,
 
-    -- Every contributing fixture came from a ratified capture; NULL when blank
+    -- The round's finality, per FPL's event-status (see fct_player_fixture);
+    -- every contributing fixture carries the same value, so this aggregate is
+    -- a pass-through that stays NULL for a blank round — which
+    -- fct_test_player_gameweek_counted_round_has_kickoff asserts. Joining
+    -- int_round_ratification here instead would give a blank round the round's
+    -- real flag and break that contract.
     bool_and(fixtures.is_ratified)                      as is_ratified,
 
     -- Appearance (additive)
