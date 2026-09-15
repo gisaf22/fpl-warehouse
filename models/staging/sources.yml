@@ -62,3 +62,37 @@ sources:
               union_by_name = true,
               filename = true
             )
+
+      - name: event_status
+        description: >
+          FPL's authoritative points-finality signal — the source of truth for
+          whether a round's scores are ratified, replacing the per-fixture
+          score-non-null inference the served layer used previously.
+
+          The payload is `{"status": [...], "leagues": "..."}`. `status` is one
+          row per (event, match-date), NOT one per round: a round spanning
+          three match days contributes three entries, and a round mid-transition
+          carries a mix of `points` values across them. Round-level finality is
+          therefore an aggregate, built in int_round_ratification — see that
+          model for the rule.
+
+          `status[].points` is a string with three observed values: `"r"`
+          (ratified), `"p"` (provisional) and `""` (empty, seen alongside `"p"`
+          while a round is in progress). `status[].bonus_added` is the boolean
+          companion. `leagues` is a top-level string (`""` / `"Updated"`) with
+          no per-round meaning and is not read.
+
+          Only the *current* round's dates are served — a finished round rolls
+          out of the window entirely. Every capture ever taken is read here
+          precisely so that finished rounds survive as history; the latest
+          object alone would report nothing about rounds already settled.
+
+          One object per run, same `{extraction_date}/{run_id}` key layout as
+          bootstrap-static, parsed the same way in staging.
+        meta:
+          external_location: >-
+            read_json(
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/event-status/*/*/payload.json',
+              union_by_name = true,
+              filename = true
+            )

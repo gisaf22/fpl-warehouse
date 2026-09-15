@@ -8,3 +8,12 @@ models:
       including blanks. Internal: not part of the served contract.
     group: warehouse_internal
     access: private
+
+  - name: int_round_ratification
+    description: >
+      One row per round carrying FPL's authoritative points-finality flag,
+      rolled up from stg_event_status across match dates and across every
+      capture ever taken. The source of truth for is_ratified in both served
+      models. Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private

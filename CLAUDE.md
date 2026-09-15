@@ -77,6 +77,100 @@ ties. There is no `metadata.json` alongside element-summary payloads to read ins
 
 ---
 
+## Round ratification — `is_ratified` is sourced, not inferred
+
+`is_ratified` on both served models comes from FPL's `event-status` endpoint, via
+`stg_event_status` -> `int_round_ratification`. **Do not re-derive it from the scoreline.**
+
+Until 2026-09-14 it was inferred in `fct_player_fixture` as `team_h_score is not null and
+team_a_score is not null`, i.e. scoreline publication used as a proxy for points
+ratification. Those are different events. Scores appear at full time; bonus points are
+applied hours later, typically the next morning. In that window the inference reported
+`is_ratified = true` while `bonus` was still 0 — the served flag said "safe to use" about
+rows whose points were not final. It was also blind to the rest of the round: a player
+whose Saturday fixture had finished read ratified while the round's Monday match was
+still unplayed.
+
+Confirmed against live S3 on 2026-09-14, over every `event-status` capture in the bucket:
+
+- The payload is `{"status": [...], "leagues": "..."}`. **`status` is one row per
+  `(event, match-date)`, not one per round** — a round spanning three match days
+  contributes three entries, and a round mid-transition carries a mix of values across
+  them within a single payload. Round-level finality is therefore an aggregate.
+- `status[].points` is a string with three observed values: `"r"`, `"p"` and `""`. The
+  empty string is an in-progress state seen alongside `"p"`, not a missing one; both are
+  treated as not-ratified. `status[].bonus_added` is the boolean companion and moves with
+  `points` in every capture observed.
+- **Only the current round's dates are served.** A finished round rolls out of the window
+  completely — the 2026-09-14 payload mentions round 4 and nothing else.
+
+That last point drives the rollup rule in `int_round_ratification`, which is two-level and
+must stay that way:
+
+1. **Within one capture**, a round is ratified only when *every* dated entry for it is
+   ratified — `bool_and`, never `bool_or`.
+2. **Across captures**, a round is ratified if *any* capture ever said so. Resolving to the
+   latest capture the way `fct_player_fixture` resolves competing element-summary captures
+   would lose every past round, because the latest capture reports nothing about them.
+   Ratification is monotonic, so "ever observed ratified" is sound.
+
+### The 2026-08-29 fallback — bounded, and meant to die
+
+All three raw endpoints' capture history begins **2026-08-29**, after round 1 of 2026-27
+had already finished and settled. Round 1 therefore appears in **zero** `event-status`
+captures and its finality is unrecoverable from the source. A plain join would flip an
+entire round from `true` to `NULL`.
+
+So `fct_player_fixture` accepts a final scoreline as proof of ratification for a round that
+is absent from `event-status` entirely *and* whose kickoff predates that date. This is a
+dated backfill for one round of one season, not a revival of the general inference — a
+round absent from `event-status` with a kickoff on or after the cutoff reads `false`, never
+fallback. When raw history for 2026-27 is superseded, **delete the clause rather than
+re-dating it.**
+
+### Migration — a breaking change to the served contract (2026-09-15)
+
+The column's name and type are unchanged, so the enforced contract in
+`models/marts/schema.yml` does not move. **Its values do.** Measured against live S3 on
+2026-09-15, over the latest element-summary capture and all 17 `event-status` captures:
+
+| round | old (inferred) | new (sourced) | rows |
+|---|---|---|---|
+| 1 | true | true | 610 — via the 2026-08-29 fallback |
+| 2 | true | true | 626 |
+| 3 | true | true | 654 |
+| 4 | **true** | **false** | **658 — changed** |
+
+**658 rows in `fct_player_fixture` flip `true` -> `false`**, plus the corresponding rows in
+`fct_player_gameweek`. Every one is a genuine correction, not a join defect: round 4 was
+played and scored by the 2026-09-14 capture but `event-status` reported `points: "p"` and
+`bonus_added: false` — bonus points had not been applied, so those rows' `bonus` and BPS
+were not final while the old flag said they were.
+
+Round 4's divergence is transient — it resolves the moment FPL ratifies the round. The
+*class* is not: it recurs every gameweek for the hours between full time and bonus
+application, which is exactly the window the fix exists to close.
+
+**No special first-deploy handling is needed.** Both served models are full-refresh tables,
+so the next scheduled build republishes `served/` with corrected values and no backfill,
+migration or manual step. This is safe today only because no consumer reads these tables in
+production yet. It is recorded as breaking regardless: the semantics change even for rows
+whose value does not, since `is_ratified` now means "FPL has ratified this round" rather
+than "a scoreline exists for this fixture". Any future consumer that started reading
+`served/` before this date and cached `is_ratified` would need to re-read.
+
+### What the column means to a consumer
+
+The flag is a property of the *round*, carried on each of its fixture rows. On
+`fct_player_gameweek` it stays a `bool_and` over the round's fixtures rather than a direct
+join, deliberately: every contributing fixture carries the same value, so the aggregate is
+a pass-through that keeps returning `NULL` for a blank round — the contract
+`fct_test_player_gameweek_counted_round_has_kickoff` asserts. Joining
+`int_round_ratification` there instead would hand a blank round the round's real flag and
+break it.
+
+---
+
 ## Retracted history rows
 
 **FPL sometimes deletes a history row it published earlier.** Confirmed on 2026-09-03: two
