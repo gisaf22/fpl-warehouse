@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [166, 233, 426, 427, 611] and `events` kept whole (all 38 rounds, so the spine's calendar is real). Every other top-level key is dropped \u2014 stg_player reads `elements` and stg_gameweek reads `events`, nothing else. The element and event objects themselves are verbatim.",
+ "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [166, 233, 426, 427, 611] and `events` kept whole (all 38 rounds, so the spine's calendar is real). Every other top-level key is dropped \u2014 stg_player reads `elements` and stg_gameweek reads `events`, nothing else. The element and event objects themselves are verbatim. Player 4 is deliberately ABSENT: a synthetic departure, removed from `elements` for every run after 20260831T203609Z-227b9b. See DEPARTED in build_fixtures.py.",
  "elements": [
   {
    "assists": 0,
