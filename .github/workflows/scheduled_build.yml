@@ -76,10 +76,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # The build is ~10 minutes measured (run 34501607108, 9m57s of dbt plus
-    # setup). This bounds a hung S3 read rather than letting it burn the
-    # 6-hour default, while leaving 3x headroom over the real figure.
-    timeout-minutes: 30
+    # Bounds a hung S3 read rather than letting it burn the 6-hour default.
+    #
+    # Sized against the worst observed run, not the typical one, because the
+    # element-summary read varies far more than it grows. Measured at 32
+    # threads over ~74k objects within 18 hours of each other:
+    #
+    #   2026-09-15 07:49  stg_player_fixture 409s   job  7m11s
+    #   2026-09-15 19:48  stg_player_fixture 441s   job  7m43s
+    #   2026-09-16 01:40  stg_player_fixture 925s   job 15m50s
+    #
+    # That 2.3x spread at identical configuration is the thing to survive; the
+    # old 30 was 3x headroom over a 10.3m build (run 34501607108) that is no
+    # longer representative, and 15m50s had already eaten half of it.
+    #
+    # 45 keeps roughly the same 3x rule against 15m50s. It is deliberately not
+    # higher: the OIDC session is one hour, so a longer budget lets a genuinely
+    # stuck build race its own credentials and die with an opaque expiry
+    # instead of a clean timeout. 45 plus ~1m of setup leaves that margin
+    # intact.
+    #
+    # Re-check this against the worst run, not the median, whenever the raw
+    # tree grows materially.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
