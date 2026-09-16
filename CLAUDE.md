@@ -318,7 +318,7 @@ dbt test --select tag:e2e
 
 **`unit` and `integration` build against a checked-in fixture, not against S3.**
 `--target fixtures` points the raw source at `tests/fixtures/raw` — three real captures
-over five players, ~430 KB — instead of the live bucket's ~26k objects. The tree is real
+over five players, ~430 KB — instead of the live bucket's ~74k objects. The tree is real
 captured data, trimmed; `tests/fixtures/build_fixtures.py` documents every edge case it
 covers and regenerates it from S3 when one needs adding.
 
@@ -357,11 +357,11 @@ tiers mean the same thing:
 |---|---|---|---|
 | `unit` | Single-model grain and structure — PK uniqueness, `not_null`, range and cross-column bounds within one row. No cross-model logic. | Fixture | Seconds, no credentials |
 | `integration` | Cross-model and business logic — dedup correctness, ratified-preference, retracted rows, spine completeness, `fixture_count` against the real fixtures. Runs against whatever is already built. | Fixture | Seconds, no credentials |
-| `e2e` | The full build against live S3 from scratch. Hits real infrastructure, excluded from the default run. | Live S3 | ~8 min, needs a session |
+| `e2e` | The full build against live S3 from scratch. Hits real infrastructure, excluded from the default run. | Live S3 | 7-16 min, needs a session |
 
 **That split is the standard one, and it was not before.** `unit` and `integration` are
 supposed to be fast and hermetic; until the fixture tree landed both required a full
-production read of ~26k objects before a single assertion could run, which made every PR
+production read of ~74k objects before a single assertion could run, which made every PR
 check a read of live data and made the tiers unusable in CI at all. Only `e2e` is meant to
 touch real infrastructure, and now only `e2e` does.
 
@@ -453,7 +453,7 @@ which is what the fast tiers do). For an ad-hoc build against some other local t
 but note that a single-capture tree passes every dedup assertion vacuously, which is what
 the fixture tree exists to avoid.
 
-**Build cost — staging reads ~26k S3 objects.** Because `stg_player_fixture` was once
+**Build cost — staging reads ~74k S3 objects.** Because `stg_player_fixture` was once
 materialized as a view, *every* consumer re-read it: the fact model, then each test that
 references staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's
 lifetime partway through and failed with `ExpiredToken`. Materializing staging as a table
@@ -467,13 +467,50 @@ The credential source is the constraint: `aws configure export-credentials`, bac
 back on. At DuckDB's default of one thread per core the element-summary read had grown to
 901s — 15.0 minutes — so it raced the token and lost mid-read.
 
-The read is bound by HTTP round-trip latency, not CPU, so the number of concurrent
-requests is what matters. Measured over an 8,436-object subset: **474s at 4 threads, 49s
-at 32.** **Resolved: `profiles.yml` sets `threads: 32` in its `settings:` block** — DuckDB's
-own thread count, distinct from the `threads: 4` above it that sets dbt's model
-concurrency. A full `dbt build` then completes in **7m53s**, comfortably inside the token
-window. Treat that setting as a correctness requirement rather than a speed preference:
-lowering it puts the build back in a race with the credential lifetime.
+At low thread counts the read is bound by HTTP round-trip latency rather than CPU, so the
+number of concurrent requests is what matters. Measured over an 8,436-object subset:
+**474s at 4 threads, 49s at 32** — near-linear. **Resolved: `profiles.yml` sets
+`threads: 32` in its `settings:` block** — DuckDB's own thread count, distinct from the
+`threads: 4` above it that sets dbt's model concurrency. A full `dbt build` then completed
+in **7m53s**, comfortably inside the token window. Locally that setting is a correctness
+requirement rather than a speed preference: lowering it puts the build back in a race with
+the 15-minute credential lifetime. In CI, where the OIDC session is an hour, it is a
+performance setting.
+
+### The latency-bound model does not extrapolate — measured 2026-09-16
+
+The paragraph above was written as a general rule and used to justify oversubscribing the
+cores without an upper bound. **It holds only in the range it was measured (4 → 32, on a
+subset, locally).** Measured on a CI runner over the full ~74k tree, via the
+`duckdb_threads` dispatch input on `live-tests`:
+
+| threads | `stg_player_fixture` | glob (LIST only) | peak RSS |
+|---|---|---|---|
+| 64 | 332s | 16.6s | 14.6 GiB |
+| 128 | **397s — slower** | **86.5s — 5.2x worse** | 14.4 GiB |
+
+Peak RSS is pinned at ~14.5 GiB of the runner's 15.6 GiB at *both thread counts*, so
+somewhere below 128 the read stops being bound by round trips and becomes bound by memory.
+Past that point more threads buy queueing, not concurrency. That peak RSS was measured with
+`preserve_insertion_order: false` already set, which suggests the workload's memory
+appetite sits near the runner's ceiling independent of that setting — **not confirmed
+against the setting reversed**, since the two have never been compared at the same thread
+count.
+
+**A second term the old model ignored now dominates: run-to-run variance.** The same build
+at 32 threads took **409s, 441s and 925s** across three runs within 18 hours
+(2026-09-15 07:49, 2026-09-15 19:48, 2026-09-16 01:40), against job totals of 7m11s, 7m43s
+and 15m50s. That **2.3x spread at identical configuration is larger than any difference
+measurable between 32 and 64 threads**, which is why no thread-count change is recommended
+on the strength of a single pair of timings. Treat any one timing as a sample, never as
+the figure, and size timeouts against the worst observed run rather than the median — that
+is what `scheduled_build.yml`'s `timeout-minutes: 45` is sized on.
+
+**LIST is not the cost.** Glob expansion is **16.6s**, ~4-5% of the build. The listing
+returns **148,120 keys for 74,060 payloads — exactly 2.0x**, because every payload has a
+`metadata.json` sidecar the models never read. All three glob patterns tested cost the
+same, including one matching zero keys: DuckDB lists the whole wildcard-free prefix and
+matches client-side, so **narrowing the glob by date would not reduce LIST at all.**
 
 Also note the read is memory-hungry: loading all element-summary payloads in one
 `read_json` OOM'd at 12.7 GiB on default settings. **Resolved: `preserve_insertion_order:
@@ -630,8 +667,10 @@ missing variable. A scheduled run's OIDC subject is the ref form
 default branch — there is no distinct `schedule` subject format, so a role trust policy
 that already admits main covers this workflow with no change. Note the session is an
 `AssumeRoleWithWebIdentity` session (1 hour by default), not the 15-minute `aws login`
-export that forced `threads: 32` locally, so this build is not racing its credentials.
-Keep `threads: 32` regardless — without it the S3 read alone was 901s locally.
+export that forced `threads: 32` locally, so this build is not racing its credentials and
+32 is a performance setting here rather than a correctness one.
+Keep `threads: 32` regardless — but not because more is better: 64 and 128 were measured
+on this runner and 128 is *slower*. See "The latency-bound model does not extrapolate".
 
 **The role reads raw and writes served, under one inline policy.** Publishing needed a
 permission change but **not** a trust-policy change — the distinction is
@@ -657,8 +696,27 @@ The write grant is scoped to the `served/` prefix, so a bug in the publish step 
 overwrite anything under `raw/`. That containment is the reason to keep the two statements
 separate rather than widening one to the whole bucket.
 
-**Measured CI runtime, 2026-09-10 (run `34501607108`): `dbt build` took 9m57s**, job total
-10.3m — longer than the 7m53s measured locally, so size timeouts against this figure rather
-than the local one. Effectively all of it is one model: `stg_player_fixture` took 593s of
-the 597s, since that is the ~26k-object S3 read. Every other model is sub-second. Still
-comfortable against both the 30-minute job timeout and the 1-hour OIDC session.
+**Measured CI runtime, 2026-09-15/16.** Effectively the whole job is one model —
+`stg_player_fixture` is the S3 read and every other model is sub-second — so these are the
+same number twice:
+
+| run | `stg_player_fixture` | job total |
+|---|---|---|
+| 2026-09-15 07:49 | 409s | 7m11s |
+| 2026-09-15 19:48 | 441s | 7m43s |
+| 2026-09-16 01:40 | **925s** | **15m50s** |
+
+Size timeouts against the **worst** row, not the median: the spread is 2.3x at identical
+configuration, and it is variance in the S3 read rather than growth in the tree. That is
+what `timeout-minutes: 45` is sized on, and why it is not 30.
+
+**The figures this replaces were not merely outdated — they were already wrong when
+written.** The previous text paired "~26k objects" with "593s of the 597s" as though both
+came from run `34501607108` on 2026-09-10. They came from different dates: 25,611 payloads
+was counted on 2026-09-03, while 593s was measured a week later, by which time the tree
+held **at least 49,699** objects (directly counted from a staging build of 2026-09-07) —
+already roughly double the object count it was attributed to. Per-object cost was therefore
+overstated by about 2x, and the resulting "~10 minutes, comfortable against a 30-minute
+timeout" conclusion outlived the data behind it. The correction matters beyond the
+arithmetic: it is what made the build look like it had years of headroom when a single slow
+run had already reached half the timeout.

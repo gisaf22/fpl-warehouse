@@ -5,7 +5,7 @@ integration tiers build against.
 WHY THIS EXISTS
 ---------------
 `raw_root` defaults to s3://fpl-data-safari/raw, so every dbt model build read
-the live bucket — ~26k objects, ~8 minutes, and an AWS session. That made the
+the live bucket — ~74k objects, 7-16 minutes, and an AWS session. That made the
 `unit` and `integration` tiers neither fast nor hermetic: a PR check could not
 run them without credentials, and CI had no route to the bucket. This tree is
 the fixture the fast tiers build against instead. `--target fixtures` points

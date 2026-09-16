@@ -57,11 +57,11 @@ permissions:
   id-token: write
   contents: read
 
-# A build reads ~26k S3 objects and takes ~10 minutes (measured 2026-09-10,
-# run 34501607108). Overlapping runs would race on nothing shared, but they
-# would double the read for no benefit, so queue them instead. Not
-# cancel-in-progress: a run already most of the way through a full read should
-# be allowed to finish and report.
+# A build reads ~74k S3 objects and takes 7-16 minutes (measured 2026-09-15/16;
+# see the timeout comment below for the spread and why it is a spread).
+# Overlapping runs would race on nothing shared, but they would double the read
+# for no benefit, so queue them instead. Not cancel-in-progress: a run already
+# most of the way through a full read should be allowed to finish and report.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -133,9 +133,19 @@ jobs:
       # The session is an AssumeRoleWithWebIdentity session (1 hour by
       # default), not the 15-minute `aws login` export that forced the
       # threads: 32 setting locally — so the build is not racing its
-      # credentials here. Keep threads: 32 anyway; it is what makes this job
-      # ~10 minutes rather than far longer — the ~26k-object read in
-      # stg_player_fixture is 593s of the 597s total.
+      # credentials here, and 32 is a performance setting in CI rather than the
+      # correctness requirement it is locally.
+      #
+      # Keep it at 32 regardless, but not on the old reasoning that more
+      # concurrency is monotonically better: measured 2026-09-16 on this runner,
+      # 64 threads built stg_player_fixture in 332s and 128 in 397s — slower —
+      # with peak RSS pinned at ~14.5 GiB of the runner's 15.6 GiB in both. The
+      # read is memory-bound well before 128, not purely latency-bound. See
+      # CLAUDE.md, "S3 credentials for local dbt runs".
+      #
+      # Effectively the whole job is this one model: stg_player_fixture was 409s,
+      # 441s and 925s across three 32-thread runs within 18 hours, against job
+      # totals of 7m11s, 7m43s and 15m50s. Every other model is sub-second.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
