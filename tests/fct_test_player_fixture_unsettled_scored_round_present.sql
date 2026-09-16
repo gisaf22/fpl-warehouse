@@ -4,7 +4,7 @@
 --          yet ratified — the case where the retired inference and
 --          event-status disagree.
 -- Origin: new with the event-status source swap
--- Tier: integration
+-- Tier: integration (fixtures target only — see the guard below)
 {{ config(group='warehouse_internal', tags=['integration']) }}
 
 -- A precondition test, in the same spirit as
@@ -29,7 +29,29 @@
 -- so re-cutting the fixture against a later window keeps the test meaningful
 -- as long as it still spans a settlement transition.
 --
+-- Fixtures target only, guarded exactly as stg_test_player_departure_present
+-- is and for the same reason. In the pinned tree the precondition is true by
+-- construction. In the live tree it is true only during the hours between full
+-- time and bonus application, so against `dev` this asserts the state of FPL's
+-- settlement clock rather than anything about this repo.
+--
+-- That is not hypothetical: it ran green on the 07:49 scheduled build of
+-- 2026-09-15 and failed the 19:48 one the same day (run 35015868316) purely
+-- because the round had finished settling in between. A failed build does not
+-- publish, so an unguarded version of this test blocks `served/` twice a day
+-- for reasons that have nothing to do with the warehouse.
+--
+-- Guarded rather than retiered as e2e because it must run in the same fast PR
+-- check as the test whose non-vacuity it protects — that test is integration,
+-- and a guard in a tier nobody runs alongside it protects nothing.
+--
 -- Fails with a single row when no such round exists.
+
+{% if target.name != 'fixtures' %}
+
+select null as failure where false
+
+{% else %}
 
 with disagreeing_rounds as (
 
@@ -45,3 +67,5 @@ with disagreeing_rounds as (
 
 select 'no scored-but-unratified round in the fixture' as failure
 where (select count(*) from disagreeing_rounds) = 0
+
+{% endif %}
