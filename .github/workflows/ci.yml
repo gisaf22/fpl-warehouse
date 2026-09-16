@@ -101,7 +101,7 @@ jobs:
   # It needs no AWS credentials, no OIDC role and no repository variables,
   # because it does not read S3 at all. `--target fixtures` builds against
   # tests/fixtures/raw — a checked-in capture of real objects, three runs over
-  # five players — instead of the ~26k-object live bucket. That tree is what
+  # five players — instead of the ~74k-object live bucket. That tree is what
   # makes these tiers hermetic: see tests/fixtures/build_fixtures.py, which
   # documents every edge case it covers and regenerates it.
   #
