@@ -37,7 +37,20 @@ fpl_warehouse:
         # thread per core the full read took 901s — it failed mid-read with
         # ExpiredToken, having outgrown the staging-as-a-table fix that had
         # previously resolved the same error. See CLAUDE.md, "S3 credentials".
-        threads: 32
+        #
+        # Overridable by DBT_DUCKDB_THREADS purely so the value can be measured
+        # rather than assumed — ci.yml's live-tests job exposes it as a
+        # workflow_dispatch input. The default is unchanged and every build that
+        # does not set the variable behaves exactly as before. Raising it is not
+        # free: 32 threads already needed preserve_insertion_order: false below
+        # to avoid a 12.7 GiB OOM, and a runner has 16 GB.
+        # Quoted because dbt loads this file as YAML before rendering Jinja,
+        # so a bare {{ ... }} is read as a flow mapping and fails to parse. The
+        # string is not a compromise: the adapter emits every setting as
+        # `SET <key> = '<value>'` regardless (environments/__init__.py), so this
+        # is byte-identical to what `threads: 32` already produced, and a
+        # non-numeric value fails loudly at connect time with a cast error.
+        threads: "{{ env_var('DBT_DUCKDB_THREADS', '32') }}"
       extensions:
         - httpfs
         - json
