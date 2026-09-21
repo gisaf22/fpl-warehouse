@@ -78,6 +78,34 @@ departure. With R1-R3 alone the only finished rounds were 1 and 2, both of
 which that player actually played, so the fixture could prove they stay in the
 spine but never that their post-departure rounds read fixture_count = 0.
 
+HISTORY SEASON
+--------------
+A second tree sits beside the live one:
+
+    history/{season}/fpl/bootstrap-static/{date}/{run_id}/payload.json
+    history/{season}/fpl/element-summary/{fpl_id}/{date}/{run_id}/payload.json
+
+It holds 2025-26, ported from the pre-S3 archive by
+scripts/rekey_history_season.py and trimmed here the same way the live tree is.
+Its purpose is to make the fast tiers multi-season, so the season partitioning
+in every dedup, retraction check and spine step is exercised on a PR instead of
+only against live S3 after the fact.
+
+One capture, not four: that season really was captured once, by a single run
+whose id (20260526T034626Z-2a6b73) the re-key script derives from the archived
+bootstrap's own digest. Every recency comparison over it is therefore a
+singleton — which is the point, and what the ratification override relies on.
+
+The calendar is kept whole and unedited: all 38 rounds report finished and
+data_checked, which is what fct_test_player_fixture_closed_season_settled
+requires before the closed-season override may call these rows ratified. No
+synthetic edit of any kind is applied to this tree — unlike the live one, it
+needs none, because the season is over.
+
+event-status is deliberately absent: FPL serves only the current round, so no
+capture of a finished season exists. That absence is exactly the condition the
+closed-season override exists to handle.
+
 WHAT EACH PLAYER COVERS
 -----------------------
 426, 427  Normal case. Both played rounds 1 and 2. Their round-2 key carries a
@@ -204,6 +232,36 @@ BUCKET = "fpl-data-safari"
 RAW_PREFIX = "raw/fpl"
 OUT_ROOT = Path(__file__).parent / "raw" / "fpl"
 
+# The ported history season — see HISTORY SEASON below.
+ARCHIVE_PREFIX = "archive/2025-26/raw"
+HISTORY_SEASON = "2025-26"
+HISTORY_RUN_ID = "20260526T034626Z-2a6b73"
+HISTORY_DATE = "2026-05-26"
+HISTORY_OUT_ROOT = Path(__file__).parent / "history" / HISTORY_SEASON / "fpl"
+
+# 2025-26 fpl_ids, chosen so the fixture exercises what a second season breaks.
+# Three of them (4, 166, 426) are ids the live tree also uses — for different
+# people — and two (119, 449) are the 2025-26 identities of live players 427 and
+# 426. Both shapes must survive: an id that means two people across seasons, and
+# a person who changes id.
+HISTORY_PLAYERS = {
+    4:   "Id collision. In 2026-27 fpl_id 4 is Gabriel; here it is a different "
+         "player entirely. Any dedup, retraction check or spine step that "
+         "partitions by fpl_id without season collapses these two people into "
+         "one row.",
+    166: "Id collision, second case — 2026-27's fpl_id 166 is N.Jackson, whose "
+         "2025-26 id was 251. Also the id whose live rows carry the retracted "
+         "ghost fixture, so a season-blind retraction check would drop this "
+         "season's rows as 'not in the player's latest capture'.",
+    426: "Id collision, third case, against the live tree's normal-settlement "
+         "player 426 (B.Fernandes this season).",
+    449: "The same person as the live tree's 426 — B.Fernandes, code 141746, "
+         "id 449 in 2025-26. player_code is the only thing that links them, "
+         "and nothing in any model may join on it.",
+    119: "The same person as the live tree's 427 — Mbeumo, code 446008, id 119 "
+         "in 2025-26.",
+}
+
 # (run_id, extraction_date) — see CAPTURES above.
 RUNS = [
     ("20260829T191108Z-b12d19", "2026-08-29"),
@@ -322,8 +380,59 @@ def s3_get(key: str) -> dict:
 def write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
-    print(f"  {path.relative_to(OUT_ROOT.parent.parent)}  "
+    print(f"  {path.relative_to(Path(__file__).parent)}  "
           f"{path.stat().st_size / 1024:.1f} KiB")
+
+
+def build_history_season() -> None:
+    """Write the trimmed 2025-26 tree from the archived pre-S3 capture.
+
+    Reads the archive rather than the re-keyed history tree, so this runs
+    before scripts/rekey_history_season.py has ever touched S3 and depends on
+    nothing that script wrote.
+    """
+    if HISTORY_OUT_ROOT.exists():
+        shutil.rmtree(HISTORY_OUT_ROOT)
+
+    boot = s3_get(f"{ARCHIVE_PREFIX}/bootstrap.json")
+    kept = sorted(HISTORY_PLAYERS)
+    unsettled = [
+        e["id"] for e in boot["events"]
+        if not (e["finished"] and e["data_checked"])
+    ]
+    if unsettled:
+        sys.exit(
+            f"archived {HISTORY_SEASON} calendar reports rounds {unsettled} not "
+            "finished and data_checked — the closed-season override would be "
+            "asserting something the source does not say"
+        )
+    print(f"{HISTORY_SEASON} {HISTORY_RUN_ID}  (history)")
+    write(
+        HISTORY_OUT_ROOT / "bootstrap-static" / HISTORY_DATE / HISTORY_RUN_ID
+        / "payload.json",
+        {
+            "_fixture_note": (
+                f"Trimmed bootstrap-static for the ported {HISTORY_SEASON} "
+                f"season. `elements` is filtered to players {kept} and "
+                "`events` kept whole — all 38 rounds, every one finished and "
+                "data_checked, which is what the closed-season override is "
+                "checked against. No synthetic edits. Sourced from "
+                f"s3://{BUCKET}/{ARCHIVE_PREFIX}/bootstrap.json; the element "
+                "and event objects are verbatim."
+            ),
+            "elements": [e for e in boot["elements"] if e["id"] in HISTORY_PLAYERS],
+            "events": boot["events"],
+        },
+    )
+
+    for fpl_id, note in HISTORY_PLAYERS.items():
+        payload = s3_get(f"{ARCHIVE_PREFIX}/players/{fpl_id}.json")
+        payload["_fixture_note"] = note
+        write(
+            HISTORY_OUT_ROOT / "element-summary" / str(fpl_id) / HISTORY_DATE
+            / HISTORY_RUN_ID / "payload.json",
+            payload,
+        )
 
 
 def add_synthetic_dgw(payload: dict) -> dict:
@@ -378,6 +487,11 @@ def is_departed(fpl_id: int, run_id: str) -> bool:
 
 
 def main() -> None:
+    history_only = "--history-only" in sys.argv
+    if history_only:
+        build_history_season()
+        return
+
     if OUT_ROOT.exists():
         shutil.rmtree(OUT_ROOT)
 
@@ -462,6 +576,11 @@ def main() -> None:
                 / "payload.json",
                 payload,
             )
+
+    # The second season, written last so a full regeneration produces both
+    # trees. `--history-only` rewrites just this one, leaving the live tree
+    # untouched.
+    build_history_season()
 
 
 if __name__ == "__main__":

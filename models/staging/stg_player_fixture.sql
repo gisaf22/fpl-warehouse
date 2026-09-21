@@ -42,6 +42,15 @@
 --   start instant, which is what `extracted_at` casts. These are the only
 --   real ordering fields available, and the served layer needs them to
 --   resolve competing captures of the same (fpl_id, fixture_id).
+--
+-- Season:
+--   `season` is part of capture identity. fpl_id, fixture_id and round are
+--   all reassigned every season, so every downstream dedup, retraction check
+--   and ratification lookup partitions by season as well — it keeps that
+--   within-season logic from ever reaching across a season boundary. It is
+--   never used to relate one season's rows to another's. The live raw layout
+--   has no season segment, so the value is stamped from the `season` var; the
+--   same column appears on every stg_ model.
 -- =============================================================================
 
 with raw as (
@@ -55,6 +64,7 @@ with raw as (
 
 select
     -- Capture identity
+    {{ season_from_filename() }} as season,
     cast(str_split(filename, '/')[-3] as date) as extraction_date,
     str_split(filename, '/')[-2]               as run_id,
     strptime(

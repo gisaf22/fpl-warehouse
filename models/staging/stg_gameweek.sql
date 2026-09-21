@@ -30,6 +30,7 @@ with raw as (
 
 select
     -- Capture identity (see stg_player_fixture for the key layout)
+    {{ season_from_filename() }} as season,
     cast(str_split(filename, '/')[-3] as date) as extraction_date,
     str_split(filename, '/')[-2]               as run_id,
     strptime(

@@ -19,6 +19,19 @@ sources:
       without credentials and without a ~26k-object production read — see
       tests/fixtures/build_fixtures.py for what that tree holds and why.
 
+      Two trees, one relation. bootstrap-static and element-summary are read
+      from the live tree AND from every ported history season under
+      `history_root` (tests/fixtures/history under the `fixtures` target), in a
+      single read_json over a list of globs rather than a UNION in staging — see
+      the reason noted on those `external_location`s. Each row carries its own
+      season, parsed from its key by the `season_from_filename` macro; no model
+      ever relates one season's rows to another's.
+
+      event-status is live-only on purpose: the endpoint serves only the
+      current round, so no capture of it exists for any closed season. A closed
+      season's finality comes from the `closed_seasons` override in
+      fct_player_fixture, checked against that season's own calendar.
+
       The switch is on `target.name` rather than on the var, so `--target
       fixtures` is a complete invocation: the target and the root it reads
       cannot be selected independently, and neither can be paired with the
@@ -38,9 +51,27 @@ sources:
           timestamp. `{extraction_date}/{run_id}` is parsed out of it in
           staging so the served layer can order competing captures.
         meta:
+          # One read over a list of globs: the live tree, plus each ported
+          # history season. read_json's union_by_name absorbs the schema drift
+          # between seasons, which a UNION of two sources in staging could not —
+          # the payload struct types differ. Season comes from each row's own key
+          # (season_from_filename). An empty history_root yields the live glob
+          # alone, so a build works before any season has been ported. Project
+          # macros are not available when dbt renders source YAML, so the list is
+          # spelled out here rather than built by one.
           external_location: >-
             read_json(
-              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/element-summary/*/*/*/payload.json',
+              [
+                {% if target.name == "fixtures" %}
+                'tests/fixtures/raw/fpl/element-summary/*/*/*/payload.json',
+                'tests/fixtures/history/*/fpl/element-summary/*/*/*/payload.json'
+                {% else %}
+                '{{ var("raw_root") }}/fpl/element-summary/*/*/*/payload.json'
+                {% if var("history_root") %}
+                , '{{ var("history_root") }}/*/fpl/element-summary/*/*/*/payload.json'
+                {% endif %}
+                {% endif %}
+              ],
               union_by_name = true,
               filename = true
             )
@@ -56,9 +87,27 @@ sources:
           selected downstream by the same `{extraction_date}/{run_id}` key
           fields used for element-summary.
         meta:
+          # One read over a list of globs: the live tree, plus each ported
+          # history season. read_json's union_by_name absorbs the schema drift
+          # between seasons, which a UNION of two sources in staging could not —
+          # the payload struct types differ. Season comes from each row's own key
+          # (season_from_filename). An empty history_root yields the live glob
+          # alone, so a build works before any season has been ported. Project
+          # macros are not available when dbt renders source YAML, so the list is
+          # spelled out here rather than built by one.
           external_location: >-
             read_json(
-              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/bootstrap-static/*/*/payload.json',
+              [
+                {% if target.name == "fixtures" %}
+                'tests/fixtures/raw/fpl/bootstrap-static/*/*/payload.json',
+                'tests/fixtures/history/*/fpl/bootstrap-static/*/*/payload.json'
+                {% else %}
+                '{{ var("raw_root") }}/fpl/bootstrap-static/*/*/payload.json'
+                {% if var("history_root") %}
+                , '{{ var("history_root") }}/*/fpl/bootstrap-static/*/*/payload.json'
+                {% endif %}
+                {% endif %}
+              ],
               union_by_name = true,
               filename = true
             )

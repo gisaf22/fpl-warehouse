@@ -29,42 +29,53 @@
 
 with latest_capture as (
 
-    -- The same single capture int_player_gameweek_spine selects rounds from.
-    select run_id
-    from {{ ref('stg_gameweek') }}
-    order by extracted_at desc, run_id desc
-    limit 1
+    -- The same per-season capture int_player_gameweek_spine selects rounds
+    -- from: each season is checked against its own calendar only.
+    select season, run_id
+    from (
+        select
+            season,
+            run_id,
+            row_number() over (
+                partition by season
+                order by extracted_at desc, run_id desc
+            ) as capture_rank
+        from (select distinct season, run_id, extracted_at from {{ ref('stg_gameweek') }})
+    )
+    where capture_rank = 1
 
 ),
 
 calendar as (
 
-    select distinct round
-    from {{ ref('stg_gameweek') }}
-    where run_id = (select run_id from latest_capture)
-      and finished
+    select distinct gameweek.season, gameweek.round
+    from {{ ref('stg_gameweek') }} as gameweek
+    inner join latest_capture using (season, run_id)
+    where gameweek.finished
 
 ),
 
 served as (
 
-    select distinct round
+    select distinct season, round
     from {{ ref('fct_player_gameweek') }}
 
 )
 
 select
+    calendar.season,
     calendar.round,
     'finished_round_missing_from_fct' as failure
 from calendar
-left join served using (round)
+left join served using (season, round)
 where served.round is null
 
 union all
 
 select
+    served.season,
     served.round,
     'fct_round_not_finished_in_calendar' as failure
 from served
-left join calendar using (round)
+left join calendar using (season, round)
 where calendar.round is null

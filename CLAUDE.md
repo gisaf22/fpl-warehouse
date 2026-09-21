@@ -30,13 +30,21 @@ and states it can be deleted on migration.
 - **Never model at gameweek grain directly from raw data.**
 - **`season` is part of the grain project-wide** — `fct_player_fixture` is
   `(season, fpl_id, fixture_id)`, `int_player_gameweek_spine` and `fct_player_gameweek` are
-  `(season, fpl_id, round)`. It is stamped from the `season` var in `dbt_project.yml`
-  (currently `2026-27`) because fpl-ingest's raw key layout has no season segment, so every
-  raw object read belongs to one season. Multi-season joining is therefore not yet
-  exercised; the column exists now so adding a second season is a data change rather than a
-  breaking rebuild of every downstream consumer. **Extending the raw key layout with a
-  season segment is an open item for fpl-ingest, not fpl-warehouse** — until it lands, the
-  constant is the only available source of the value.
+  `(season, fpl_id, round)`. Each row reads its season from its own raw key via the
+  `season_from_filename` macro: a season-shaped segment before `/fpl/` means a ported
+  history season and states its own season, anything else is the live tree and takes the
+  `season` var (currently `2026-27`). The live key layout still has no season segment, so
+  for live rows the var remains the only available source of the value — **extending it is
+  an open item for fpl-ingest, not fpl-warehouse.**
+- **`season` partitions; it never relates.** Every dedup, retraction check, ratification
+  rollup and spine cross is keyed by season, because `fpl_id`, `fixture_id` and `round` are
+  all reassigned each season and unscoped logic would silently merge two different people
+  or two different rounds. Season appears in joins only as same-season equality. **No model
+  anywhere joins, matches or combines one season's rows with another's.**
+- **`player_code` is carried, never used.** FPL's cross-season player identifier
+  (`elements[].code`) sits on `stg_player` as a plain column so a consumer can follow a
+  person across seasons. Nothing in this project joins, deduplicates or filters on it;
+  `fpl_id` remains the key within a season.
 - **ASSUMED, not verified: the double-gameweek rule for the event-level fields.**
   `fct_player_gameweek` takes `value`, `selected` and the `transfers_*` family from the
   round's last fixture (`max_by(..., kickoff_time)` — last write wins) on the basis that FPL

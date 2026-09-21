@@ -16,10 +16,17 @@
 --   and the gameweek calendar only — it never reads fct_player_fixture.
 --
 -- Grain:
---   One row per (season, fpl_id, round): players from the latest
---   bootstrap-static capture, crossed with every round that capture reports as
---   finished. `season` is stamped from the `season` var — see
---   CLAUDE.md, "Season is part of the grain".
+--   One row per (season, fpl_id, round): each season's players crossed with
+--   every round that season's latest bootstrap-static capture reports as
+--   finished. `season` comes from staging — see CLAUDE.md, "Season is part of
+--   the grain".
+--
+-- Season scoping:
+--   Every step below — the latest capture, the player union, the web_name
+--   dedup and the players x rounds cross — is computed per season. fpl_id and
+--   round are both reassigned each season, so an unscoped version would take
+--   one season's calendar for another's players. Season is only ever a
+--   partition here; no row pairs one season's data with another's.
 --
 -- Round range:
 --   `finished` is the boundary. A round in progress or still upcoming has no
@@ -75,27 +82,40 @@
 
 with latest_capture as (
 
-    -- run_id carries a per-run hash, so it identifies one capture outright.
-    select run_id
-    from {{ ref('stg_gameweek') }}
-    order by extracted_at desc, run_id desc
-    limit 1
+    -- One capture per season. run_id carries a per-run hash, so it identifies
+    -- one capture outright.
+    select
+        season,
+        run_id
+    from (
+        select
+            season,
+            run_id,
+            row_number() over (
+                partition by season
+                order by extracted_at desc, run_id desc
+            ) as capture_rank
+        from (select distinct season, run_id, extracted_at from {{ ref('stg_gameweek') }})
+    )
+    where capture_rank = 1
 
 ),
 
 players as (
 
-    -- Every player from every capture, one row each, carrying the most
-    -- recently captured spelling of web_name.
+    -- Every player from every capture of the season, one row each, carrying
+    -- the most recently captured spelling of web_name.
     select
+        season,
         fpl_id,
         web_name
     from (
         select
+            season,
             fpl_id,
             web_name,
             row_number() over (
-                partition by fpl_id
+                partition by season, fpl_id
                 order by extracted_at desc, run_id desc
             ) as name_rank
         from {{ ref('stg_player') }}
@@ -107,19 +127,22 @@ players as (
 rounds as (
 
     select
-        round,
-        deadline_time
-    from {{ ref('stg_gameweek') }}
-    where run_id = (select run_id from latest_capture)
-      and finished
+        gameweek.season,
+        gameweek.round,
+        gameweek.deadline_time
+    from {{ ref('stg_gameweek') }} as gameweek
+    inner join latest_capture using (season, run_id)
+    where gameweek.finished
 
 )
 
 select
-    '{{ var('season') }}' as season,
+    players.season,
     players.fpl_id,
     rounds.round,
     players.web_name,
     rounds.deadline_time
 from players
-cross join rounds
+-- The within-season cross join: each season's players against that same
+-- season's rounds, and nothing else.
+inner join rounds using (season)

@@ -13,10 +13,15 @@
 --   tests/fct_test_player_fixture_grain_uniqueness.sql.
 --
 --   `season` is in the grain from the outset so adding a second season later is
---   a data change, not a breaking rebuild of every downstream consumer. It is
---   stamped from the `season` var because fpl-ingest's raw key layout carries no
---   season segment yet — every raw object read here belongs to one season. See
---   CLAUDE.md, "Season is part of the grain".
+--   a data change, not a breaking rebuild of every downstream consumer. It comes
+--   from staging. See CLAUDE.md, "Season is part of the grain".
+--
+-- Season scoping:
+--   fpl_id, fixture_id and round are all reassigned every season, so the
+--   latest-capture lookup, the retraction check, the dedup partition and the
+--   ratification join below all carry season. That keeps each piece of
+--   within-season logic inside its own season; season is never used to relate
+--   one season's rows to another's.
 --
 -- Dedup rule — provisional vs ratified:
 --   A capture taken before a round's scores are ratified carries NULL
@@ -97,6 +102,22 @@
 --   kickoff on or after the cutoff reads false, never fallback. When raw
 --   history for 2026-27 is superseded the clause becomes dead and should be
 --   deleted rather than re-dated. See CLAUDE.md, "Round ratification".
+--
+--   The fallback is scoped to season 2026-27 explicitly. It is a statement
+--   about that season's capture history, and every closed season's fixtures
+--   also kicked off before the cutoff — unscoped, it would mark them ratified
+--   by accident rather than by the rule below.
+--
+--   Closed seasons — ratified by definition:
+--   A season listed in the `closed_seasons` var is over and fully settled, and
+--   its rows read is_ratified = true unconditionally. event-status cannot
+--   speak for it: the endpoint serves only the current round, and no capture
+--   of it exists for any closed season. The override is not trusted blindly —
+--   tests/fct_test_player_fixture_closed_season_settled.sql fails unless that
+--   season's own latest calendar reports every round finished and
+--   data_checked, and fails if the live season is ever listed as closed. The
+--   override reads a season's own rows only; it never consults another
+--   season's data.
 -- =============================================================================
 
 with captures as (
@@ -110,17 +131,19 @@ with captures as (
 latest_run_per_player as (
 
     select
+        season,
         fpl_id,
         run_id
     from (
         select
+            season,
             fpl_id,
             run_id,
             row_number() over (
-                partition by fpl_id
+                partition by season, fpl_id
                 order by extracted_at desc, run_id desc
             ) as run_rank
-        from (select distinct fpl_id, run_id, extracted_at from captures)
+        from (select distinct season, fpl_id, run_id, extracted_at from captures)
     )
     where run_rank = 1
 
@@ -130,10 +153,11 @@ latest_run_per_player as (
 current_keys as (
 
     select distinct
+        captures.season,
         captures.fpl_id,
         captures.fixture_id
     from captures
-    inner join latest_run_per_player using (fpl_id, run_id)
+    inner join latest_run_per_player using (season, fpl_id, run_id)
 
 ),
 
@@ -141,15 +165,22 @@ ranked as (
 
     select
         captures.*,
-        coalesce(
-            ratification.is_ratified,
-            -- Bounded fallback for rounds predating capture history; see header.
-            captures.kickoff_time < timestamp '2026-08-29 00:00:00'
-                and captures.team_h_score is not null
-                and captures.team_a_score is not null
-        )                                                   as is_ratified,
+        case
+            -- Closed season: fully settled by definition; see header.
+            when list_contains({{ closed_seasons_list() }}, captures.season)
+                then true
+            else coalesce(
+                ratification.is_ratified,
+                -- Bounded fallback for 2026-27 rounds predating capture
+                -- history; see header.
+                captures.season = '2026-27'
+                    and captures.kickoff_time < timestamp '2026-08-29 00:00:00'
+                    and captures.team_h_score is not null
+                    and captures.team_a_score is not null
+            )
+        end                                                 as is_ratified,
         row_number() over (
-            partition by captures.fpl_id, captures.fixture_id
+            partition by captures.season, captures.fpl_id, captures.fixture_id
             order by
                 (captures.team_h_score is not null
                     and captures.team_a_score is not null) desc,
@@ -157,14 +188,15 @@ ranked as (
                 captures.run_id desc
         ) as capture_rank
     from captures
-    inner join current_keys using (fpl_id, fixture_id)
+    inner join current_keys using (season, fpl_id, fixture_id)
     left join {{ ref('int_round_ratification') }} as ratification
-        on ratification.round = captures.round
+        on ratification.season = captures.season
+       and ratification.round = captures.round
 
 )
 
 select
-    '{{ var('season') }}' as season,
-    * exclude (capture_rank)
+    season,
+    * exclude (season, capture_rank)
 from ranked
 where capture_rank = 1

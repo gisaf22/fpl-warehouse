@@ -15,9 +15,13 @@
 --   still 0. See CLAUDE.md, "Round ratification".
 --
 -- Grain:
---   One row per round, for every round that appears in at least one
+--   One row per (season, round), for every round that appears in at least one
 --   event-status capture. Rounds absent from every capture are absent here;
 --   handling that gap is fct_player_fixture's job, not this model's.
+--
+--   Both rollup levels partition by season: round numbers repeat every season,
+--   and "ever observed ratified" must never let one season's verdict answer
+--   for another's round of the same number.
 --
 -- Why an intermediate model:
 --   Per CLAUDE.md "Layering", the layer is used only when a reshape is
@@ -48,16 +52,18 @@
 with per_capture as (
 
     select
+        season,
         round,
         run_id,
         bool_and(points = 'r' and bonus_added) as is_ratified
     from {{ ref('stg_event_status') }}
-    group by round, run_id
+    group by season, round, run_id
 
 )
 
 select
+    season,
     round,
     coalesce(bool_or(is_ratified), false) as is_ratified
 from per_capture
-group by round
+group by season, round

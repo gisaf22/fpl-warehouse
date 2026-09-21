@@ -26,17 +26,19 @@
 with latest_run_per_player as (
 
     select
+        season,
         fpl_id,
         run_id
     from (
         select
+            season,
             fpl_id,
             run_id,
             row_number() over (
-                partition by fpl_id
+                partition by season, fpl_id
                 order by extracted_at desc, run_id desc
             ) as run_rank
-        from (select distinct fpl_id, run_id, extracted_at from {{ ref('stg_player_fixture') }})
+        from (select distinct season, fpl_id, run_id, extracted_at from {{ ref('stg_player_fixture') }})
     )
     where run_rank = 1
 
@@ -45,17 +47,19 @@ with latest_run_per_player as (
 current_keys as (
 
     select distinct
+        stg.season,
         stg.fpl_id,
         stg.fixture_id
     from {{ ref('stg_player_fixture') }} as stg
-    inner join latest_run_per_player using (fpl_id, run_id)
+    inner join latest_run_per_player using (season, fpl_id, run_id)
 
 )
 
 select
+    fct.season,
     fct.fpl_id,
     fct.fixture_id,
     fct.round
 from {{ ref('fct_player_fixture') }} as fct
-left join current_keys using (fpl_id, fixture_id)
+left join current_keys using (season, fpl_id, fixture_id)
 where current_keys.fpl_id is null
