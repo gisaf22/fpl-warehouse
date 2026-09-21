@@ -243,29 +243,92 @@ s3://fpl-data-safari/served/_manifest.json
 Consumers read them with `duckdb.read_parquet()` against those stable keys — they do not
 connect to a DuckDB database file, and there is no shared served database.
 
-### Multi-season shape — decided, not yet published
+### Multi-season shape — published
 
-**`served/` will carry every season in one combined table, with `season` as a plain
-column.** There is no separate history-only serving path, no per-season key, and no season
-dimension table. This matches how season is already modelled everywhere upstream: a
-partition label on the grain, never a join key.
+**`served/` carries every season in one combined table, with `season` as a plain column.**
+There is no separate history-only serving path, no per-season key, and no season dimension
+table. This matches how season is already modelled everywhere upstream: a partition label
+on the grain, never a join key.
 
-What this means for a consumer: `fct_player_fixture.parquet` stops being implicitly
-single-season the first time a scheduled build runs with `history_root` set. **Any query
-that assumes one season must filter on `season` explicitly.** Row counts roughly
-11x — 3,216 rows for 2026-27 alone against ~35k for both — and `fpl_id`, `fixture_id` and
-`round` all repeat across seasons, so an unfiltered group-by on any of them silently merges
-two different people or two different rounds.
+This is live as of the history port's Step 7: `scheduled_build.yml` sets
+`HISTORY_ROOT: s3://fpl-data-safari/history` and passes it to `dbt build` as `--vars`, so
+every scheduled build reads and publishes both seasons. It is a constant in the workflow,
+not a dispatch input as it is in `ci.yml`'s `live-tests` job — there is no per-run decision
+to make, and a build that quietly dropped a season would overwrite good served data with a
+single-season table.
 
-This is the target state for the history port's Step 7 publish. As of the Step 5 merge the
-published tables are still 2026-27 only, because `history_root` is empty on the scheduled
-build. Recorded here so nothing downstream is written against a shape that was never the
-plan.
+**Any query that assumes one season must filter on `season` explicitly.** This is the
+consumer consequence and it has teeth: `fpl_id`, `fixture_id` and `round` are all
+reassigned every season and therefore repeat across them, so an unfiltered group-by on any
+of them silently merges two different people or two different rounds. Row counts went up
+roughly 10x at the switchover — measured 2026-09-21, `fct_player_fixture` holds 32,963 rows
+of which only 3,216 are 2026-27, and `fct_player_gameweek` holds 34,626 of which 2,668 are
+2026-27.
+
+**2025-26 is closed and will never change again.** Every future scheduled build re-reads
+the same ported history tree and reproduces the same rows for it; only 2026-27's data
+actually grows and updates. Two consequences worth knowing. First, a change in a closed
+season's row count between two builds is a defect, not data — there is no legitimate reason
+for it to move. Second, most of the published volume is static, so a consumer that caches
+per season gets nearly all of the benefit; this is also why the publish guard below is
+computed per season rather than on the total, since the live season is small enough to
+vanish inside the total's noise.
+
+The season's `is_ratified` is true on every row, set unconditionally by the `closed_seasons`
+var rather than derived from event-status, which only ever serves the current round. See
+"Round ratification".
 
 `_manifest.json` describes what is currently published, not a history of publishes. It
 carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
-from, and a `row_counts` object for both tables. A consumer that wants a consistency check
+from, `seasons` (a sorted list of what is in the files), `row_counts` (per table) and
+`row_counts_by_season` (per table, per season). A consumer that wants a consistency check
 can compare those counts against what it actually reads.
+
+`row_counts` deliberately kept its original `{table: total}` shape instead of becoming
+nested when the second season arrived, so nothing reading it has to change; the breakdown
+was added alongside it. `seasons` is a list rather than a multi-season boolean for the same
+reason — a flag would encode today's two-season state as the thing to branch on, and the
+count changes again the next time a season is ported.
+
+### The publish floor is computed, not configured
+
+`scripts/publish_served.py` refuses to publish a table that falls meaningfully short of
+what the build's own data says it should hold. The expectation is derived per run rather
+than hardcoded, so it tracks the data instead of needing an edit whenever the data grows:
+
+- For each season, expected rows = that season's distinct player count x its round count,
+  both read from that season's own captures in `stg_player` and `stg_gameweek`.
+- Round count means **every** round for a closed season, and only the rounds the latest
+  capture reports `finished` for the live season. That distinction is the whole point: the
+  live calendar publishes all 38 rounds from day one, so counting them all would have
+  expected 667 x 38 = 25,346 rows for 2026-27 on 2026-09-21 against a real 3,216.
+- Computed from staging, not from `int_player_gameweek_spine` — which is already exactly
+  this product. The spine is `fct_player_gameweek`'s direct parent, so checking that table
+  against it would compare a number against itself and pass unconditionally.
+
+Measured on run 35632785680 (2026-09-21): expected 31,958 for 2025-26 (841 x 38) and 2,668
+for 2026-27 (667 x 4), total 34,626. `fct_player_gameweek` matched it exactly.
+`fct_player_fixture` returned 32,963, 4.8% below — legitimately, because it is a different
+grain: one row per fixture a player actually has history for, so a blank gameweek removes
+rows the expectation counted. 2025-26 alone was 6.9% low, 2,211 player-rounds in which that
+player's club did not play.
+
+Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`, which
+is the expectation's own grain, and 15% for `fct_player_fixture`, roughly 2x its observed
+worst case. Double gameweeks push the other way and nothing caps the upside — a table
+larger than expected is not the failure this guards against.
+
+The check is applied **per season**, and a season present in staging but absent from a
+served table scores zero and fails outright. The summed total is reported but is not what
+is enforced, because it is not sensitive enough: on 2026-09-21 losing all of 2026-27 would
+have shown as a 9.3% shortfall on `fct_player_fixture`'s total, comfortably inside the 15%
+that table needs for blank gameweeks. Against that season's own expectation the same loss
+is unmissable. An empty `expected` — no seasons in staging at all — is itself a failure,
+which the old static floor caught only by accident.
+
+This replaced a static `ROW_FLOOR = 500`, sized in 2026-09 when one part-played season held
+~3,200 rows. Against a two-season build it sits three orders of magnitude below anything
+real: a build that dropped all of 2025-26 would have cleared it comfortably.
 
 **No dated or versioned keys, and no staging/promote step.** The keys are stable so
 consumers need no discovery logic, and the objects are overwritten because there is no
@@ -276,8 +339,9 @@ things and nothing more:
    any model error or test failure, so the publish step never runs on a build whose
    assertions did not hold.
 2. `scripts/publish_served.py` re-reads each exported parquet file and exits non-zero if
-   either is below `ROW_FLOOR`, which catches a build that exited 0 having produced an empty
-   or truncated table for an upstream reason.
+   any season's slice of either table is below its computed floor (above), which catches a
+   build that exited 0 having produced an empty or truncated table, or having lost a whole
+   season, for an upstream reason.
 
 Neither is atomic across the two objects: they are uploaded by two separate `put_object`
 calls, so a reader can in principle catch one updated and the other not. Accepted for now

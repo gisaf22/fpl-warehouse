@@ -76,6 +76,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # The scheduled build is multi-season as of the 2025-26 history port's
+    # publish step. Same mechanism as ci.yml's live-tests job, which proved it
+    # on 2026-09-21 (run 35632785680): HISTORY_ROOT is NOT read by dbt itself —
+    # sources.yml guards the history glob on `{% if var("history_root") %}`,
+    # and an env_var() default would be the truthy literal string
+    # "{{ env_var(...) }}", firing the guard on every build and emitting an
+    # unrendered Jinja path. So it is passed to `dbt build` as --vars below.
+    #
+    # Unlike live-tests this is a constant, not a dispatch input. There is no
+    # per-run decision to make here: every scheduled build publishes every
+    # season, and a build that quietly dropped one would overwrite good served
+    # data with a single-season table. Changing what gets published is a code
+    # change, reviewed, not a field someone fills in at dispatch time.
+    env:
+      HISTORY_ROOT: s3://fpl-data-safari/history
+
     # Bounds a hung S3 read rather than letting it burn the 6-hour default.
     #
     # Sized against the worst observed run, not the typical one, because the
@@ -171,7 +187,9 @@ jobs:
       # in the project is error severity (no `severity: warn` anywhere), so
       # there is no path where a real failure lands as a passing warning.
       - name: Build and test against live S3
-        run: uv run dbt build
+        run: >-
+          uv run dbt build
+          --vars "{history_root: '$HISTORY_ROOT'}"
 
       # Publishes the two served fact tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
@@ -184,7 +202,9 @@ jobs:
       # or an always() step above has to step past this line to break it.
       #
       # The script's own row-count floor is the second guard, for the case dbt
-      # exits 0 having built a table that is empty for an upstream reason.
+      # exits 0 having built a table that is empty, or missing a whole season,
+      # for an upstream reason. That floor is computed per season from the
+      # build's own staging tables rather than hardcoded — see the script.
       - name: Publish served tables to S3
         if: success()
         run: uv run python scripts/publish_served.py
