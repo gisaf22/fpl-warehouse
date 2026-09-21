@@ -243,6 +243,25 @@ s3://fpl-data-safari/served/_manifest.json
 Consumers read them with `duckdb.read_parquet()` against those stable keys — they do not
 connect to a DuckDB database file, and there is no shared served database.
 
+### Multi-season shape — decided, not yet published
+
+**`served/` will carry every season in one combined table, with `season` as a plain
+column.** There is no separate history-only serving path, no per-season key, and no season
+dimension table. This matches how season is already modelled everywhere upstream: a
+partition label on the grain, never a join key.
+
+What this means for a consumer: `fct_player_fixture.parquet` stops being implicitly
+single-season the first time a scheduled build runs with `history_root` set. **Any query
+that assumes one season must filter on `season` explicitly.** Row counts roughly
+11x — 3,216 rows for 2026-27 alone against ~35k for both — and `fpl_id`, `fixture_id` and
+`round` all repeat across seasons, so an unfiltered group-by on any of them silently merges
+two different people or two different rounds.
+
+This is the target state for the history port's Step 7 publish. As of the Step 5 merge the
+published tables are still 2026-27 only, because `history_root` is empty on the scheduled
+build. Recorded here so nothing downstream is written against a shape that was never the
+plan.
+
 `_manifest.json` describes what is currently published, not a history of publishes. It
 carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
 from, and a `row_counts` object for both tables. A consumer that wants a consistency check
