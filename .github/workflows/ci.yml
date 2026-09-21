@@ -14,6 +14,16 @@ on:
           measure scaling — see CLAUDE.md, "S3 credentials for local dbt runs".
         required: false
         default: "32"
+      history_root:
+        description: >-
+          Root of the ported history tree for the live build, e.g.
+          s3://fpl-data-safari/history. Empty (the default) globs the live root
+          only, which is the normal case and is proven a no-op. Setting it
+          makes the live build multi-season — the CI role must hold
+          s3:GetObject on that prefix, or every history payload GET 403s while
+          the glob still expands. See dbt_project.yml, `history_root`.
+        required: false
+        default: ""
 
 jobs:
   # Required check. Everything here runs without credentials, because nothing
@@ -189,11 +199,24 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
-    # profiles.yml reads this; unset it and the dev target is exactly as it was.
-    # The fallback covers the push/pull_request events, where the input does not
+    # profiles.yml reads DBT_DUCKDB_THREADS directly. HISTORY_ROOT is NOT read
+    # by dbt itself — it is passed to each dbt command as `--vars` below. It
+    # cannot be an env_var() default in dbt_project.yml: sources.yml guards the
+    # history glob on `{% if var("history_root") %}`, and a var whose value is
+    # the literal string "{{ env_var(...) }}" is truthy, so the guard would fire
+    # on every build and emit an unrendered Jinja path. Verified 2026-09-21.
+    #
+    # The fallbacks cover the push/pull_request events, where the inputs do not
     # exist — though this job does not run on those anyway.
+    #
+    # HISTORY_ROOT defaults to empty, which renders the live glob alone, byte
+    # identical to passing no --vars at all. So an ordinary dispatch is the
+    # single-season build this project has always run. It is deliberately an
+    # input rather than a repository variable: pointing a build at history is a
+    # per-run decision made while porting a season, not standing configuration.
     env:
       DBT_DUCKDB_THREADS: ${{ github.event.inputs.duckdb_threads || '32' }}
+      HISTORY_ROOT: ${{ github.event.inputs.history_root || '' }}
 
     permissions:
       id-token: write
@@ -245,17 +268,25 @@ jobs:
       # the element-summary read OOM'd at 12.7 GiB before
       # preserve_insertion_order was turned off, and a runner has ~16 GB.
       - name: Build models
-        run: /usr/bin/time -v uv run dbt run
+        run: >-
+          /usr/bin/time -v uv run dbt run
+          --vars "{history_root: '$HISTORY_ROOT'}"
 
       - name: Runner memory after the build
         if: always()
         run: free -m
 
       - name: Fast tier — unit
-        run: uv run dbt test --select tag:unit
+        run: >-
+          uv run dbt test --select tag:unit
+          --vars "{history_root: '$HISTORY_ROOT'}"
 
       - name: Fast tier — integration
-        run: uv run dbt test --select tag:integration
+        run: >-
+          uv run dbt test --select tag:integration
+          --vars "{history_root: '$HISTORY_ROOT'}"
 
       - name: e2e tier
-        run: uv run dbt test --select tag:e2e
+        run: >-
+          uv run dbt test --select tag:e2e
+          --vars "{history_root: '$HISTORY_ROOT'}"
