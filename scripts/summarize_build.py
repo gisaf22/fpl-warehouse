@@ -39,7 +39,17 @@ import duckdb
 # renamed: DuckDB derives the catalog name from the filename and the
 # intermediate models are views that qualify their refs with it, so a renamed
 # copy resolves those views against the wrong catalog.
-DATABASE = Path(os.environ.get("FPL_WAREHOUSE_DB", ".local/warehouse.duckdb"))
+OVERRIDE = os.environ.get("FPL_WAREHOUSE_DB")
+DATABASE = Path(OVERRIDE or ".local/warehouse.duckdb")
+
+# The heading states which tier produced the numbers, because the two are
+# wildly different in scale and trivially confused once pasted somewhere else:
+# the fixture tree holds five 2025-26 players, the real archive holds 841. A
+# fixture-tier table headed "Live build shape" reads as a live build that lost
+# 99% of its players. The override is the only way this script sees anything
+# other than the live build, so it is what the label keys on; the database path
+# is printed alongside so the claim is checkable rather than just asserted.
+TIER = "Fixture-tier" if OVERRIDE else "Live"
 
 # Every model the DAG builds, in dependency order rather than alphabetically,
 # so the summary reads the way the build ran.
@@ -97,7 +107,14 @@ def main() -> int:
 
     seasons = sorted({s for rows in per_season.values() for s, _ in rows})
 
-    lines = ["### Live build shape", "", "| model | rows |", "| --- | ---: |"]
+    lines = [
+        f"### {TIER} build shape",
+        "",
+        f"Read from `{DATABASE}`.",
+        "",
+        "| model | rows |",
+        "| --- | ---: |",
+    ]
     lines += [f"| `{m}` | {n:,} |" for m, n in totals.items()]
 
     if seasons:
