@@ -276,6 +276,21 @@ jobs:
         if: always()
         run: free -m
 
+      # What the build actually produced — row count per model, and the
+      # per-season breakdown — into the job summary.
+      #
+      # The runner's DuckDB dies with the job and nothing exports it, so a CI
+      # build's rows cannot be diffed afterwards the way a local build's can.
+      # Without this the only CI-side evidence is "59 tests passed", which says
+      # nothing about shape: a build that read half the raw tree still passes
+      # every test, because every test is relative to what was read.
+      #
+      # Runs before the test tiers, so the shape is recorded even when a tier
+      # below fails — that is exactly the run where you want to see it. It
+      # reports and never asserts, so it cannot fail the job on its own.
+      - name: Report build shape
+        run: uv run python scripts/summarize_build.py
+
       - name: Fast tier — unit
         run: >-
           uv run dbt test --select tag:unit
