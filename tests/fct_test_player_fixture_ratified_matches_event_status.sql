@@ -28,6 +28,7 @@
 -- Fails with one row per disagreeing key.
 
 select
+    fct.season,
     fct.fpl_id,
     fct.fixture_id,
     fct.round,
@@ -35,5 +36,6 @@ select
     ratification.is_ratified                as event_status_is_ratified
 from {{ ref('fct_player_fixture') }} as fct
 inner join {{ ref('int_round_ratification') }} as ratification
-    on ratification.round = fct.round
+    on ratification.season = fct.season
+   and ratification.round = fct.round
 where fct.is_ratified is distinct from ratification.is_ratified

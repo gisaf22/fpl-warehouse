@@ -10,8 +10,9 @@
 --
 -- Grain:
 --   One row per (season, fpl_id, round), one-for-one with the spine. `season`
---   is carried from the spine, which stamps it from the `season` var — see
---   CLAUDE.md, "Season is part of the grain".
+--   is carried from the spine, which reads it from staging — see CLAUDE.md,
+--   "Season is part of the grain". The join below carries season, so a round
+--   number is only ever matched within the season it belongs to.
 --
 -- fixture_count:
 --   0 = blank gameweek (spine row with no fixture), 1 = normal, 2+ = double.

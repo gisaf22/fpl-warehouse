@@ -24,6 +24,7 @@
 with ratified_available as (
 
     select distinct
+        season,
         fpl_id,
         fixture_id
     from {{ ref('stg_player_fixture') }}
@@ -33,10 +34,11 @@ with ratified_available as (
 )
 
 select
+    fct.season,
     fct.fpl_id,
     fct.fixture_id,
     fct.run_id
 from {{ ref('fct_player_fixture') }} as fct
-inner join ratified_available using (fpl_id, fixture_id)
+inner join ratified_available using (season, fpl_id, fixture_id)
 where fct.team_h_score is null
    or fct.team_a_score is null

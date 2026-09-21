@@ -37,25 +37,34 @@ select null as failure where false
 
 {% else %}
 
+-- Per season: a departure is absence from that season's own latest capture.
 with latest_capture as (
 
-    select run_id
-    from {{ ref('stg_player') }}
-    order by extracted_at desc, run_id desc
-    limit 1
+    select season, run_id
+    from (
+        select
+            season,
+            run_id,
+            row_number() over (
+                partition by season
+                order by extracted_at desc, run_id desc
+            ) as capture_rank
+        from (select distinct season, run_id, extracted_at from {{ ref('stg_player') }})
+    )
+    where capture_rank = 1
 
 ),
 
 departed as (
 
-    select distinct fpl_id
+    select distinct season, fpl_id
     from {{ ref('stg_player') }}
 
     except
 
-    select distinct fpl_id
-    from {{ ref('stg_player') }}
-    where run_id = (select run_id from latest_capture)
+    select distinct player.season, player.fpl_id
+    from {{ ref('stg_player') }} as player
+    inner join latest_capture using (season, run_id)
 
 )
 

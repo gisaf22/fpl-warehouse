@@ -55,10 +55,11 @@ select null as failure where false
 
 with disagreeing_rounds as (
 
-    select distinct fct.round
+    select distinct fct.season, fct.round
     from {{ ref('fct_player_fixture') }} as fct
     inner join {{ ref('int_round_ratification') }} as ratification
-        on ratification.round = fct.round
+        on ratification.season = fct.season
+       and ratification.round = fct.round
     where fct.team_h_score is not null
       and fct.team_a_score is not null
       and not ratification.is_ratified

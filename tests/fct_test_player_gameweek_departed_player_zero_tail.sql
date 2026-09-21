@@ -45,28 +45,58 @@
 -- by accident, and R4 plus SYNTHETIC_FINISHED in build_fixtures.py exist to
 -- make the tail more than one row deep.
 
-with latest_capture as (
+-- Every step is per season: a departure means absence from that season's own
+-- latest capture, and its tail rounds come from that season's own calendar.
 
-    select run_id
-    from {{ ref('stg_player') }}
-    order by extracted_at desc, run_id desc
-    limit 1
+with latest_player_capture as (
+
+    select season, run_id
+    from (
+        select
+            season,
+            run_id,
+            row_number() over (
+                partition by season
+                order by extracted_at desc, run_id desc
+            ) as capture_rank
+        from (select distinct season, run_id, extracted_at from {{ ref('stg_player') }})
+    )
+    where capture_rank = 1
 
 ),
 
--- Players seen at some point but absent from the most recent capture.
+latest_calendar_capture as (
+
+    select season, run_id
+    from (
+        select
+            season,
+            run_id,
+            row_number() over (
+                partition by season
+                order by extracted_at desc, run_id desc
+            ) as capture_rank
+        from (select distinct season, run_id, extracted_at from {{ ref('stg_gameweek') }})
+    )
+    where capture_rank = 1
+
+),
+
+-- Players seen at some point in a season but absent from that season's most
+-- recent capture.
 departed as (
 
     select
+        season,
         fpl_id,
         max(extracted_at) as last_seen_at
     from {{ ref('stg_player') }}
-    where fpl_id not in (
-        select fpl_id
-        from {{ ref('stg_player') }}
-        where run_id = (select run_id from latest_capture)
+    where (season, fpl_id) not in (
+        select (current_player.season, current_player.fpl_id)
+        from {{ ref('stg_player') }} as current_player
+        inner join latest_player_capture using (season, run_id)
     )
-    group by fpl_id
+    group by season, fpl_id
 
 ),
 
@@ -75,33 +105,31 @@ departed as (
 tail_rounds as (
 
     select
+        departed.season,
         departed.fpl_id,
         gameweek.round
     from departed
-    cross join (
-        select distinct round, deadline_time
-        from {{ ref('stg_gameweek') }}
-        where run_id = (
-            select run_id
-            from {{ ref('stg_gameweek') }}
-            order by extracted_at desc, run_id desc
-            limit 1
-        )
-          and finished
+    inner join (
+        select distinct calendar.season, calendar.round, calendar.deadline_time
+        from {{ ref('stg_gameweek') }} as calendar
+        inner join latest_calendar_capture using (season, run_id)
+        where calendar.finished
     ) as gameweek
+        on gameweek.season = departed.season
     where gameweek.deadline_time > departed.last_seen_at
 
 )
 
 -- The aggregate must hold the round, and it must read zero.
 select
+    tail_rounds.season,
     tail_rounds.fpl_id,
     tail_rounds.round,
     coalesce(cast(agg.fixture_count as varchar), 'ROW MISSING') as fixture_count,
     'post-departure round is not fixture_count = 0'             as failure
 from tail_rounds
 left join {{ ref('fct_player_gameweek') }} as agg
-    using (fpl_id, round)
+    using (season, fpl_id, round)
 where agg.fpl_id is null
    or agg.fixture_count <> 0
 
@@ -109,11 +137,12 @@ union all
 
 -- ...and no fixture row may exist for it in the first place.
 select
+    tail_rounds.season,
     tail_rounds.fpl_id,
     tail_rounds.round,
     cast(count(*) as varchar)                        as fixture_count,
     'fixture rows exist for a post-departure round'  as failure
 from tail_rounds
 inner join {{ ref('fct_player_fixture') }} as fixtures
-    using (fpl_id, round)
-group by tail_rounds.fpl_id, tail_rounds.round
+    using (season, fpl_id, round)
+group by tail_rounds.season, tail_rounds.fpl_id, tail_rounds.round

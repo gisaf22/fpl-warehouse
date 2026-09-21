@@ -32,6 +32,28 @@ vars:
   # itself does not change.
   season: "2026-27"
 
+  # Root of the re-keyed history tree — closed seasons ported from the pre-S3
+  # archive by scripts/rekey_history_season.py, laid out as
+  # {history_root}/{season}/fpl/{endpoint}/{extraction_date}/{run_id}/payload.json.
+  #
+  # Empty means "no history tree": the sources then glob the live root only,
+  # which is what keeps a build working before the tree exists. It is
+  # deliberately NOT under raw_root — see the script's docstring for the two
+  # reasons (the live globs would read it as this season, and fpl-ingest treats
+  # any object under an endpoint prefix as "already captured").
+  #
+  # The `fixtures` target ignores this var, as it ignores raw_root, and reads
+  # the checked-in tree under tests/fixtures/history instead.
+  history_root: ""
+
+  # Seasons that are over and fully settled. Every fct_player_fixture row of a
+  # closed season reads is_ratified = true: event-status only ever serves the
+  # current round, so there is no per-round verdict to read for them. The claim
+  # is checked against each closed season's own calendar by
+  # tests/fct_test_player_fixture_closed_season_settled.sql, which also fails if
+  # the live `season` above is ever listed here.
+  closed_seasons: ["2025-26"]
+
 models:
   fpl_warehouse:
     staging:

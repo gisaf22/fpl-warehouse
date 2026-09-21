@@ -27,12 +27,16 @@
 
 with capture_counts as (
 
+    -- Per season: fixture_id and fpl_id repeat across seasons, and two
+    -- seasons' single captures of the same numbers must not count as two
+    -- captures of one key.
     select
+        season,
         fpl_id,
         fixture_id,
         count(distinct run_id) as capture_count
     from {{ ref('stg_player_fixture') }}
-    group by fpl_id, fixture_id
+    group by season, fpl_id, fixture_id
 
 )
 

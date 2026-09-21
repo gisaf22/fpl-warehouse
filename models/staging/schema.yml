@@ -16,6 +16,15 @@ models:
       contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: player_code
+        description: >
+          FPL's cross-season player identifier (`elements[].code`). Carried
+          only; never joined, deduplicated or filtered on.
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
 
   - name: stg_gameweek
     description: >

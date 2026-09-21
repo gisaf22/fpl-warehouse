@@ -41,19 +41,20 @@
 
 with ever_captured as (
 
-    select distinct fpl_id
+    select distinct season, fpl_id
     from {{ ref('stg_player') }}
 
 )
 
 select
+    ever_captured.season,
     ever_captured.fpl_id,
     'captured in bootstrap-static but missing from the spine' as failure
 from ever_captured
 left join (
 
-    select distinct fpl_id
+    select distinct season, fpl_id
     from {{ ref('int_player_gameweek_spine') }}
 
-) as spine using (fpl_id)
+) as spine using (season, fpl_id)
 where spine.fpl_id is null
