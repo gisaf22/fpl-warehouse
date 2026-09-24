@@ -22,3 +22,6 @@ logs/
 
 # Local raw capture used when no AWS session is available
 .local/
+
+# Local IAM policy scratch (applied manually, not IaC)
+updated-policy.json
