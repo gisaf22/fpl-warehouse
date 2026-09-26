@@ -1,0 +1,137 @@
+version: 2
+
+# dbt unit tests for the intermediate layer. Each carries exactly one tier tag,
+# like every other test, and a `covers` meta entry naming the board item and
+# acceptance criterion it pins.
+
+unit_tests:
+
+  # --- int_round_ratification: the two-level rollup (#45) ---------------------
+  # See the model header and CLAUDE.md, "Round ratification".
+
+  - name: round_with_one_provisional_date_in_a_capture_is_not_ratified
+    description: >
+      Within one capture a round is ratified only when every dated entry is.
+      One ratified date alongside one provisional date leaves the round
+      unratified.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC2"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 4, run_id: "20260914T190000Z-aaaa", match_date: "2026-09-12", points: "r", bonus_added: true}
+          - {season: "2026-27", round: 4, run_id: "20260914T190000Z-aaaa", match_date: "2026-09-13", points: "p", bonus_added: false}
+    expect:
+      rows:
+        - {season: "2026-27", round: 4, is_ratified: false}
+
+  - name: round_ratified_earlier_and_omitted_later_stays_ratified
+    description: >
+      Across captures a round is ratified if any capture ever said so. A later
+      capture that no longer lists the round (it rolled out of the window) does
+      not undo that.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC3"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 4, run_id: "20260915T190000Z-aaaa", match_date: "2026-09-13", points: "r", bonus_added: true}
+          - {season: "2026-27", round: 5, run_id: "20260919T190000Z-bbbb", match_date: "2026-09-20", points: "p", bonus_added: false}
+    expect:
+      rows:
+        - {season: "2026-27", round: 4, is_ratified: true}
+        - {season: "2026-27", round: 5, is_ratified: false}
+
+  - name: round_ratified_earlier_and_provisional_later_stays_ratified
+    description: >
+      Ratification is monotonic: once any capture reads the round ratified, a
+      later capture reading it provisional does not flip it back.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC3"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 4, run_id: "20260915T190000Z-aaaa", match_date: "2026-09-13", points: "r", bonus_added: true}
+          - {season: "2026-27", round: 4, run_id: "20260916T070000Z-bbbb", match_date: "2026-09-13", points: "p", bonus_added: false}
+    expect:
+      rows:
+        - {season: "2026-27", round: 4, is_ratified: true}
+
+  - name: round_never_ratified_reads_false_not_null
+    description: >
+      A round no capture ever ratified reads false, never null, so consumers
+      can filter on the boolean directly.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC4"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 5, run_id: "20260919T190000Z-aaaa", match_date: "2026-09-20", points: "p", bonus_added: false}
+          - {season: "2026-27", round: 5, run_id: "20260920T190000Z-bbbb", match_date: "2026-09-20", points: "p", bonus_added: false}
+    expect:
+      rows:
+        - {season: "2026-27", round: 5, is_ratified: false}
+
+  - name: round_never_ratified_with_unknown_bonus_reads_false_not_null
+    description: >
+      Same as above when bonus_added is missing from the payload: the
+      per-capture verdict is then null, and the round must still read false.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC4"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 5, run_id: "20260919T190000Z-aaaa", match_date: "2026-09-20", points: "r", bonus_added: null}
+    expect:
+      rows:
+        - {season: "2026-27", round: 5, is_ratified: false}
+
+  - name: empty_points_status_alongside_provisional_is_not_ratified
+    description: >
+      An empty-string points status is an in-progress state, seen alongside
+      "p" in the same capture. The round is not ratified.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC5"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 4, run_id: "20260914T070000Z-aaaa", match_date: "2026-09-12", points: "", bonus_added: false}
+          - {season: "2026-27", round: 4, run_id: "20260914T070000Z-aaaa", match_date: "2026-09-13", points: "p", bonus_added: false}
+    expect:
+      rows:
+        - {season: "2026-27", round: 4, is_ratified: false}
+
+  - name: empty_points_status_is_not_ratified_even_with_bonus_added
+    description: >
+      Isolates the empty string itself: a round whose only date has points ""
+      is not ratified, even if bonus_added reads true.
+    model: int_round_ratification
+    config:
+      tags: [unit]
+      meta:
+        covers: "#45 AC5"
+    given:
+      - input: ref('stg_event_status')
+        rows:
+          - {season: "2026-27", round: 4, run_id: "20260914T070000Z-aaaa", match_date: "2026-09-12", points: "", bonus_added: true}
+    expect:
+      rows:
+        - {season: "2026-27", round: 4, is_ratified: false}

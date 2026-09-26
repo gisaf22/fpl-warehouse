@@ -457,7 +457,9 @@ check a read of live data and made the tiers unusable in CI at all. Only `e2e` i
 touch real infrastructure, and now only `e2e` does.
 
 **Every test carries exactly one tier tag**, and CI fails if one carries none or two — a
-tag-less test runs in no tier and is silently never enforced. Prefer a generic test in
+tag-less test runs in no tier and is silently never enforced. dbt unit tests
+(`unit_tests:`, e.g. `models/intermediate/unit_tests.yml`) are held to the same rule via
+`config: tags:`. Prefer a generic test in
 `schema.yml` (`unique` / `not_null` / `relationships` / `accepted_values`) over a singular
 `.sql` wherever the assertion is expressible that way.
 
