@@ -112,6 +112,40 @@ sources:
               filename = true
             )
 
+      - name: fixtures
+        description: >
+          The season's fixture list — one JSON array per capture, one element
+          per fixture, with `event` (the round), `team_h` / `team_a`, scores,
+          difficulty and per-fixture `stats`. Read here so fixture context and
+          team per fixture can be resolved from the source rather than from
+          bootstrap's current-state view.
+
+          Captured on the same `{extraction_date}/{run_id}` layout as
+          bootstrap-static, so every capture is read and staging parses capture
+          identity from the key the same way. The ported 2025-26 season carries
+          one end-of-season snapshot (see
+          scripts/rekey_history_season.py, which maps the archive's
+          `fixtures.json` to this endpoint).
+        meta:
+          # Same list-of-globs shape as bootstrap-static above, for the same
+          # reasons.
+          external_location: >-
+            read_json(
+              [
+                {% if target.name == "fixtures" %}
+                'tests/fixtures/raw/fpl/fixtures/*/*/payload.json',
+                'tests/fixtures/history/*/fpl/fixtures/*/*/payload.json'
+                {% else %}
+                '{{ var("raw_root") }}/fpl/fixtures/*/*/payload.json'
+                {% if var("history_root") %}
+                , '{{ var("history_root") }}/*/fpl/fixtures/*/*/payload.json'
+                {% endif %}
+                {% endif %}
+              ],
+              union_by_name = true,
+              filename = true
+            )
+
       - name: event_status
         description: >
           FPL's authoritative points-finality signal — the source of truth for
