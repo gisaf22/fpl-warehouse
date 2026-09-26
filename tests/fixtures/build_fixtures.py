@@ -17,6 +17,7 @@ models parse capture identity out of the object key itself:
     raw/fpl/element-summary/{fpl_id}/{extraction_date}/{run_id}/payload.json
     raw/fpl/bootstrap-static/{extraction_date}/{run_id}/payload.json
     raw/fpl/event-status/{extraction_date}/{run_id}/payload.json
+    raw/fpl/fixtures/{extraction_date}/{run_id}/payload.json
 
 CAPTURES
 --------
@@ -84,6 +85,7 @@ A second tree sits beside the live one:
 
     history/{season}/fpl/bootstrap-static/{date}/{run_id}/payload.json
     history/{season}/fpl/element-summary/{fpl_id}/{date}/{run_id}/payload.json
+    history/{season}/fpl/fixtures/{date}/{run_id}/payload.json
 
 It holds 2025-26, ported from the pre-S3 archive by
 scripts/rekey_history_season.py and trimmed here the same way the live tree is.
@@ -101,6 +103,11 @@ data_checked, which is what fct_test_player_fixture_closed_season_settled
 requires before the closed-season override may call these rows ratified. No
 synthetic edit of any kind is applied to this tree — unlike the live one, it
 needs none, because the season is over.
+
+Its fixtures payload is the archive's single end-of-season snapshot, carried
+as-is: every fixture finished, difficulty as it stood at season end. That is
+what makes a pre-kickoff difficulty impossible to claim for this season
+downstream — there is no earlier capture to take one from.
 
 event-status is deliberately absent: FPL serves only the current round, so no
 capture of a finished season exists. That absence is exactly the condition the
@@ -131,6 +138,12 @@ WHAT EACH PLAYER COVERS
           is itself ratified. Only the "present in the player's latest capture"
           rule removes it. Without this fixture,
           fct_test_player_fixture_no_retracted_rows has nothing to catch.
+
+          The same transfer seen through the fixtures endpoint: round 1's
+          fixture 10 was played for the former club, and so was the retracted
+          fixture 16; every fixture from round 2 on is the new club's. Both
+          clubs resolve from each fixture's home/away side. Feeds
+          stg_test_fixture_tree_transfer_fixtures_and_clubs_resolve.
 
 611       Blank gameweek. Present in bootstrap-static `elements` in all three
           captures — so the spine gives them a row for every finished round —
@@ -183,6 +196,16 @@ WHAT EACH PLAYER COVERS
           two) and fct_test_player_gameweek_fixture_count_matches assert
           something at 2+ instead of only ever seeing 0 and 1.
 
+          The fixtures endpoint gets the matching synthetic row, so the double
+          still resolves once a player's team is read through the fixture
+          (team per fixture). Fixture 12 is copied under the same `id` and
+          `kickoff_time` as the history row; every other field, `code` and
+          `pulse_id` included, is fixture 12's as captured. The live season
+          in this tree therefore holds 381 fixtures, not 380 — nothing may
+          assume 380 for the fixture tree (the 380 publish floor is a
+          live-data check). Feeds
+          stg_test_fixture_tree_double_gameweek_fixtures_resolve.
+
 TRIMMING
 --------
 element-summary payloads are checked in whole: every history row of every
@@ -193,12 +216,27 @@ so a regeneration produces a readable diff instead of one reflowed line; the
 values themselves are exactly as captured.
 
 bootstrap-static is trimmed, because the real object is 1.65 MB and 99% of it
-is unread. `elements` is filtered to the six players above and `events` kept
-whole (all 38, so the round calendar the spine is built from is real). Every
-other top-level key is dropped; the staging models read only these two. The
-element and event objects themselves are verbatim.
+is unread. `elements` is filtered to the six players above; `events` (all 38,
+so the round calendar the spine is built from is real), `teams` (all 20) and
+`element_types` (the positions) are kept whole. Every other top-level key is
+dropped. The element, event, team and position objects themselves are
+verbatim.
 
-Two departures from "filtered, but verbatim", both in the bootstrap payloads:
+fixtures is trimmed by one key. Every fixture of the season is kept — all 380,
+so a dimension built over the tree sees the real calendar — and every field of
+each is verbatim except `stats`, the per-fixture list of per-player events
+(goals, assists, bps, ...), which is dropped. It is most of the payload:
+pretty-printed, the 2025-26 snapshot is 1.8 MB with it and 135 KiB without,
+and each live capture 320 KiB against 136 KiB. Nothing reads it — the same
+per-player figures reach the warehouse through element-summary. If a model
+ever needs it, stop dropping it in `trim_fixtures` and regenerate.
+
+The fixtures payload is a JSON array, not an object, so it cannot carry a
+`_fixture_note`: any added element would read as a fixture. This docstring is
+its note.
+
+Two departures from "filtered, but verbatim" in the bootstrap payloads, plus
+the synthetic fixture 999 in the fixtures payloads (see 233 above):
 player 4 is dropped from `elements` for R3 and R4 and given no element-summary
 capture in either (see DEPARTED), and round 4's `finished` flag is set in R4's
 `events` (see SYNTHETIC_FINISHED). The element and event objects are otherwise
@@ -352,6 +390,9 @@ SYNTHETIC_FINISHED = {
 # round-2 fixture would really fall. `fixture` 999 is outside the real 1-380
 # range for a season, so a synthetic row can never be mistaken for a captured
 # one — grep 999 to find it.
+#
+# The fixtures endpoint gets the matching row: fixture 12 copied as fixture 999
+# with this kickoff, every other field as captured (add_synthetic_dgw_fixture).
 SYNTHETIC_DGW = {
     "fpl_id": 233,
     "round": 2,
@@ -361,7 +402,7 @@ SYNTHETIC_DGW = {
 }
 
 
-def s3_get(key: str) -> dict:
+def s3_get(key: str) -> dict | list:
     """Fetch one object and parse it. Fails loudly — a partial tree is worse
     than none, because the gap shows up as a mysterious test failure later."""
     proc = subprocess.run(
@@ -377,7 +418,7 @@ def s3_get(key: str) -> dict:
     return json.loads(proc.stdout)
 
 
-def write(path: Path, payload: dict) -> None:
+def write(path: Path, payload: dict | list) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
     print(f"  {path.relative_to(Path(__file__).parent)}  "
@@ -413,16 +454,26 @@ def build_history_season() -> None:
         {
             "_fixture_note": (
                 f"Trimmed bootstrap-static for the ported {HISTORY_SEASON} "
-                f"season. `elements` is filtered to players {kept} and "
-                "`events` kept whole — all 38 rounds, every one finished and "
-                "data_checked, which is what the closed-season override is "
-                "checked against. No synthetic edits. Sourced from "
-                f"s3://{BUCKET}/{ARCHIVE_PREFIX}/bootstrap.json; the element "
-                "and event objects are verbatim."
+                f"season. `elements` is filtered to players {kept}; "
+                "`events` is kept whole — all 38 rounds, every one finished "
+                "and data_checked, which is what the closed-season override is "
+                "checked against — and so are `teams` and `element_types`. No "
+                "synthetic edits. Sourced from "
+                f"s3://{BUCKET}/{ARCHIVE_PREFIX}/bootstrap.json; the element, "
+                "event, team and position objects are verbatim."
             ),
             "elements": [e for e in boot["elements"] if e["id"] in HISTORY_PLAYERS],
             "events": boot["events"],
+            "teams": boot["teams"],
+            "element_types": boot["element_types"],
         },
+    )
+
+    # The single end-of-season snapshot, carried as-is apart from `stats`.
+    write(
+        HISTORY_OUT_ROOT / "fixtures" / HISTORY_DATE / HISTORY_RUN_ID
+        / "payload.json",
+        trim_fixtures(s3_get(f"{ARCHIVE_PREFIX}/fixtures.json")),
     )
 
     for fpl_id, note in HISTORY_PLAYERS.items():
@@ -433,6 +484,32 @@ def build_history_season() -> None:
             / HISTORY_RUN_ID / "payload.json",
             payload,
         )
+
+
+def trim_fixtures(fixtures: list) -> list:
+    """Drop `stats` from every fixture; keep every fixture and other field."""
+    return [{k: v for k, v in f.items() if k != "stats"} for f in fixtures]
+
+
+def add_synthetic_dgw_fixture(fixtures: list) -> list:
+    """Add fixture 999 — a copy of fixture 12 — so the synthetic double's
+    second history row resolves to a fixture. See SYNTHETIC_DGW."""
+    source = [f for f in fixtures if f["id"] == SYNTHETIC_DGW["source_fixture"]]
+    if not source or source[0]["event"] != SYNTHETIC_DGW["round"]:
+        sys.exit(
+            f"fixture {SYNTHETIC_DGW['source_fixture']} is missing or not in "
+            f"round {SYNTHETIC_DGW['round']} — the synthetic double's fixture "
+            "row would be silently wrong"
+        )
+    if any(f["id"] == SYNTHETIC_DGW["fixture"] for f in fixtures):
+        sys.exit(
+            f"fixture {SYNTHETIC_DGW['fixture']} already exists in the capture "
+            "— the synthetic id is no longer outside the real range"
+        )
+    dgw = dict(source[0])
+    dgw["id"] = SYNTHETIC_DGW["fixture"]
+    dgw["kickoff_time"] = SYNTHETIC_DGW["kickoff_time"]
+    return fixtures + [dgw]
 
 
 def add_synthetic_dgw(payload: dict) -> dict:
@@ -545,11 +622,11 @@ def main() -> None:
             {
                 "_fixture_note": (
                     "Trimmed bootstrap-static capture. `elements` is filtered "
-                    f"to players {kept} and `events` kept whole (all "
-                    "38 rounds, so the spine's calendar is real). Every other "
-                    "top-level key is dropped — stg_player reads `elements` "
-                    "and stg_gameweek reads `events`, nothing else. The "
-                    "element and event objects themselves are verbatim."
+                    f"to players {kept}; `events` (all 38 rounds, so the "
+                    "spine's calendar is real), `teams` and `element_types` "
+                    "are kept whole. Every other top-level key is dropped. The "
+                    "element, event, team and position objects themselves are "
+                    "verbatim."
                     + departure_note
                     + finished_note
                 ),
@@ -558,7 +635,15 @@ def main() -> None:
                     if e["id"] in PLAYERS and not is_departed(e["id"], run_id)
                 ],
                 "events": mark_synthetic_finished(boot["events"], run_id),
+                "teams": boot["teams"],
+                "element_types": boot["element_types"],
             },
+        )
+
+        fixtures = s3_get(f"{RAW_PREFIX}/fixtures/{date}/{run_id}/payload.json")
+        write(
+            OUT_ROOT / "fixtures" / date / run_id / "payload.json",
+            add_synthetic_dgw_fixture(trim_fixtures(fixtures)),
         )
 
         for fpl_id, note in PLAYERS.items():
