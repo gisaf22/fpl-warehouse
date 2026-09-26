@@ -408,8 +408,10 @@ dbt test --select tag:e2e
 ```
 
 **`unit` and `integration` build against a checked-in fixture, not against S3.**
-`--target fixtures` points the raw source at `tests/fixtures/raw` — three real captures
-over five players, ~430 KB — instead of the live bucket's ~74k objects. The tree is real
+`--target fixtures` points the raw source at `tests/fixtures/raw` and
+`tests/fixtures/history` — four live captures over six players plus one 2025-26 snapshot,
+with element-summary, bootstrap-static (elements, events, teams, positions), fixtures and
+event-status, ~1.7 MB — instead of the live bucket's ~74k objects. The tree is real
 captured data, trimmed; `tests/fixtures/build_fixtures.py` documents every edge case it
 covers and regenerates it from S3 when one needs adding.
 
