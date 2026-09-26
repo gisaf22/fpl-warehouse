@@ -60,9 +60,15 @@ jobs:
       # Keeps the tier taxonomy honest as tests are added: a test with no tier
       # tag runs in no tier and is silently never enforced, and one with two
       # tiers runs in both. Neither is visible without this check.
+      #
+      # dbt unit tests (`unit_tests:`) are a separate resource type from data
+      # tests, so both are listed. They also report their tags only under
+      # `config.tags` — the top-level `tags` key is absent from their `dbt ls`
+      # output — so tags are read from both places.
       - name: Check every test carries exactly one tier tag
         run: |
-          uv run dbt ls --resource-type test --output json --output-keys name tags \
+          uv run dbt ls --resource-type test --resource-type unit_test \
+            --output json --output-keys name tags config \
             > /tmp/tests.json
           uv run python - <<'PY'
           import json, sys
@@ -78,7 +84,9 @@ jobs:
                       continue
                   node = json.loads(line)
                   seen += 1
-                  tiers = TIERS & set(node.get("tags", []))
+                  tags = set(node.get("tags") or []) | set(
+                      (node.get("config") or {}).get("tags") or [])
+                  tiers = TIERS & tags
                   if len(tiers) != 1:
                       bad.append((node["name"], sorted(tiers) or "none"))
                   for t in tiers:
