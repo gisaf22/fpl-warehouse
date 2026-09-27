@@ -195,8 +195,11 @@ ranked as (
 
 )
 
+-- Stub for #43's tests: team_fpl_id is null until the implementation lands.
+-- depends_on: {{ ref('dim_fixture') }}
 select
     season,
-    * exclude (season, capture_rank)
+    * exclude (season, capture_rank),
+    cast(null as integer) as team_fpl_id
 from ranked
 where capture_rank = 1

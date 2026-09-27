@@ -42,6 +42,17 @@ models:
             tags: [integration]
             meta:
               covers: "#42 AC6"
+      # Every row's team is a club in dim_team within its own season, matched
+      # on the same season-qualified expression.
+      - relationships:
+          column_name: "season || '|' || team_fpl_id"
+          arguments:
+            to: ref('dim_team')
+            field: "season || '|' || team_fpl_id"
+          config:
+            tags: [integration]
+            meta:
+              covers: "#43 AC4"
     columns:
       - name: season
         data_type: VARCHAR
@@ -154,6 +165,17 @@ models:
         data_type: BOOLEAN
       - name: is_ratified
         data_type: BOOLEAN
+      # The club the player played for in this fixture, as of the fixture:
+      # the fixture's home or away side, whichever the player was on. Added
+      # last so every existing column keeps its position (#43).
+      - name: team_fpl_id
+        data_type: INTEGER
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#43 AC3"
 
   - name: fct_player_gameweek
     description: >
