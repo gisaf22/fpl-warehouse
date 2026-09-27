@@ -1,0 +1,105 @@
+version: 2
+
+# dbt unit tests for the staging layer. Each carries exactly one tier tag, like
+# every other test, and a `covers` meta entry naming the board item and
+# acceptance criterion it pins.
+#
+# The raw sources are read through `external_location`, so there is no
+# relation for dbt to introspect columns from, and dict-format `rows` fail with
+# "Not able to get columns for unit test". Source inputs are therefore given as
+# `format: sql`, which declares each column's type itself. Every column the
+# model reads must be listed, null where the case does not care.
+
+unit_tests:
+
+  # --- stg_fixture: fixtures staged per capture (#37) --------------------------
+
+  - name: unscheduled_fixture_is_staged_with_null_round_and_kickoff
+    description: >
+      A fixture FPL has not scheduled — postponed, or not yet given a date —
+      has no round and no kickoff. It still exists and will be played, so it is
+      staged with both null: not dropped, and not given a round or time.
+    model: stg_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#37 AC2"
+    given:
+      - input: source('fpl_raw', 'fixtures')
+        format: sql
+        rows: |
+          select
+              'tests/fixtures/raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json' as filename,
+              57::bigint as id, null::bigint as event, null::timestamp as kickoff_time,
+              3::bigint as team_h, 14::bigint as team_a,
+              null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
+              3::bigint as team_h_difficulty, 4::bigint as team_a_difficulty
+    expect:
+      rows:
+        - {season: "2026-27", run_id: "20260914T211204Z-a730c3", fixture_id: 57, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
+
+  - name: postponed_fixture_keeps_each_captures_round_as_reported
+    description: >
+      A fixture scheduled in round 5, postponed (round and kickoff withdrawn),
+      then rescheduled into round 12 is three captures and three rows, each
+      with the round and kickoff that capture reported. The postponed capture
+      stays null rather than inheriting either neighbour's round.
+    model: stg_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#37 AC2"
+    given:
+      - input: source('fpl_raw', 'fixtures')
+        format: sql
+        rows: |
+          select * from (values
+              ('tests/fixtures/raw/fpl/fixtures/2026-09-06/20260906T191056Z-6d5820/payload.json',
+               41::bigint, 5::bigint,    timestamp '2026-09-27 14:00:00'),
+              ('tests/fixtures/raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json',
+               41::bigint, null::bigint, null::timestamp),
+              ('tests/fixtures/raw/fpl/fixtures/2026-09-20/20260920T191100Z-0f0f0f/payload.json',
+               41::bigint, 12::bigint,   timestamp '2026-11-25 19:30:00')
+          ) as t(filename, id, event, kickoff_time),
+          lateral (select
+              6::bigint as team_h, 9::bigint as team_a,
+              null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
+              2::bigint as team_h_difficulty, 3::bigint as team_a_difficulty)
+    expect:
+      rows:
+        - {run_id: "20260906T191056Z-6d5820", fixture_id: 41, round: 5,    kickoff_time: "2026-09-27 14:00:00"}
+        - {run_id: "20260914T211204Z-a730c3", fixture_id: 41, round: null, kickoff_time: null}
+        - {run_id: "20260920T191100Z-0f0f0f", fixture_id: 41, round: 12,   kickoff_time: "2026-11-25 19:30:00"}
+
+  - name: same_fixture_id_in_two_seasons_is_two_rows_each_with_its_own_season
+    description: >
+      fixture_id is reassigned every season, so id 1 in the ported season and
+      id 1 in the live season are different matches. Each row takes its season
+      from its own key — the ported tree's season segment, or the `season` var
+      for the live tree — and the two never merge. The ported row has no
+      kickoff, so the season is shown to come from the key and not the date.
+    model: stg_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#37 AC3"
+    overrides:
+      vars:
+        season: "2026-27"
+    given:
+      - input: source('fpl_raw', 'fixtures')
+        format: sql
+        rows: |
+          select * from (values
+              ('s3://bucket/history/2025-26/fpl/fixtures/2026-05-26/20260526T034626Z-2a6b73/payload.json',
+               1::bigint, null::bigint, null::timestamp, 12::bigint, 4::bigint),
+              ('s3://bucket/raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json',
+               1::bigint, 1::bigint, timestamp '2026-08-21 19:00:00', 1::bigint, 7::bigint)
+          ) as t(filename, id, event, kickoff_time, team_h, team_a),
+          lateral (select
+              null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
+              null::bigint as team_h_difficulty, null::bigint as team_a_difficulty)
+    expect:
+      rows:
+        - {season: "2025-26", fixture_id: 1, team_h_fpl_id: 12, team_a_fpl_id: 4}
+        - {season: "2026-27", fixture_id: 1, team_h_fpl_id: 1,  team_a_fpl_id: 7}
