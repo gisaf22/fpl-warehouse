@@ -28,6 +28,20 @@ models:
     config:
       contract:
         enforced: true
+    # Every fact row's fixture exists in dim_fixture within its own season.
+    # relationships takes one column on each side and the key is two, so both
+    # sides are the same season-qualified expression, as in dim_team's unique
+    # test. A fixture_id matching only another season's fixture fails.
+    data_tests:
+      - relationships:
+          column_name: "season || '|' || fixture_id"
+          arguments:
+            to: ref('dim_fixture')
+            field: "season || '|' || fixture_id"
+          config:
+            tags: [integration]
+            meta:
+              covers: "#42 AC6"
     columns:
       - name: season
         data_type: VARCHAR
@@ -308,3 +322,108 @@ models:
       - name: team_code
       - name: team_name
       - name: team_short_name
+
+  - name: dim_fixture
+    description: >
+      One row per fixture per season, keyed (season, fixture_id). Teams, round,
+      kickoff and result come from the fixture's latest capture. Difficulty
+      comes from the last capture before kickoff, and
+      difficulty_is_pre_kickoff says whether one existed: false for all of
+      2025-26 (one end-of-season snapshot) and for live fixtures that kicked
+      off before capture history began (decision 3 on #32). A double round has
+      more than 10 fixtures and a team playing twice; a blank round has fewer
+      than 10. Nothing here assumes either count. Internal until the
+      dimensions are served (#34, B5).
+    group: warehouse_internal
+    access: private
+    # The grain as one expression, as in dim_team: a null in either half nulls
+    # the expression, which unique skips, so the key columns are also not_null.
+    data_tests:
+      - unique:
+          column_name: "season || '|' || fixture_id"
+          config:
+            tags: [unit]
+            meta:
+              covers: "#42 AC1"
+      # Both sides resolve within the fixture's own season. relationships
+      # skips a null from-value, and a team id is never null here: stg_fixture
+      # stages both sides from every fixture object.
+      - relationships:
+          column_name: "season || '|' || team_h_fpl_id"
+          arguments:
+            to: ref('dim_team')
+            field: "season || '|' || team_fpl_id"
+          config: &dim_fixture_team_resolves
+            tags: [integration]
+            meta:
+              covers: "#42 AC2"
+      - relationships:
+          column_name: "season || '|' || team_a_fpl_id"
+          arguments:
+            to: ref('dim_team')
+            field: "season || '|' || team_fpl_id"
+          config: *dim_fixture_team_resolves
+    columns:
+      - name: season
+        data_tests: &dim_fixture_key_not_null
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#42 AC1"
+      - name: fixture_id
+        data_tests: *dim_fixture_key_not_null
+      - name: round
+        description: >
+          Nullable, no not_null test: null for a fixture FPL has not scheduled
+          (postponed, or not yet given a date). Such a fixture is still one of
+          the season's fixtures and is kept.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1, max_value: 38}
+              config: &dim_fixture_in_range
+                tags: [unit]
+                meta:
+                  covers: "#42 AC7"
+      - name: kickoff_time
+        description: >
+          Nullable, no not_null test: null for a fixture FPL has not scheduled,
+          for the same reason as round.
+      - name: team_h_fpl_id
+      - name: team_a_fpl_id
+      - name: team_h_score
+        description: >
+          Nullable, no not_null test: null until the fixture is played. Taken
+          from the latest capture, so it is the final score once there is one.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+              config: *dim_fixture_in_range
+      - name: team_a_score
+        description: Nullable, no not_null test, for the same reason as team_h_score.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+              config: *dim_fixture_in_range
+      - name: finished
+      - name: team_h_difficulty
+        data_tests: &dim_fixture_difficulty
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#42 AC4"
+          - value_between:
+              arguments: {min_value: 1, max_value: 5}
+              config: *dim_fixture_in_range
+      - name: team_a_difficulty
+        data_tests: *dim_fixture_difficulty
+      # BOOLEAN, so true and false are its only values; not_null is the
+      # remaining half of "only its defined values".
+      - name: difficulty_is_pre_kickoff
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#42 AC5"
