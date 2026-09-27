@@ -74,6 +74,16 @@
 --   to is still mid-settlement. Consumers wanting settled data only should
 --   filter on it rather than re-deriving it from the scores.
 --
+--   `team_fpl_id`, last, is the club the player played for in this fixture:
+--   dim_fixture's home side when the row's was_home is true, its away side
+--   otherwise. It is resolved per fixture, as of that fixture, never once per
+--   player or per round — a player transferred mid-season, even between the
+--   two fixtures of a double gameweek, carries each fixture's own club. A
+--   build-time lookup is known bug 1 in CLAUDE.md. The join is a left join so
+--   a fixture missing from dim_fixture surfaces as a null team, which the
+--   not_null test fails, rather than silently dropping the row. Team is not on
+--   fct_player_gameweek, where a double-gameweek transfer has no single club.
+--
 -- is_ratified — sourced, not inferred:
 --   The flag comes from int_round_ratification, which rolls up FPL's own
 --   event-status endpoint. It previously read `both scores are non-NULL`,
@@ -196,7 +206,15 @@ ranked as (
 )
 
 select
-    season,
-    * exclude (season, capture_rank)
+    ranked.season,
+    ranked.* exclude (season, capture_rank),
+    -- The fixture's side the player was on; see header.
+    case
+        when ranked.was_home then fixture.team_h_fpl_id
+        else fixture.team_a_fpl_id
+    end                                                     as team_fpl_id
 from ranked
-where capture_rank = 1
+left join {{ ref('dim_fixture') }} as fixture
+    on  fixture.season = ranked.season
+    and fixture.fixture_id = ranked.fixture_id
+where ranked.capture_rank = 1

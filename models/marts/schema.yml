@@ -11,9 +11,9 @@ version: 2
 # suite, move dbt tests to tests/":
 #   tests/availability/sql/fact_test_keys_not_null.sql      -> the grain columns
 #   tests/availability/sql/fact_test_column_coverage.sql    -> the COALESCEd measures
-# Their team_fpl_id clause is deliberately not carried: this warehouse holds no
-# team identifier, because resolving one at build time is the as-of bug the
-# rebuild exists to remove.
+# Their team_fpl_id clause was not carried at the time, because resolving a team
+# at build time is the as-of bug the rebuild exists to remove. fct_player_fixture
+# now carries team_fpl_id resolved per fixture (#43), with its own not_null test.
 
 models:
   - name: fct_player_fixture
@@ -42,6 +42,17 @@ models:
             tags: [integration]
             meta:
               covers: "#42 AC6"
+      # Every row's team is a club in dim_team within its own season, matched
+      # on the same season-qualified expression.
+      - relationships:
+          column_name: "season || '|' || team_fpl_id"
+          arguments:
+            to: ref('dim_team')
+            field: "season || '|' || team_fpl_id"
+          config:
+            tags: [integration]
+            meta:
+              covers: "#43 AC4"
     columns:
       - name: season
         data_type: VARCHAR
@@ -154,6 +165,22 @@ models:
         data_type: BOOLEAN
       - name: is_ratified
         data_type: BOOLEAN
+      - name: team_fpl_id
+        data_type: INTEGER
+        description: >
+          The club the player played for in this fixture, as of the fixture:
+          the fixture's home side if was_home, else its away side. Resolved per
+          fixture, so a mid-season transfer — even between the two fixtures of
+          a double gameweek — carries each fixture's own club. A team id is
+          reassigned each season; match it within season. Added 2026-09-27
+          (#43) as the last column, an additive change: every existing column
+          keeps its name, type and position. Not on fct_player_gameweek.
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#43 AC3"
 
   - name: fct_player_gameweek
     description: >

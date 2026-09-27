@@ -326,6 +326,24 @@ was added alongside it. `seasons` is a list rather than a multi-season boolean f
 reason — a flag would encode today's two-season state as the thing to branch on, and the
 count changes again the next time a season is ported.
 
+### Column changes to the served tables
+
+Newest first. Each entry is a change to the enforced column list in
+`models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
+learns of it.
+
+- **2026-09-27 — `fct_player_fixture.team_fpl_id INTEGER`, appended last (#43). Additive.**
+  The club the player played for in that fixture: the fixture's home side if `was_home`, else
+  its away side, read from `dim_fixture` within the row's own season. Every existing column
+  keeps its name, type and position, so a consumer selecting by name is unaffected, and so is
+  one reading by position up to `is_ratified`. Never null. Match it within season: team ids
+  are reassigned each season like `fpl_id`. `fct_player_gameweek` is unchanged and has no
+  team column, because a player transferred between the two fixtures of a double gameweek has
+  no single club (decision 5 on #32). The next scheduled build publishes it for every season;
+  no backfill.
+- **2026-09-15 — `is_ratified` values change, shape unchanged. Breaking.** See "Round
+  ratification — Migration".
+
 ### The publish floor is computed, not configured
 
 `scripts/publish_served.py` refuses to publish a table that falls meaningfully short of
