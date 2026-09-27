@@ -275,3 +275,36 @@ models:
       - name: transfers_balance
         data_type: INTEGER
 
+
+  - name: dim_team
+    description: >
+      One row per team per season, keyed (season, team_fpl_id), taken from that
+      season's latest bootstrap-static capture. A club present in two seasons
+      is two rows sharing team_code, never merged — team_fpl_id is reassigned
+      every season. `strength` is staged, not carried here (decision 4 on
+      #32). Internal until the dimensions are served (#34, B5).
+    group: warehouse_internal
+    access: private
+    # The grain as one expression: dbt's unique test takes a single column, and
+    # the key is two. A null in either half nulls the expression, which unique
+    # skips — the per-column not_null tests below close that gap.
+    data_tests:
+      - unique:
+          column_name: "season || '|' || team_fpl_id"
+          config:
+            tags: [unit]
+            meta:
+              covers: "#40 AC3"
+    columns:
+      - name: season
+        data_tests: &dim_team_key_not_null
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#40 AC3"
+      - name: team_fpl_id
+        data_tests: *dim_team_key_not_null
+      - name: team_code
+      - name: team_name
+      - name: team_short_name

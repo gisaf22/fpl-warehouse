@@ -1,0 +1,59 @@
+version: 2
+
+# dbt unit tests for the marts layer. Each carries exactly one tier tag, like
+# every other test, and a `covers` meta entry naming the board item and
+# acceptance criterion it pins.
+
+unit_tests:
+
+  # --- dim_team: one row per team per season (#40) ----------------------------
+
+  - name: team_dimension_takes_each_seasons_latest_capture
+    description: >
+      Each season's teams come from that season's latest capture only. A team
+      renamed between captures reads its latest name, and a team listed only in
+      an earlier capture is not carried. The closed season's single, older
+      capture still stands for its own season: latest is per season, never
+      across them.
+    model: dim_team
+    config:
+      tags: [unit]
+      meta:
+        covers: "#40 AC1"
+    given:
+      - input: ref('stg_team')
+        rows:
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", team_fpl_id: 1, team_code: 3, team_name: "Old name", team_short_name: "OLD"}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", team_fpl_id: 99, team_code: 999, team_name: "Earlier only", team_short_name: "EAR"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 2, team_code: 7, team_name: "Aston Villa", team_short_name: "AVL"}
+    expect:
+      rows:
+        - {season: "2025-26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+        - {season: "2026-27", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+        - {season: "2026-27", team_fpl_id: 2, team_code: 7, team_name: "Aston Villa", team_short_name: "AVL"}
+
+  - name: same_club_in_two_seasons_is_two_rows_sharing_its_team_code
+    description: >
+      Season partitions; it never relates. A club present in both seasons is
+      two rows with the same team_code — whether its team_fpl_id is the same
+      in both seasons or was reassigned — never merged into one.
+    model: dim_team
+    config:
+      tags: [unit]
+      meta:
+        covers: "#40 AC2"
+    given:
+      - input: ref('stg_team')
+        rows:
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 13, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 12, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
+    expect:
+      rows:
+        - {season: "2025-26", team_fpl_id: 1, team_code: 3}
+        - {season: "2025-26", team_fpl_id: 13, team_code: 43}
+        - {season: "2026-27", team_fpl_id: 1, team_code: 3}
+        - {season: "2026-27", team_fpl_id: 12, team_code: 43}
