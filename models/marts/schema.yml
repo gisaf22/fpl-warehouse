@@ -62,6 +62,18 @@ models:
         data_type: INTEGER
       - name: minutes
         data_type: INTEGER
+        # The one schema.yml use of value_between inside #53, so dbt's YAML
+        # argument path is exercised and not only the singular tests' direct
+        # calls. min alone: the 90-minute ceiling is asserted separately by
+        # tests/fct_test_player_fixture_minutes_within_match_length.sql.
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 0
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#53 AC4"
       - name: starts
         data_type: INTEGER
       - name: total_points
