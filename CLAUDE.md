@@ -122,6 +122,42 @@ must stay that way:
    would lose every past round, because the latest capture reports nothing about them.
    Ratification is monotonic, so "ever observed ratified" is sound.
 
+### Ratification lead before a round leaves the window — measured 2026-09-23
+
+**Observed for rounds 2–4 of 2026-27 with at least 70.0h of margin** between a round first
+reading ratified and its last appearance in `event-status`. This is an observation over
+three complete windows, not a guarantee FPL makes. fpl-ingest's `gameweeks.py` relies on it:
+it treats a finished round that is absent from a non-empty `event-status` map as ratified.
+
+Measured over every `event-status` capture in `s3://fpl-data-safari/raw/fpl/event-status/`:
+177 captures, 2026-08-29 01:23 → 2026-09-23 19:14 UTC, none skipped, none with an empty
+`status` array. A round counts as ratified in a capture under rule 1 above (every dated
+entry `points == "r"` and `bonus_added == true`). Timestamps are each sidecar's
+`received_at`.
+
+| Round | First capture ratified | Last capture listing it | First capture without it | Margin |
+|---|---|---|---|---|
+| 2 | 09-01 19:13 | 09-04 17:12 | 09-04 19:10 | **≥ 70.0h** (≤ 72.0h) |
+| 3 | 09-07 19:12 | 09-12 12:19 | 09-12 14:12 | **≥ 113.1h** (≤ 115.0h) |
+| 4 | 09-15 19:13 | 09-18 17:11 | 09-18 19:12 | **≥ 70.0h** (≤ 72.0h) |
+| 5 | 09-21 19:13 | still in window at 09-23 19:14 | — | ≥ 48.0h so far; window not yet closed |
+
+- **Why the "≥" figure is a lower bound:** FPL ratified the round at or before its first
+  ratified capture, and the round left the window after its last listing capture.
+- **The "≤" figure** adds the gap to the first capture without the round. It only bounds
+  the time from the first *observed* ratification.
+- **Round 1** is in zero captures (see the fallback below). Round 5 already reads ratified
+  while still listed, so it is consistent with the finding but adds no completed margin.
+- **No round regressed:** none went from ratified back to unratified in any later capture.
+  That supports the monotonicity rule 2 depends on.
+- **Resolution:** the first ratified capture fell on the 19:00 daily run every time, so
+  capture cadence limits how precisely the ratification moment is known. It does not
+  affect the lower bound.
+
+Re-measure as rounds accumulate, and update this section with the date and the round
+range. A round that leaves the window unratified would break fpl-ingest's absent-means-
+ratified rule: it would capture and mark a provisional event-live payload as final.
+
 ### The 2026-08-29 fallback — bounded, and meant to die
 
 All three raw endpoints' capture history begins **2026-08-29**, after round 1 of 2026-27
