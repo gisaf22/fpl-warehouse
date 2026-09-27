@@ -72,7 +72,7 @@ unit_tests:
       13:00 capture is before kickoff and the 15:00 one is not.
     model: dim_fixture
     config:
-      tags: [integration]
+      tags: [unit]
       meta:
         covers: "#42 AC3"
     given:
@@ -94,7 +94,7 @@ unit_tests:
       end-of-season snapshot is flagged the same way.
     model: dim_fixture
     config:
-      tags: [integration]
+      tags: [unit]
       meta:
         covers: "#42 AC4"
     given:
@@ -174,7 +174,8 @@ unit_tests:
       A fixture scheduled in round 5 and then postponed has no round and no
       kickoff in its latest capture. It is kept, with both null. It is not
       dropped, and the earlier capture's round and kickoff are not carried
-      forward.
+      forward. It has not been played, so every capture is before kickoff and
+      its difficulty is flagged pre-kickoff.
     model: dim_fixture
     config:
       tags: [unit]
@@ -187,4 +188,4 @@ unit_tests:
           - {season: "2026-27", run_id: "20260914T211204Z-bbbb", extracted_at: "2026-09-14 21:12:04", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
     expect:
       rows:
-        - {season: "2026-27", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
+        - {season: "2026-27", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, difficulty_is_pre_kickoff: true}

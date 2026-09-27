@@ -410,7 +410,7 @@ models:
         data_tests: &dim_fixture_difficulty
           - not_null:
               config:
-                tags: [integration]
+                tags: [unit]
                 meta:
                   covers: "#42 AC4"
           - value_between:
@@ -418,15 +418,12 @@ models:
               config: *dim_fixture_in_range
       - name: team_a_difficulty
         data_tests: *dim_fixture_difficulty
+      # BOOLEAN, so true and false are its only values; not_null is the
+      # remaining half of "only its defined values".
       - name: difficulty_is_pre_kickoff
         data_tests:
           - not_null:
-              config: &dim_fixture_flag_defined
+              config:
                 tags: [unit]
                 meta:
                   covers: "#42 AC5"
-          - accepted_values:
-              arguments:
-                values: [true, false]
-                quote: false
-              config: *dim_fixture_flag_defined

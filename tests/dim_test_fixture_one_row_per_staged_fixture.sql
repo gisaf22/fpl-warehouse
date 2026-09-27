@@ -3,8 +3,8 @@
 -- Asserts: each season holds exactly as many fixtures as its captures name,
 --          counted from the data rather than fixed at 380.
 -- Origin: new in #42
--- Tier: unit
-{{ config(group='warehouse_internal', tags=['unit'], meta={'covers': '#42 AC1'}) }}
+-- Tier: integration
+{{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#42 AC1'}) }}
 
 -- Live data has 380 fixtures a season. The fixture tree's live season has 381
 -- (synthetic fixture 999, #36), so the expected count is the number of
