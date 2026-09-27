@@ -17,6 +17,10 @@
 --   team as of the capture, and joining it onto historical fixtures at build
 --   time is the known as-of bug this rebuild must not reintroduce.
 --
+-- position_id:
+--   FPL's `element_type`, as of the capture. Unlike team it is treated as
+--   fixed within a season (decision 2 on #32); #41 asserts it in dim_player.
+--
 -- player_code:
 --   FPL's `code`, the player's identifier across seasons — `fpl_id` is
 --   reassigned every season (verified 2026-09-16: 471 of 476 players present
@@ -57,6 +61,9 @@ select
     -- Identity
     cast(e.web_name as varchar)                as web_name,
     cast(e.code as integer)                    as player_code,
+
+    -- Position as of this capture; refers to stg_position.position_id
+    cast(e.element_type as integer)            as position_id,
 
     -- Season total as of this capture
     cast(e.total_points as integer)            as total_points
