@@ -56,6 +56,17 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: stg_fixture
+    description: >
+      1:1 with the fixtures endpoint — one row per fixture per capture, typing
+      and renaming only. `round` and `kickoff_time` are null while a fixture is
+      unscheduled or postponed and are never coalesced. `fixture_id` repeats
+      every season, so it identifies a fixture only together with `season`.
+      Choosing one capture per fixture is left downstream. Internal: not part
+      of the served contract.
+    group: warehouse_internal
+    access: private
+
   - name: stg_gameweek
     description: >
       1:1 with bootstrap-static `events` — the 38-gameweek calendar. Internal:
