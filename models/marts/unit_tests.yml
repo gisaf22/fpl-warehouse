@@ -57,3 +57,134 @@ unit_tests:
         - {season: "2025-26", team_fpl_id: 13, team_code: 43}
         - {season: "2026-27", team_fpl_id: 1, team_code: 3}
         - {season: "2026-27", team_fpl_id: 12, team_code: 43}
+
+  # --- dim_fixture: one row per fixture per season (#42) -----------------------
+  #
+  # The fixture tree's difficulty never changes between captures, so which
+  # capture a value came from is only distinguishable with mocked input.
+
+  - name: fixture_difficulty_is_the_last_value_before_kickoff
+    description: >
+      A fixture captured twice before kickoff, with difficulty 2 and then 3,
+      and once after kickoff with 5, serves 3, the value managers saw last
+      before the match, and is flagged pre-kickoff. Kickoff is the latest
+      capture's: the fixture was moved forward from 16:30 to 14:00, so the
+      13:00 capture is before kickoff and the 15:00 one is not.
+    model: dim_fixture
+    config:
+      tags: [integration]
+      meta:
+        covers: "#42 AC3"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", run_id: "20260910T190000Z-aaaa", extracted_at: "2026-09-10 19:00:00", fixture_id: 30, round: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 2, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260913T130000Z-bbbb", extracted_at: "2026-09-13 13:00:00", fixture_id: 30, round: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260913T150000Z-cccc", extracted_at: "2026-09-13 15:00:00", fixture_id: 30, round: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 5, team_a_difficulty: 1}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 30, kickoff_time: "2026-09-13 14:00:00", team_h_difficulty: 3, team_a_difficulty: 4, difficulty_is_pre_kickoff: true}
+
+  - name: fixture_with_no_capture_before_kickoff_keeps_its_difficulty_flagged_false
+    description: >
+      A fixture with no capture before kickoff keeps a difficulty rather than
+      going null, and is flagged not pre-kickoff. For a live fixture that
+      kicked off before capture history began, the value is its earliest
+      capture's, the one closest to kickoff. A closed season's single
+      end-of-season snapshot is flagged the same way.
+    model: dim_fixture
+    config:
+      tags: [integration]
+      meta:
+        covers: "#42 AC4"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", fixture_id: 1, round: 1, kickoff_time: "2025-08-15 19:00:00", team_h_fpl_id: 12, team_a_fpl_id: 4, team_h_score: 4, team_a_score: 2, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", fixture_id: 1, round: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 2, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", fixture_id: 1, round: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
+    expect:
+      rows:
+        - {season: "2025-26", fixture_id: 1, team_h_difficulty: 3, team_a_difficulty: 5, difficulty_is_pre_kickoff: false}
+        - {season: "2026-27", fixture_id: 1, team_h_difficulty: 2, team_a_difficulty: 4, difficulty_is_pre_kickoff: false}
+
+  - name: finished_fixture_reports_its_latest_captured_score
+    description: >
+      A fixture's result comes from its latest capture: no score before the
+      match, a provisional 1-0 while it was in progress, then 2-1 final. The
+      dimension serves 2-1 and finished, never an older score.
+    model: dim_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#42 AC5"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", run_id: "20260906T120000Z-aaaa", extracted_at: "2026-09-06 12:00:00", fixture_id: 40, round: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260906T150000Z-bbbb", extracted_at: "2026-09-06 15:00:00", fixture_id: 40, round: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 1, team_a_score: 0, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260906T191056Z-cccc", extracted_at: "2026-09-06 19:10:56", fixture_id: 40, round: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 2, team_a_score: 1, finished: true, team_h_difficulty: 3, team_a_difficulty: 3}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 40, team_h_score: 2, team_a_score: 1, finished: true}
+
+  - name: double_and_blank_rounds_keep_every_fixture
+    description: >
+      Round 2 is a double: 11 fixtures, with team 1 playing twice. Round 3 is
+      a blank with one fixture. Every fixture in both is one row with its own
+      teams and round. Nothing is dropped to reach 10 per round or one per
+      team per round.
+    model: dim_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#42 AC8"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 11, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 1,  team_a_fpl_id: 2,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 12, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 4,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 13, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 5,  team_a_fpl_id: 6,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 14, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 7,  team_a_fpl_id: 8,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 15, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 9,  team_a_fpl_id: 10, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 16, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 11, team_a_fpl_id: 12, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 17, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 13, team_a_fpl_id: 14, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 18, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 15, team_a_fpl_id: 16, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 19, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 17, team_a_fpl_id: 18, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 20, round: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 19, team_a_fpl_id: 20, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 21, round: 2, kickoff_time: "2026-09-01 19:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 1,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 22, round: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 2,  team_a_fpl_id: 5,  team_h_difficulty: 3, team_a_difficulty: 3}
+    expect:
+      rows:
+        - {fixture_id: 11, round: 2, team_h_fpl_id: 1,  team_a_fpl_id: 2}
+        - {fixture_id: 12, round: 2, team_h_fpl_id: 3,  team_a_fpl_id: 4}
+        - {fixture_id: 13, round: 2, team_h_fpl_id: 5,  team_a_fpl_id: 6}
+        - {fixture_id: 14, round: 2, team_h_fpl_id: 7,  team_a_fpl_id: 8}
+        - {fixture_id: 15, round: 2, team_h_fpl_id: 9,  team_a_fpl_id: 10}
+        - {fixture_id: 16, round: 2, team_h_fpl_id: 11, team_a_fpl_id: 12}
+        - {fixture_id: 17, round: 2, team_h_fpl_id: 13, team_a_fpl_id: 14}
+        - {fixture_id: 18, round: 2, team_h_fpl_id: 15, team_a_fpl_id: 16}
+        - {fixture_id: 19, round: 2, team_h_fpl_id: 17, team_a_fpl_id: 18}
+        - {fixture_id: 20, round: 2, team_h_fpl_id: 19, team_a_fpl_id: 20}
+        - {fixture_id: 21, round: 2, team_h_fpl_id: 3,  team_a_fpl_id: 1}
+        - {fixture_id: 22, round: 3, team_h_fpl_id: 2,  team_a_fpl_id: 5}
+
+  - name: postponed_fixture_is_kept_with_null_round_and_kickoff
+    description: >
+      A fixture scheduled in round 5 and then postponed has no round and no
+      kickoff in its latest capture. It is kept, with both null. It is not
+      dropped, and the earlier capture's round and kickoff are not carried
+      forward.
+    model: dim_fixture
+    config:
+      tags: [unit]
+      meta:
+        covers: "#42 AC9"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", run_id: "20260906T191056Z-aaaa", extracted_at: "2026-09-06 19:10:56", fixture_id: 41, round: 5, kickoff_time: "2026-09-27 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260914T211204Z-bbbb", extracted_at: "2026-09-14 21:12:04", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
