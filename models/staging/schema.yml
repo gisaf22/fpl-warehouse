@@ -33,6 +33,20 @@ models:
       not part of the served contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: strength
+        # Nullable by design, so no not_null test: FPL reports no strength for
+        # any team in 2026-27 (decision 4 on #32). Where present it must sit on
+        # FPL's 1-5 scale; anything outside it means the source changed.
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 1
+                max_value: 5
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#40 AC6"
 
   - name: stg_position
     description: >
