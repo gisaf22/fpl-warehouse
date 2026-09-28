@@ -9,7 +9,7 @@
 #
 # It is also the publish path. The `dev` target writes .local/warehouse.duckdb
 # on the runner, which still dies with the runner — but the final step now
-# exports both fct_ tables from it to parquet and uploads them to
+# exports the five served tables from it to parquet and uploads them to
 # s3://fpl-data-safari/served/, overwritten in place, alongside a
 # _manifest.json. That is what fpl-intelligence reads, via
 # duckdb.read_parquet() against those stable keys. See CLAUDE.md,
@@ -211,7 +211,7 @@ jobs:
           uv run dbt build
           --vars "{history_root: '$HISTORY_ROOT'}"
 
-      # Publishes the two served fact tables to s3://fpl-data-safari/served/,
+      # Publishes the served fact and dimension tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
       # current objects; there is no published history to pin to.
       #

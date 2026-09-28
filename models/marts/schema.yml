@@ -78,15 +78,19 @@ models:
         data_type: TIMESTAMP
       - name: fpl_id
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
       - name: fixture_id
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
       - name: round
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
       - name: opponent_team_fpl_id
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
       - name: was_home
         data_type: BOOLEAN
       - name: kickoff_time
@@ -175,14 +179,15 @@ models:
         data_type: BOOLEAN
       - name: is_ratified
         data_type: BOOLEAN
+        description: "{{ doc('ratified') }}"
       - name: team_fpl_id
         data_type: INTEGER
         description: >
+          {{ doc('season_scoped_key') }}
           The club the player played for in this fixture, as of the fixture:
           the fixture's home side if was_home, else its away side. Resolved per
           fixture, so a mid-season transfer — even between the two fixtures of
-          a double gameweek — carries each fixture's own club. A team id is
-          reassigned each season; match it within season. Added 2026-09-27
+          a double gameweek — carries each fixture's own club. Added 2026-09-27
           (#43) as the last column, an additive change: every existing column
           keeps its name, type and position. Not on fct_player_gameweek.
         data_tests:
@@ -210,9 +215,11 @@ models:
         data_tests: *unit_not_null
       - name: fpl_id
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
       - name: round
         data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
       - name: web_name
         data_type: VARCHAR
@@ -232,6 +239,7 @@ models:
         data_type: TIMESTAMP
       - name: is_ratified
         data_type: BOOLEAN
+        description: "{{ doc('ratified') }}"
       - name: minutes
         data_type: INTEGER
         data_tests: *unit_not_null
@@ -331,11 +339,14 @@ models:
     description: >
       One row per team per season, keyed (season, team_fpl_id), taken from that
       season's latest bootstrap-static capture. A club present in two seasons
-      is two rows sharing team_code, never merged — team_fpl_id is reassigned
-      every season. `strength` is staged, not carried here (decision 4 on
-      #32). Internal until the dimensions are served (#34, B5).
+      is two rows sharing team_code, never merged. `strength` is staged, not
+      carried here (decision 4 on #32). Part of the served contract, published
+      to served/dim_team.parquet (#44); the column list below is enforced.
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     # The grain as one expression: dbt's unique test takes a single column, and
     # the key is two. A null in either half nulls the expression, which unique
     # skips — the per-column not_null tests below close that gap.
@@ -348,6 +359,7 @@ models:
               covers: "#40 AC3"
     columns:
       - name: season
+        data_type: VARCHAR
         data_tests: &dim_team_key_not_null
           - not_null:
               config:
@@ -355,10 +367,23 @@ models:
                 meta:
                   covers: "#40 AC3"
       - name: team_fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *dim_team_key_not_null
       - name: team_code
+        data_type: INTEGER
       - name: team_name
+        data_type: VARCHAR
+        # A null name in the latest capture would be served straight through.
+        data_tests: &dim_team_name_not_null
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#44 AC8"
       - name: team_short_name
+        data_type: VARCHAR
+        data_tests: *dim_team_name_not_null
 
   - name: dim_player
     description: >
@@ -367,10 +392,14 @@ models:
       FPL assigns for the season, taken from the player's latest appearance;
       it is fixed within a season (decision 2 on #32), which the
       constant_per_key test on stg_player.position_id enforces. No team: team
-      is per fixture, on fct_player_fixture. Internal until the dimensions are
-      served (#34, B5).
+      is per fixture, on fct_player_fixture. Part of the served contract,
+      published to served/dim_player.parquet (#44); the column list below is
+      enforced.
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     # The grain as one expression, as in dim_team: a null in either half nulls
     # the expression, which unique skips, so the key columns are also not_null.
     data_tests:
@@ -382,6 +411,7 @@ models:
               covers: "#41 AC3"
     columns:
       - name: season
+        data_type: VARCHAR
         data_tests: &dim_player_not_null
           - not_null:
               config:
@@ -389,14 +419,19 @@ models:
                 meta:
                   covers: "#41 AC3"
       - name: fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *dim_player_not_null
       - name: player_code
+        data_type: INTEGER
         description: >
           FPL's cross-season player identifier. Carried only; never joined,
           deduplicated or filtered on.
       - name: web_name
+        data_type: VARCHAR
         description: The latest appearance's spelling within the season.
       - name: position_id
+        data_type: INTEGER
         data_tests:
           - not_null:
               config:
@@ -413,7 +448,8 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#41 AC6"
-      - name: position
+      - name: position_short_name
+        data_type: VARCHAR
         description: >
           The position's short name (GKP, DEF, MID, FWD), from the same capture
           as position_id. A new value fails the enumeration, so adding a
@@ -435,16 +471,17 @@ models:
   - name: dim_fixture
     description: >
       One row per fixture per season, keyed (season, fixture_id). Teams, round,
-      kickoff and result come from the fixture's latest capture. Difficulty
-      comes from the last capture before kickoff, and
-      difficulty_is_pre_kickoff says whether one existed: false for all of
-      2025-26 (one end-of-season snapshot) and for live fixtures that kicked
-      off before capture history began (decision 3 on #32). A double round has
+      kickoff and result come from the fixture's latest capture; difficulty
+      is pre-kickoff (decision 3 on #32, see its columns). A double round has
       more than 10 fixtures and a team playing twice; a blank round has fewer
-      than 10. Nothing here assumes either count. Internal until the
-      dimensions are served (#34, B5).
+      than 10. Nothing here assumes either count. Part of the served contract,
+      published to served/dim_fixture.parquet (#44); the column list below is
+      enforced.
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     # The grain as one expression, as in dim_team: a null in either half nulls
     # the expression, which unique skips, so the key columns are also not_null.
     data_tests:
@@ -474,6 +511,7 @@ models:
           config: *dim_fixture_team_resolves
     columns:
       - name: season
+        data_type: VARCHAR
         data_tests: &dim_fixture_key_not_null
           - not_null:
               config:
@@ -481,9 +519,13 @@ models:
                 meta:
                   covers: "#42 AC1"
       - name: fixture_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests: *dim_fixture_key_not_null
       - name: round
+        data_type: INTEGER
         description: >
+          {{ doc('season_scoped_key') }}
           Nullable, no not_null test: null for a fixture FPL has not scheduled
           (postponed, or not yet given a date). Such a fixture is still one of
           the season's fixtures and is kept.
@@ -495,12 +537,18 @@ models:
                 meta:
                   covers: "#42 AC7"
       - name: kickoff_time
+        data_type: TIMESTAMP
         description: >
           Nullable, no not_null test: null for a fixture FPL has not scheduled,
           for the same reason as round.
       - name: team_h_fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
       - name: team_a_fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
       - name: team_h_score
+        data_type: INTEGER
         description: >
           Nullable, no not_null test: null until the fixture is played. Taken
           from the latest capture, so it is the final score once there is one.
@@ -509,13 +557,17 @@ models:
               arguments: {min_value: 0}
               config: *dim_fixture_in_range
       - name: team_a_score
+        data_type: INTEGER
         description: Nullable, no not_null test, for the same reason as team_h_score.
         data_tests:
           - value_between:
               arguments: {min_value: 0}
               config: *dim_fixture_in_range
       - name: finished
+        data_type: BOOLEAN
       - name: team_h_difficulty
+        data_type: INTEGER
+        description: "{{ doc('pre_kickoff') }}"
         data_tests: &dim_fixture_difficulty
           - not_null:
               config:
@@ -526,10 +578,14 @@ models:
               arguments: {min_value: 1, max_value: 5}
               config: *dim_fixture_in_range
       - name: team_a_difficulty
+        data_type: INTEGER
+        description: "{{ doc('pre_kickoff') }}"
         data_tests: *dim_fixture_difficulty
       # BOOLEAN, so true and false are its only values; not_null is the
       # remaining half of "only its defined values".
       - name: difficulty_is_pre_kickoff
+        data_type: BOOLEAN
+        description: "{{ doc('pre_kickoff') }}"
         data_tests:
           - not_null:
               config:

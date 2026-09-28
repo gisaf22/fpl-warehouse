@@ -1,156 +1,32 @@
 """The publish is refused when a season shrinks against the previous publish.
 
-Each test builds a small warehouse file holding just what publish_served.py
-reads (staging for the expectation, the two fct tables for the export), stands
-a fake S3 client in for boto3 that serves a chosen previous manifest, and runs
-main() as the workflow does. "Refused" means exit 1 with nothing uploaded;
-"proceeds" means exit 0 with both tables and the manifest uploaded.
+The harness is shared with the dimension tests: see publish_harness.py.
+"Refused" means exit 1 with nothing uploaded; "proceeds" means exit 0 with
+every served table and the manifest uploaded.
 """
 
 from __future__ import annotations
 
-import io
 import json
-import sys
 
-import duckdb
 import pytest
-from botocore.exceptions import ClientError
 
-import publish_served
-
-CLOSED = "2025-26"
-LIVE = "2026-27"
-MANIFEST_KEY = "served/_manifest.json"
-
-
-class FakeS3:
-    """Serves one previous manifest and records every upload."""
-
-    def __init__(self, previous: dict | bytes | None) -> None:
-        self.previous = previous
-        self.uploads: dict[str, bytes] = {}
-
-    def get_object(self, Bucket: str, Key: str) -> dict:  # noqa: N803 - boto3's names
-        if Key != MANIFEST_KEY or self.previous is None:
-            raise ClientError(
-                {"Error": {"Code": "NoSuchKey", "Message": "not found"}},
-                "GetObject",
-            )
-        body = (
-            self.previous
-            if isinstance(self.previous, bytes)
-            else json.dumps(self.previous).encode()
-        )
-        return {"Body": io.BytesIO(body)}
-
-    def put_object(self, Bucket: str, Key: str, Body: bytes, **_: object) -> dict:  # noqa: N803
-        self.uploads[Key] = Body
-        return {}
-
-    def published_manifest(self) -> dict:
-        return json.loads(self.uploads[MANIFEST_KEY])
-
-
-def season(
-    players: int, rounds: int, fixture: int | None = None, gameweek: int | None = None
-) -> dict:
-    """One season's staging shape and served row counts.
-
-    Served counts default to exactly the staging expectation (players x
-    rounds), which clears the per-season floor in both tables.
-    """
-    expected = players * rounds
-    return {
-        "players": players,
-        "rounds": rounds,
-        "fct_player_fixture": expected if fixture is None else fixture,
-        "fct_player_gameweek": expected if gameweek is None else gameweek,
-    }
-
-
-def manifest(**by_season: dict) -> dict:
-    """A previous manifest recording each season's served counts."""
-    by_table = {
-        table: {name: shape[table] for name, shape in by_season.items()}
-        for table in publish_served.TABLES
-    }
-    return {
-        "run_id": "previous",
-        "seasons": sorted(by_season),
-        "row_counts": {
-            table: sum(counts.values()) for table, counts in by_table.items()
-        },
-        "row_counts_by_season": by_table,
-    }
+from publish_harness import (
+    CLOSED,
+    LIVE,
+    SERVED,
+    assert_published,
+    assert_refused,
+    make_publish,
+    manifest,
+    season,
+)
 
 
 @pytest.fixture
 def publish(tmp_path, monkeypatch):
     """Build a warehouse from `build`, then run main() against `previous`."""
-
-    project = tmp_path / "dbt_project.yml"
-    project.write_text(f"vars:\n  season: '{LIVE}'\n")
-    monkeypatch.setattr(publish_served, "PROJECT_FILE", project)
-    monkeypatch.setattr(publish_served, "OUT_DIR", tmp_path / "served")
-    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
-
-    def run(
-        build: dict[str, dict], previous: dict | bytes | None, args: list[str] = ()
-    ):
-        database = tmp_path / "warehouse.duckdb"
-        database.unlink(missing_ok=True)
-        with duckdb.connect(str(database)) as connection:
-            connection.execute(
-                "create table stg_player (season varchar, fpl_id integer)"
-            )
-            connection.execute(
-                "create table stg_gameweek (season varchar, run_id varchar, "
-                "extracted_at timestamp, round integer, finished boolean)"
-            )
-            for table in publish_served.TABLES:
-                connection.execute(
-                    f"create table {table} (season varchar, row_number integer)"
-                )
-            for name, shape in build.items():
-                connection.execute(
-                    "insert into stg_player select ?, range from range(?)",
-                    [name, shape["players"]],
-                )
-                connection.execute(
-                    "insert into stg_gameweek select ?, 'run', timestamp '2026-09-27', "
-                    "range + 1, true from range(?)",
-                    [name, shape["rounds"]],
-                )
-                for table in publish_served.TABLES:
-                    connection.execute(
-                        f"insert into {table} select ?, range from range(?)",
-                        [name, shape[table]],
-                    )
-        monkeypatch.setattr(publish_served, "DATABASE", database)
-
-        s3 = FakeS3(previous)
-        monkeypatch.setattr(publish_served.boto3, "client", lambda *_a, **_k: s3)
-        monkeypatch.setattr(sys, "argv", ["publish_served.py", *args])
-        return publish_served.main(), s3
-
-    return run
-
-
-def assert_refused(result) -> None:
-    code, s3 = result
-    assert code == 1
-    assert s3.uploads == {}
-
-
-def assert_published(result) -> None:
-    code, s3 = result
-    assert code == 0
-    assert set(s3.uploads) == {
-        "served/fct_player_fixture.parquet",
-        "served/fct_player_gameweek.parquet",
-        MANIFEST_KEY,
-    }
+    return make_publish(tmp_path, monkeypatch)
 
 
 # AC1 -------------------------------------------------------------------------
@@ -169,11 +45,12 @@ def test_a_season_lost_upstream_of_staging_is_refused(publish, capsys):
         for line in capsys.readouterr().out.splitlines()
         if line.startswith("::error::")
     ]
-    for table in publish_served.TABLES:
+    for table in SERVED:
+        before = previous["row_counts_by_season"][table][LIVE]
         assert any(
-            table in line and LIVE in line and "40" in line and " 0 " in line
+            table in line and LIVE in line and f"{before:,}" in line and " 0 " in line
             for line in errors
-        ), f"no error names {table}, {LIVE}, the previous 40 and the new 0: {errors}"
+        ), f"no error names {table}, {LIVE}, the previous {before} and the new 0: {errors}"
 
 
 @pytest.mark.unit
