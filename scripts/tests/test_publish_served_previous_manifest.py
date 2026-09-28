@@ -343,6 +343,48 @@ def test_publishing_without_a_baseline_proceeds_when_explicitly_overridden(publi
     assert_published(result)
 
 
+@pytest.mark.unit
+@pytest.mark.covers("#63 AC4")
+def test_publishing_without_a_baseline_is_recorded_in_the_manifest_and_log(
+    publish, capsys
+):
+    result = publish(
+        {CLOSED: season(10, 38), LIVE: season(10, 4)}, None, ["--without-baseline"]
+    )
+
+    assert_published(result)
+    _, s3 = result
+    assert s3.published_manifest()["published_without_baseline"] is True
+    log = capsys.readouterr().out
+    assert any("without-baseline" in line for line in log.splitlines()), log
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#63 AC4")
+def test_a_publish_with_a_baseline_records_no_baseline_override(publish):
+    previous = manifest(**{CLOSED: season(10, 38), LIVE: season(10, 4)})
+
+    result = publish({CLOSED: season(10, 38), LIVE: season(10, 5)}, previous)
+
+    assert_published(result)
+    _, s3 = result
+    assert s3.published_manifest()["published_without_baseline"] is False
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#63 AC4")
+def test_a_previous_manifest_written_before_restatements_existed_is_accepted(publish):
+    # Today's published manifest: per-season counts, no restated_seasons or
+    # published_without_baseline keys. The first publish after this change
+    # reads exactly this shape.
+    previous = manifest(**{CLOSED: season(10, 38), LIVE: season(10, 4)})
+    assert "restated_seasons" not in previous
+
+    result = publish({CLOSED: season(10, 38), LIVE: season(10, 5)}, previous)
+
+    assert_published(result)
+
+
 # AC5 -------------------------------------------------------------------------
 
 
