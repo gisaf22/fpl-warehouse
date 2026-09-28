@@ -57,8 +57,9 @@ and states it can be deleted on migration.
 
 ## Capture dedup — provisional vs ratified
 
-Confirmed against live S3 on 2026-09-03, building `stg_player_fixture` over all 25,611
-`element-summary` payloads (50,568 rows, 1,238 distinct `(fpl_id, fixture_id)` keys):
+Measured on 2026-09-03 against live S3, building `stg_player_fixture` over all 25,611
+`element-summary` payloads then in the bucket (50,568 rows, 1,238 distinct
+`(fpl_id, fixture_id)` keys):
 
 - An `element-summary` payload captured **before a round's scores are ratified** carries
   `NULL` `team_h_score` / `team_a_score`. Round 2 was 36.8% null (9,411 of 25,558 rows);
@@ -129,18 +130,18 @@ reading ratified and its last appearance in `event-status`. This is an observati
 three complete windows, not a guarantee FPL makes. fpl-ingest's `gameweeks.py` relies on it:
 it treats a finished round that is absent from a non-empty `event-status` map as ratified.
 
-Measured over every `event-status` capture in `s3://fpl-data-safari/raw/fpl/event-status/`:
-177 captures, 2026-08-29 01:23 → 2026-09-23 19:14 UTC, none skipped, none with an empty
-`status` array. A round counts as ratified in a capture under rule 1 above (every dated
-entry `points == "r"` and `bonus_added == true`). Timestamps are each sidecar's
-`received_at`.
+Measured on 2026-09-23 over every `event-status` capture then in
+`s3://fpl-data-safari/raw/fpl/event-status/`: 177 captures, 2026-08-29 01:23 → 2026-09-23
+19:14 UTC, none skipped, none with an empty `status` array. A round counts as ratified in
+a capture under rule 1 above (every dated entry `points == "r"` and `bonus_added ==
+true`). Timestamps are each sidecar's `received_at`.
 
 | Round | First capture ratified | Last capture listing it | First capture without it | Margin |
 |---|---|---|---|---|
 | 2 | 09-01 19:13 | 09-04 17:12 | 09-04 19:10 | **≥ 70.0h** (≤ 72.0h) |
 | 3 | 09-07 19:12 | 09-12 12:19 | 09-12 14:12 | **≥ 113.1h** (≤ 115.0h) |
 | 4 | 09-15 19:13 | 09-18 17:11 | 09-18 19:12 | **≥ 70.0h** (≤ 72.0h) |
-| 5 | 09-21 19:13 | still in window at 09-23 19:14 | — | ≥ 48.0h so far; window not yet closed |
+| 5 | 09-21 19:13 | still in window at 09-23 19:14 | — | ≥ 48.0h as of 09-23; window not yet closed |
 
 - **Why the "≥" figure is a lower bound:** FPL ratified the round at or before its first
   ratified capture, and the round left the window after its last listing capture.
@@ -175,8 +176,9 @@ re-dating it.**
 ### Migration — a breaking change to the served contract (2026-09-15)
 
 The column's name and type are unchanged, so the enforced contract in
-`models/marts/schema.yml` does not move. **Its values do.** Measured against live S3 on
-2026-09-15, over the latest element-summary capture and all 17 `event-status` captures:
+`models/marts/schema.yml` does not move. **Its values do.** Measured on 2026-09-15 against
+live S3, over the latest element-summary capture and all 17 `event-status` captures then in
+the bucket:
 
 | round | old (inferred) | new (sourced) | rows |
 |---|---|---|---|
@@ -185,11 +187,11 @@ The column's name and type are unchanged, so the enforced contract in
 | 3 | true | true | 654 |
 | 4 | **true** | **false** | **658 — changed** |
 
-**658 rows in `fct_player_fixture` flip `true` -> `false`**, plus the corresponding rows in
-`fct_player_gameweek`. Every one is a genuine correction, not a join defect: round 4 was
-played and scored by the 2026-09-14 capture but `event-status` reported `points: "p"` and
-`bonus_added: false` — bonus points had not been applied, so those rows' `bonus` and BPS
-were not final while the old flag said they were.
+**658 rows in `fct_player_fixture` flip `true` -> `false`** (measured on 2026-09-15), plus
+the corresponding rows in `fct_player_gameweek`. Every one is a genuine correction, not a
+join defect: round 4 was played and scored by the 2026-09-14 capture but `event-status`
+reported `points: "p"` and `bonus_added: false` — bonus points had not been applied, so
+those rows' `bonus` and BPS were not final while the old flag said they were.
 
 Round 4's divergence is transient — it resolves the moment FPL ratifies the round. The
 *class* is not: it recurs every gameweek for the hours between full time and bonus
@@ -238,12 +240,12 @@ keeps the retracted rows as the audit trail.
 ## ICT aggregation — `ict_index` is additive
 
 Do not recompute `ict_index` as `(influence + creativity + threat) / 10` when aggregating
-to gameweek grain. That formula holds for most rows but **not all**: 31 of 1,236 fixture
-rows publish an index that does not reconcile with their own components (`fpl_id` 415
-round 1 states influence 0.0, creativity 1.2, threat 16.0 and an index of 0.7, where the
-formula gives 1.7).
+to gameweek grain. That formula holds for most rows but **not all**: measured on
+2026-09-03, 31 of 1,236 fixture rows publish an index that does not reconcile with their
+own components (`fpl_id` 415 round 1 states influence 0.0, creativity 1.2, threat 16.0 and
+an index of 0.7, where the formula gives 1.7).
 
-Verified against FPL's own season totals in bootstrap-static on 2026-09-03: **summing the
+Measured on 2026-09-03 against FPL's own season totals in bootstrap-static: **summing the
 per-match `ict_index` reproduces the published season figure for 626 of 626 players**,
 while recomputing from components matches only 538. `influence` / `creativity` / `threat`
 sum exactly (626/626). The published index is the authority; the inconsistency is carried,
@@ -297,9 +299,9 @@ single-season table.
 consumer consequence and it has teeth: `fpl_id`, `fixture_id` and `round` are all
 reassigned every season and therefore repeat across them, so an unfiltered group-by on any
 of them silently merges two different people or two different rounds. Row counts went up
-roughly 10x at the switchover — measured 2026-09-21, `fct_player_fixture` holds 32,963 rows
-of which only 3,216 are 2026-27, and `fct_player_gameweek` holds 34,626 of which 2,668 are
-2026-27.
+roughly 10x at the switchover (measured on 2026-09-21). For current counts per table and per
+season, read `row_counts_by_season` in `served/_manifest.json` — this file deliberately
+records none, because the live season's figures are stale by the next build.
 
 **2025-26 is closed and will never change again.** Every future scheduled build re-reads
 the same ported history tree and reproduces the same rows for it; only 2026-27's data
@@ -354,35 +356,39 @@ than hardcoded, so it tracks the data instead of needing an edit whenever the da
   both read from that season's own captures in `stg_player` and `stg_gameweek`.
 - Round count means **every** round for a closed season, and only the rounds the latest
   capture reports `finished` for the live season. That distinction is the whole point: the
-  live calendar publishes all 38 rounds from day one, so counting them all would have
-  expected 667 x 38 = 25,346 rows for 2026-27 on 2026-09-21 against a real 3,216.
+  live calendar publishes all 38 rounds from day one, so counting them all would expect a
+  full season's rows for the live season while only its finished rounds have any.
 - Computed from staging, not from `int_player_gameweek_spine` — which is already exactly
   this product. The spine is `fct_player_gameweek`'s direct parent, so checking that table
   against it would compare a number against itself and pass unconditionally.
 
-Measured on run 35632785680 (2026-09-21): expected 31,958 for 2025-26 (841 x 38) and 2,668
-for 2026-27 (667 x 4), total 34,626. `fct_player_gameweek` matched it exactly.
-`fct_player_fixture` returned 32,963, 4.8% below — legitimately, because it is a different
-grain: one row per fixture a player actually has history for, so a blank gameweek removes
-rows the expectation counted. 2025-26 alone was 6.9% low, 2,211 player-rounds in which that
-player's club did not play.
+For the closed 2025-26 season the figures are fixed — they will never change: expected
+31,958 (841 x 38). `fct_player_gameweek` matches it exactly. `fct_player_fixture` is 6.9%
+low, 2,211 player-rounds in which that player's club did not play — legitimately, because
+it is a different grain: one row per fixture a player actually has history for, so a blank
+gameweek removes rows the expectation counted. The live season follows the same pattern
+(measured on 2026-09-21, run 35632785680), but its figures move every build; the publish
+step logs each season's actual and expected counts, and `served/_manifest.json` carries
+the current actuals.
 
-Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`, which
-is the expectation's own grain, and 15% for `fct_player_fixture`, roughly 2x its observed
-worst case. Double gameweeks push the other way and nothing caps the upside — a table
-larger than expected is not the failure this guards against.
+Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`,
+which is the expectation's own grain, and 15% for `fct_player_fixture`, roughly 2x its
+observed worst case (2025-26's fixed 6.9%). Double gameweeks push the other way and
+nothing caps the upside — a table larger than expected is not the failure this guards
+against.
 
 The check is applied **per season**, and a season present in staging but absent from a
 served table scores zero and fails outright. The summed total is reported but is not what
-is enforced, because it is not sensitive enough: on 2026-09-21 losing all of 2026-27 would
-have shown as a 9.3% shortfall on `fct_player_fixture`'s total, comfortably inside the 15%
-that table needs for blank gameweeks. Against that season's own expectation the same loss
-is unmissable. An empty `expected` — no seasons in staging at all — is itself a failure,
-which the old static floor caught only by accident.
+is enforced, because it is not sensitive enough: early in a season the live season is a
+small enough share of the total that losing all of it can fall inside the 15%
+`fct_player_fixture` needs for blank gameweeks. (The share grows as rounds are played; the
+manifest's `row_counts_by_season` gives the current split.) Against that season's own
+expectation the same loss is unmissable. An empty `expected` — no seasons in staging at
+all — is itself a failure, which the old static floor caught only by accident.
 
-This replaced a static `ROW_FLOOR = 500`, sized in 2026-09 when one part-played season held
-~3,200 rows. Against a two-season build it sits three orders of magnitude below anything
-real: a build that dropped all of 2025-26 would have cleared it comfortably.
+This replaced a static `ROW_FLOOR = 500`, sized in 2026-09 against one part-played season.
+Against a two-season build it sits far below anything real: a build that dropped all of
+2025-26 would have cleared it comfortably.
 
 **No dated or versioned keys, and no staging/promote step.** The keys are stable so
 consumers need no discovery logic, and the objects are overwritten because there is no
@@ -465,7 +471,7 @@ dbt test --select tag:e2e
 `--target fixtures` points the raw source at `tests/fixtures/raw` and
 `tests/fixtures/history` — four live captures over six players plus one 2025-26 snapshot,
 with element-summary, bootstrap-static (elements, events, teams, positions), fixtures and
-event-status, ~1.7 MB — instead of the live bucket's ~74k objects. The tree is real
+event-status, ~1.7 MB — instead of the live bucket's full raw tree. The tree is real
 captured data, trimmed; `tests/fixtures/build_fixtures.py` documents every edge case it
 covers and regenerates it from S3 when one needs adding.
 
@@ -504,13 +510,13 @@ tiers mean the same thing:
 |---|---|---|---|
 | `unit` | Single-model grain and structure — PK uniqueness, `not_null`, range and cross-column bounds within one row. No cross-model logic. | Fixture | Seconds, no credentials |
 | `integration` | Cross-model and business logic — dedup correctness, ratified-preference, retracted rows, spine completeness, `fixture_count` against the real fixtures. Runs against whatever is already built. | Fixture | Seconds, no credentials |
-| `e2e` | The full build against live S3 from scratch. Hits real infrastructure, excluded from the default run. | Live S3 | 7-16 min, needs a session |
+| `e2e` | The full build against live S3 from scratch. Hits real infrastructure, excluded from the default run. | Live S3 | 7-16 min measured on 2026-09-15/16, grows with the raw tree; needs a session |
 
 **That split is the standard one, and it was not before.** `unit` and `integration` are
 supposed to be fast and hermetic; until the fixture tree landed both required a full
-production read of ~74k objects before a single assertion could run, which made every PR
-check a read of live data and made the tiers unusable in CI at all. Only `e2e` is meant to
-touch real infrastructure, and now only `e2e` does.
+production read of the full raw tree before a single assertion could run, which made every
+PR check a read of live data and made the tiers unusable in CI at all. Only `e2e` is meant
+to touch real infrastructure, and now only `e2e` does.
 
 **Every test carries exactly one tier tag**, and CI fails if one carries none or two — a
 tag-less test runs in no tier and is silently never enforced. dbt unit tests
@@ -602,7 +608,8 @@ which is what the fast tiers do). For an ad-hoc build against some other local t
 but note that a single-capture tree passes every dedup assertion vacuously, which is what
 the fixture tree exists to avoid.
 
-**Build cost — staging reads ~74k S3 objects.** Because `stg_player_fixture` was once
+**Build cost — staging reads every raw S3 object, and the tree grows with every capture.**
+Because `stg_player_fixture` was once
 materialized as a view, *every* consumer re-read it: the fact model, then each test that
 references staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's
 lifetime partway through and failed with `ExpiredToken`. Materializing staging as a table
@@ -614,23 +621,23 @@ returns immediately, and CI cannot re-export credentials mid-run either.
 The credential source is the constraint: `aws configure export-credentials`, backed by
 `aws login`, issues **15-minute** tokens, and there is no static key in `~/.aws` to fall
 back on. At DuckDB's default of one thread per core the element-summary read had grown to
-901s — 15.0 minutes — so it raced the token and lost mid-read.
+901s — 15.0 minutes, measured on 2026-09-07 — so it raced the token and lost mid-read.
 
 At low thread counts the read is bound by HTTP round-trip latency rather than CPU, so the
-number of concurrent requests is what matters. Measured over an 8,436-object subset:
-**474s at 4 threads, 49s at 32** — near-linear. **Resolved: `profiles.yml` sets
+number of concurrent requests is what matters. Measured on 2026-09-07 over an 8,436-object
+subset: **474s at 4 threads, 49s at 32** — near-linear. **Resolved: `profiles.yml` sets
 `threads: 32` in its `settings:` block** — DuckDB's own thread count, distinct from the
 `threads: 4` above it that sets dbt's model concurrency. A full `dbt build` then completed
-in **7m53s**, comfortably inside the token window. Locally that setting is a correctness
-requirement rather than a speed preference: lowering it puts the build back in a race with
-the 15-minute credential lifetime. In CI, where the OIDC session is an hour, it is a
-performance setting.
+in **7m53s** (measured on 2026-09-07), comfortably inside the token window. Locally that
+setting is a correctness requirement rather than a speed preference: lowering it puts the
+build back in a race with the 15-minute credential lifetime. In CI, where the OIDC session
+is an hour, it is a performance setting.
 
 ### The latency-bound model does not extrapolate — measured 2026-09-16
 
 The paragraph above was written as a general rule and used to justify oversubscribing the
 cores without an upper bound. **It holds only in the range it was measured (4 → 32, on a
-subset, locally).** Measured on a CI runner over the full ~74k tree, via the
+subset, locally).** Measured on 2026-09-16 on a CI runner over the full raw tree, via the
 `duckdb_threads` dispatch input on `live-tests`:
 
 | threads | `stg_player_fixture` | glob (LIST only) | peak RSS |
@@ -638,13 +645,13 @@ subset, locally).** Measured on a CI runner over the full ~74k tree, via the
 | 64 | 332s | 16.6s | 14.6 GiB |
 | 128 | **397s — slower** | **86.5s — 5.2x worse** | 14.4 GiB |
 
-Peak RSS is pinned at ~14.5 GiB of the runner's 15.6 GiB at *both thread counts*, so
-somewhere below 128 the read stops being bound by round trips and becomes bound by memory.
-Past that point more threads buy queueing, not concurrency. That peak RSS was measured with
-`preserve_insertion_order: false` already set, which suggests the workload's memory
-appetite sits near the runner's ceiling independent of that setting — **not confirmed
-against the setting reversed**, since the two have never been compared at the same thread
-count.
+Measured on 2026-09-16, peak RSS is pinned at ~14.5 GiB of the runner's 15.6 GiB at *both
+thread counts*, so somewhere below 128 the read stops being bound by round trips and
+becomes bound by memory. Past that point more threads buy queueing, not concurrency. That
+peak RSS was measured with `preserve_insertion_order: false` already set, which suggests
+the workload's memory appetite sits near the runner's ceiling independent of that setting
+— **not confirmed against the setting reversed**, since the two have never been compared
+at the same thread count.
 
 **A second term the old model ignored now dominates: run-to-run variance.** The same build
 at 32 threads took **409s, 441s and 925s** across three runs within 18 hours
@@ -655,16 +662,17 @@ on the strength of a single pair of timings. Treat any one timing as a sample, n
 the figure, and size timeouts against the worst observed run rather than the median — that
 is what `scheduled_build.yml`'s `timeout-minutes: 45` is sized on.
 
-**LIST is not the cost.** Glob expansion is **16.6s**, ~4-5% of the build. The listing
-returns **148,120 keys for 74,060 payloads — exactly 2.0x**, because every payload has a
-`metadata.json` sidecar the models never read. All three glob patterns tested cost the
-same, including one matching zero keys: DuckDB lists the whole wildcard-free prefix and
-matches client-side, so **narrowing the glob by date would not reduce LIST at all.**
+**LIST is not the cost.** Measured on 2026-09-16, glob expansion is **16.6s**, ~4-5% of
+the build. The listing returned **148,120 keys for 74,060 payloads — exactly 2.0x**,
+because every payload has a `metadata.json` sidecar the models never read. All three glob
+patterns tested cost the same, including one matching zero keys: DuckDB lists the whole
+wildcard-free prefix and matches client-side, so **narrowing the glob by date would not
+reduce LIST at all.**
 
 Also note the read is memory-hungry: loading all element-summary payloads in one
-`read_json` OOM'd at 12.7 GiB on default settings. **Resolved: `preserve_insertion_order:
-false` in `profiles.yml`'s `settings:` block** — confirmed root cause. Nothing in this
-project depends on raw row order; every model orders explicitly.
+`read_json` OOM'd at 12.7 GiB on default settings (measured on 2026-09-03). **Resolved:
+`preserve_insertion_order: false` in `profiles.yml`'s `settings:` block** — confirmed root
+cause. Nothing in this project depends on raw row order; every model orders explicitly.
 
 ---
 
@@ -762,8 +770,8 @@ unrelated merge. A failure here pages a human via GitHub's own run-failure notif
 there is no custom alerting, by design.
 
 **The offset is sized against GitHub's scheduler, not against ingest's runtime.** The
-scheduler is the larger term by far. Measured over 26 scheduled fpl-ingest daily runs
-(2026-08-28 → 2026-09-10):
+scheduler is the larger term by far. Measured on 2026-09-10 over 26 scheduled fpl-ingest
+daily runs (2026-08-28 → 2026-09-10):
 
 | | median | p90 | max |
 |---|---|---|---|
@@ -845,7 +853,7 @@ The write grant is scoped to the `served/` prefix, so a bug in the publish step 
 overwrite anything under `raw/`. That containment is the reason to keep the two statements
 separate rather than widening one to the whole bucket.
 
-**Measured CI runtime, 2026-09-15/16.** Effectively the whole job is one model —
+**CI runtime, measured on 2026-09-15/16.** Effectively the whole job is one model —
 `stg_player_fixture` is the S3 read and every other model is sub-second — so these are the
 same number twice:
 
