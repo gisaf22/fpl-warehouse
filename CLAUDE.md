@@ -564,6 +564,31 @@ against `dev`, where that distinction is not needed. If a stronger live-only ass
 ever wanted, the scale of the accumulated tree — thousands of keys, dozens of runs — is
 the thing to assert.
 
+### Python tests for `scripts/`
+
+```bash
+uv run pytest            # scripts/tests/ only — no AWS session, no S3
+```
+
+Python in `scripts/` (the publish guard, above all) is tested with pytest, in
+`scripts/tests/`. **Never put a Python test in `tests/`:** that is dbt's `test-paths`, and
+`pyproject.toml` sets `testpaths = ["scripts/tests"]` so pytest never searches it.
+`scripts/` is in no dbt path, so neither tool reads the other's tests.
+
+The rules match the dbt suite and are enforced at collection by `scripts/tests/conftest.py`
+— a violation fails the run before any test executes, naming every offending test:
+
+- **Exactly one tier marker**, `@pytest.mark.unit` or `@pytest.mark.integration`, declared
+  on the test like a dbt tier tag. None or two fails. There is no Python `e2e` tier.
+- **At least one `@pytest.mark.covers("#<issue> AC<n>")`**, the same tracing format as
+  fpl-ingest. A missing marker fails, and so does a malformed argument (`"#64AC1"`,
+  `"64 AC1"`, no argument, two arguments in one marker) — repeat the marker to cover
+  several ACs. fpl-ingest's `strict_markers` only rejects a misspelled marker *name*; this
+  project also rejects an absent or malformed trace. `strict_markers = true` is set here
+  too.
+
+Both tiers run in CI's `python-tests` job, which is credential-free and required.
+
 ---
 
 ## S3 credentials for local dbt runs
@@ -678,9 +703,9 @@ cause. Nothing in this project depends on raw row order; every model orders expl
 
 ## CI
 
-`.github/workflows/ci.yml` has three jobs. **The PR-blocking path is `validate` plus
-`fixture-tests`, and neither touches AWS** — no OIDC role, no repository variables, no
-`id-token` permission.
+`.github/workflows/ci.yml` has four jobs. **The PR-blocking path is `validate`,
+`fixture-tests` and `python-tests`, and none of them touches AWS** — no OIDC role, no
+repository variables, no `id-token` permission.
 
 **`validate`** runs without credentials because it executes no model: `dbt parse` plus the
 tier-tag check. The access boundary is genuinely enforced here — group membership and
@@ -694,6 +719,11 @@ contract violation surfaces in `fixture-tests` instead.
 checked-in capture, in seconds. A step asserts no `AWS_*` variable is in the environment,
 so "this job needs no credentials" is verified on every run rather than assumed — if a
 change ever puts a production read back on the PR path, the job fails loudly.
+
+**`python-tests`** runs the pytest suite for `scripts/` — see "Python tests for
+`scripts/`" under Tests. Collection itself enforces the tier and `covers()` rules, so this
+job is the Python counterpart of `validate`'s tier-tag check as well as a test run. It
+asserts no `AWS_*` variable is present, the same way `fixture-tests` does.
 
 **`live-tests`** runs all three tiers against live S3 and is `workflow_dispatch` only. It is
 not a PR check, and as of 2026-09-10 that is a deliberate choice rather than a limitation: a
@@ -751,8 +781,9 @@ the SHA is a silent no-op. Dependabot can maintain SHA pins if the manual lookup
 burden.
 
 Branch protection is repository configuration, not code. The `protect-main` ruleset
-(id `22415012`, active) requires exactly `validate` and `fixture-tests` — verified
-2026-09-10. Nothing else is required, and the scheduled build deliberately stays off that
+(id `22415012`, active) requires exactly `validate`, `fixture-tests` and `python-tests`
+— the first two verified 2026-09-10, `python-tests` added 2026-09-28 (#64). Nothing else
+is required, and the scheduled build deliberately stays off that
 list; see "Scheduled build".
 
 ---
@@ -763,7 +794,8 @@ list; see "Scheduled build".
 against live S3 — at **07:45 and 19:45 UTC**, plus `workflow_dispatch` for manual runs.
 
 **It is informational, not blocking.** It is deliberately absent from the `protect-main`
-required-checks list, which stays `validate` + `fixture-tests` (both credential-free). This
+required-checks list, which stays `validate` + `fixture-tests` + `python-tests` (all
+credential-free). This
 job depends on live S3 and on fpl-ingest's output, so it fails for reasons unrelated to any
 open pull request; making it required would let a bad upstream capture block every
 unrelated merge. A failure here pages a human via GitHub's own run-failure notification —

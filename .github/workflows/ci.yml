@@ -187,6 +187,46 @@ jobs:
       - name: Fast tier — integration
         run: uv run dbt test --target fixtures --select tag:integration
 
+  # Required check. The pytest suite for scripts/, in scripts/tests/ —
+  # pyproject.toml's testpaths keeps pytest out of dbt's tests/.
+  #
+  # scripts/tests/conftest.py fails collection when a test lacks exactly one
+  # tier marker or a well-formed covers("#<issue> AC<n>"), so this job enforces
+  # tracing and tiering as well as running the tests — the Python counterpart
+  # of `validate`'s tier-tag check. pytest exits non-zero when it collects
+  # nothing, so an empty suite cannot pass silently.
+  #
+  # Credential-free like `fixture-tests`, and asserted the same way.
+  python-tests:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Assert no AWS session is present
+        run: |
+          leaked=$(env | grep -o '^AWS_[A-Z_]*' || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::AWS variables are set in a job that must not need \
+          them: $leaked. The Python tests must never read S3."
+            exit 1
+          fi
+          echo "no AWS_* variables in the environment — Python tests are credential-free"
+
+      - name: Python tests — unit and integration
+        run: uv run pytest -v
+
   # Not a PR check, and still cannot be one.
   #
   # This is the tier that must read the live bucket: e2e asserts staging was
