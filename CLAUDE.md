@@ -318,9 +318,13 @@ var rather than derived from event-status, which only ever serves the current ro
 
 `_manifest.json` describes what is currently published, not a history of publishes. It
 carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
-from, `seasons` (a sorted list of what is in the files), `row_counts` (per table) and
-`row_counts_by_season` (per table, per season). A consumer that wants a consistency check
-can compare those counts against what it actually reads.
+from, `seasons` (a sorted list of what is in the files), `row_counts` (per table),
+`row_counts_by_season` (per table, per season), `restated_seasons` (the seasons this
+publish was allowed to shrink, normally `[]`) and `published_without_baseline` (normally
+`false`). A consumer that wants a consistency check can compare those counts against what
+it actually reads. The last two were added on 2026-09-28 (#63), additively; the next
+publish reads only `row_counts_by_season` back from here, so an older manifest without
+them is still a valid baseline. See "The publish floor is computed, not configured".
 
 `row_counts` deliberately kept its original `{table: total}` shape instead of becoming
 nested when the second season arrived, so nothing reading it has to change; the breakdown
@@ -379,12 +383,46 @@ against.
 
 The check is applied **per season**, and a season present in staging but absent from a
 served table scores zero and fails outright. The summed total is reported but is not what
-is enforced, because it is not sensitive enough: early in a season the live season is a
-small enough share of the total that losing all of it can fall inside the 15%
-`fct_player_fixture` needs for blank gameweeks. (The share grows as rounds are played; the
-manifest's `row_counts_by_season` gives the current split.) Against that season's own
-expectation the same loss is unmissable. An empty `expected` — no seasons in staging at
-all — is itself a failure, which the old static floor caught only by accident.
+is enforced: the per-season check is the more sensitive of the two, because a season's
+loss is measured against that season's own expectation rather than diluted by every other
+season's rows. An empty `expected` — no seasons in staging at all — is itself a failure,
+which the old static floor caught only by accident.
+
+**What the floor cannot see is staging itself shrinking.** The expectation is computed
+from the same build's staging, so rows lost *upstream* of staging — a live raw tree that
+went unreadable, a key layout that changed, a round of captures that vanished — shrink
+the expectation along with the table, and the floor still passes. A season that leaves
+staging entirely is not in the expectation at all, so it is never checked; the publish
+would go ahead and the manifest's `seasons` would quietly drop it. No dbt test covers
+this either (checked 2026-09-28, #63): every per-season test takes its season list from
+staging, so a season missing there passes them vacuously.
+
+So the script also compares against **the previous publish** (#63). It reads
+`served/_manifest.json` before uploading anything, and every season that manifest lists
+must hold at least its previous count, in each table, or the publish is refused with an
+error naming the table, the season and both counts. The comparison is strict — no
+tolerance, because the previous count is the season's own served figure, not an
+estimate. A season absent from the previous manifest is held only to the floor above,
+so a newly ported season can be published. A missing or unreadable previous manifest is
+itself a refusal, since without it nothing proves that no season shrank.
+
+Two overrides, both recorded in the manifest and the log, and both exposed as
+`workflow_dispatch` inputs on `scheduled_build.yml`:
+
+- `--restate SEASON` (input `restate`) lets the named season shrink — a deliberate
+  restatement. It covers only the seasons it names. Recorded in `restated_seasons`.
+- `--without-baseline` (input `without_baseline`) publishes when the previous manifest
+  cannot be read. If it can be read, the comparison still runs. Recorded in
+  `published_without_baseline`.
+
+One legitimate shrink is known: FPL retracting a history row (see "Retracted history
+rows") on a day no new fixture is played drops one `fct_player_fixture` row from the live
+season. That build is refused; rerun it with `restate` set to the live season.
+
+**The deploy role must be able to read the manifest.** Reading it needs `s3:GetObject`
+on `served/_manifest.json`, which the role's `served/*` write grant does not include. If
+the read is denied the publish is refused as "unreadable" — safe, but nothing publishes
+until the grant exists.
 
 This replaced a static `ROW_FLOOR = 500`, sized in 2026-09 against one part-played season.
 Against a two-season build it sits far below anything real: a build that dropped all of
@@ -399,9 +437,10 @@ things and nothing more:
    any model error or test failure, so the publish step never runs on a build whose
    assertions did not hold.
 2. `scripts/publish_served.py` re-reads each exported parquet file and exits non-zero if
-   any season's slice of either table is below its computed floor (above), which catches a
-   build that exited 0 having produced an empty or truncated table, or having lost a whole
-   season, for an upstream reason.
+   any season's slice of either table is below its computed floor, or below that season's
+   count in the previous publish's manifest (both above). The floor catches a build that
+   exited 0 having produced an empty or truncated table; the previous-publish comparison
+   catches a season lost upstream of staging, which the floor cannot see.
 
 Neither is atomic across the two objects: they are uploaded by two separate `put_object`
 calls, so a reader can in principle catch one updated and the other not. Accepted for now
@@ -875,6 +914,12 @@ permissions policy. Confirmed live via `aws iam get-role-policy` — inline poli
   over the raw tree requires; object-level read alone is not sufficient.
 - `WriteServedOutputs` — `s3:PutObject` on `arn:aws:s3:::fpl-data-safari/served/*`, what the
   publish step needs.
+
+**The publish step now also needs `s3:GetObject` on `served/_manifest.json`** (#63), to
+read the previous publish's counts, and none of the three statements above grants it. It
+is a maintainer change to the role, not to this repo; until it is made every scheduled
+publish is refused. Scope it to that one key rather than to `served/*` — the step reads
+nothing else there. Update this list once the grant exists.
 
 Note the policy *name* predates the write grant and is now a misnomer: `-s3-read` describes
 what the role originally did, not what it does. The statement names are the accurate
