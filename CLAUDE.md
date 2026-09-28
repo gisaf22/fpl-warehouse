@@ -905,21 +905,24 @@ permission change but **not** a trust-policy change — the distinction is
 authorization versus authentication. The trust policy governs who may assume the role,
 which is unchanged: the same OIDC subject assumes the same role for the same reason. What
 changed is what the role is permitted to do once assumed, which lives in its inline
-permissions policy. Confirmed live via `aws iam get-role-policy` — inline policy
-`fpl-warehouse-s3-read`, three statements:
+permissions policy. Confirmed live via `aws iam get-role-policy` on 2026-09-28 — inline
+policy `fpl-warehouse-s3-read`, five statements:
 
 - `ReadRawCaptures` — read access to `arn:aws:s3:::fpl-data-safari/raw/*`, what the build
   consumes.
+- `ReadPortedHistorySeasons` — read access to
+  `arn:aws:s3:::fpl-data-safari/history/2025-26/*`, the ported closed season the build reads
+  through `HISTORY_ROOT`. Scoped per season, so porting another one needs its own grant.
 - `ListBucketForGlobExpansion` — bucket-level `ListBucket`, which DuckDB's glob expansion
   over the raw tree requires; object-level read alone is not sufficient.
 - `WriteServedOutputs` — `s3:PutObject` on `arn:aws:s3:::fpl-data-safari/served/*`, what the
   publish step needs.
-
-**The publish step now also needs `s3:GetObject` on `served/_manifest.json`** (#63), to
-read the previous publish's counts, and none of the three statements above grants it. It
-is a maintainer change to the role, not to this repo; until it is made every scheduled
-publish is refused. Scope it to that one key rather than to `served/*` — the step reads
-nothing else there. Update this list once the grant exists.
+- `ReadServedManifest` — `s3:GetObject` on
+  `arn:aws:s3:::fpl-data-safari/served/_manifest.json` only, which the publish step reads
+  for the previous publish's counts (#63). Scoped to that one key because the step reads
+  nothing else under `served/`. In place and exercised: scheduled-build run `36365232912`
+  (2026-09-28, dispatched from `main` with default inputs) read the manifest with no
+  override and published.
 
 Note the policy *name* predates the write grant and is now a misnomer: `-s3-read` describes
 what the role originally did, not what it does. The statement names are the accurate
