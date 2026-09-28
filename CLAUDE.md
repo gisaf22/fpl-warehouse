@@ -347,6 +347,12 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it.
 
+- **2026-09-28 — manifest `seasons` restored to a list of season strings (#76). Fix.**
+  Publishes from #75's merge (first: scheduled-build run 36378178500) until this fix wrote
+  `seasons` as `[season, count]` pairs, the last table's per-season rows, instead of the
+  documented sorted list of season strings. No other field was affected; the correct
+  per-season counts were always in `row_counts_by_season`. The next publish after the fix
+  restores the documented shape. A test now asserts every manifest field's type.
 - **2026-09-28 — `dim_team`, `dim_player`, `dim_fixture` served (#44). Additive.** Three new
   objects under `served/`, each with an enforced contract, and three new table keys inside
   the manifest's `row_counts` and `row_counts_by_season`. Both facts, their contracts and

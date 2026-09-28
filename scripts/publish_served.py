@@ -333,14 +333,17 @@ def main() -> int:
 
         # Per season too, from the same file and for the same reason. This is
         # what the check below compares, and what the manifest carries.
-        seasons = connection.execute(
+        # Named apart from `seasons`, the staged season list the manifest
+        # publishes: reusing that name here overwrote it with the last table's
+        # (season, count) rows (#76).
+        table_seasons = connection.execute(
             "SELECT season, count(*) FROM read_parquet(?) "
             "GROUP BY season ORDER BY season",
             [str(path)],
         ).fetchall()
 
         counts[table] = count
-        by_season[table] = {season: n for season, n in seasons}
+        by_season[table] = {season: n for season, n in table_seasons}
         paths[table] = path
 
     # Checked per season, not only against the summed total.
