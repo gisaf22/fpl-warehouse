@@ -569,8 +569,10 @@ tag configs rather than overriding them, so a `data_tests: +tags: [unit]` defaul
 `dbt_project.yml` would also stamp `unit` onto the integration and e2e tests.
 
 Singular tests live flat in `tests/` (dbt's default `test-paths`) and are named
-`<layer>_test_<subject>_<assertion>.sql` — layer `stg` or `fct`, subject the model,
-assertion the claim. Each opens with a header stating its layer, model, the claim in one
+`<layer>_test_<subject>_<assertion>.sql` — layer `stg`, `int` or `fct`, subject the model,
+assertion the claim. `int` is for a test whose subject is an intermediate model, e.g.
+`int_test_season_roster_grain_uniqueness.sql` (#69); the spine's older tests predate it and
+keep their `fct_test_` names. Each opens with a header stating its layer, model, the claim in one
 sentence, its origin, and its tier:
 
 ```sql
