@@ -113,6 +113,48 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+      # The served boundary, checked from what dbt resolved rather than read
+      # off schema.yml (#44 AC3). Exactly the served models are public, so a
+      # model outside warehouse_internal can ref() them and a served model
+      # that slips back to private fails here. Every staging and intermediate
+      # model is private, so none of them can be ref()'d from outside the
+      # group; dbt enforces that at parse, and this pins that none was
+      # quietly made public. Add a model to SERVED only when it is published.
+      - name: Check exactly the served models are public
+        run: |
+          uv run dbt ls --resource-type model \
+            --output json --output-keys name access > /tmp/models.json
+          uv run python - <<'PY'
+          import json, sys
+
+          SERVED = {
+              "fct_player_fixture", "fct_player_gameweek",
+              "dim_team", "dim_player", "dim_fixture",
+          }
+          models = {}
+          with open("/tmp/models.json") as fh:
+              for line in fh:
+                  line = line.strip()
+                  if line.startswith("{"):
+                      node = json.loads(line)
+                      models[node["name"]] = node["access"]
+
+          public = {name for name, access in models.items() if access == "public"}
+          problems = []
+          if public != SERVED:
+              problems.append(
+                  f"public models {sorted(public)} are not the served set "
+                  f"{sorted(SERVED)}")
+          internal = [n for n in models if n.startswith(("stg_", "int_"))]
+          if not internal:
+              problems.append("no stg_/int_ models listed; nothing was checked")
+          problems += [f"{n} is {models[n]}, not private"
+                       for n in internal if models[n] != "private"]
+          for problem in problems:
+              print(f"::error::{problem}")
+          sys.exit(1 if problems else 0)
+          PY
+
   # Required check, and the real one: this is where the models get built and
   # every assertion in the fast tiers actually runs.
   #

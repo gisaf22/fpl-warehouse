@@ -358,7 +358,15 @@ models:
         data_tests: *dim_team_key_not_null
       - name: team_code
       - name: team_name
+        # A null name in the latest capture would be served straight through.
+        data_tests: &dim_team_name_not_null
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#44 AC8"
       - name: team_short_name
+        data_tests: *dim_team_name_not_null
 
   - name: dim_player
     description: >
