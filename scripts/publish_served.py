@@ -1,4 +1,4 @@
-"""Export the two served fact tables to parquet and publish them to S3.
+"""Export the served fact and dimension tables to parquet and publish them to S3.
 
 Called by .github/workflows/scheduled_build.yml after a successful
 `dbt build`. Split out of the workflow rather than inlined as a heredoc so it
@@ -36,7 +36,31 @@ BUCKET = "fpl-data-safari"
 PREFIX = "served/"
 MANIFEST_KEY = f"{PREFIX}_manifest.json"
 
-TABLES = ("fct_player_fixture", "fct_player_gameweek")
+TABLES = (
+    "fct_player_fixture",
+    "fct_player_gameweek",
+    "dim_team",
+    "dim_player",
+    "dim_fixture",
+)
+
+# Every staging model, as the source of which seasons the build holds. A season
+# found in any of them must be served by every table (see staged_seasons).
+STAGING = (
+    "stg_player",
+    "stg_gameweek",
+    "stg_team",
+    "stg_fixture",
+    "stg_player_fixture",
+)
+
+# A Premier League season's fixed sizes: 20 clubs, each playing the other 19
+# home and away. Measured on 2026-09-28, every bootstrap-static capture of
+# both seasons holds exactly 20 teams and every fixtures capture exactly 380
+# fixtures. A postponed fixture keeps its id and a null round, so it still
+# counts toward 380.
+TEAMS_PER_SEASON = 20
+FIXTURES_PER_SEASON = 380
 
 PROJECT_FILE = Path("dbt_project.yml")
 
@@ -65,9 +89,17 @@ PROJECT_FILE = Path("dbt_project.yml")
 # Double gameweeks push in the other direction, adding rows above the
 # expectation. Nothing here caps the upside — a table larger than expected is
 # not the failure this guards against.
+#
+# The dimensions take no tolerance. Each one's expectation is exact rather
+# than an estimate: a season has 20 teams and 380 fixtures, and dim_player
+# holds every player staged in the season (int_season_roster's set). One row
+# short is a lost row, not variance.
 TOLERANCE = {
     "fct_player_fixture": 0.15,
     "fct_player_gameweek": 0.02,
+    "dim_team": 0.0,
+    "dim_player": 0.0,
+    "dim_fixture": 0.0,
 }
 
 
@@ -84,8 +116,25 @@ def live_season() -> str:
     return project["vars"]["season"]
 
 
-def expected_rows(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
-    """Rows each season should contribute, computed from that build's staging.
+def staged_seasons(connection: duckdb.DuckDBPyConnection) -> list[str]:
+    """Every season any staging model holds.
+
+    The floor checks each of these in every served table, so where this list
+    comes from decides which lost seasons the floor can see. Taken from all
+    staging models rather than from the ones a table is built from: a season
+    whose bootstrap-static captures all came back empty never reaches
+    stg_team, stg_player or stg_gameweek, but the fixtures endpoint and
+    element-summary history still stage it. A list read from stg_team alone
+    would drop that season and never check dim_team for it (#44 AC7).
+    """
+    union = " union ".join(f"select distinct season from main.{m}" for m in STAGING)
+    return [row[0] for row in connection.execute(f"{union} order by 1").fetchall()]
+
+
+def expected_rows(
+    connection: duckdb.DuckDBPyConnection, seasons: list[str]
+) -> dict[str, dict[str, int]]:
+    """Rows each table should hold per season, computed from that build's staging.
 
     This replaces a static floor of 500 rows, which was sized in 2026-09 when
     one part-played season held ~3,200 rows. Against a two-season build it is
@@ -118,8 +167,16 @@ def expected_rows(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
     would compare a number against itself and pass unconditionally. Recomputing
     from stg_player and stg_gameweek makes it an independent second opinion.
 
-    Returns {season: expected_rows}, empty only if staging holds no seasons at
-    all — which main() treats as a failure rather than as nothing to check.
+    That players x rounds product is the facts' expectation. The dimensions'
+    are simpler: TEAMS_PER_SEASON teams, FIXTURES_PER_SEASON fixtures, and the
+    season's staged players, the same distinct fpl_id count as above.
+
+    Every season in `seasons` gets an entry for every table. A season that
+    lacks players or rounds expects 0 fact rows, which is right at the start
+    of a season, before any round has finished; the fixed dimension counts
+    still apply to it, so a season cannot vanish without failing somewhere.
+
+    Returns {table: {season: expected_rows}}.
     """
     rows = connection.execute(
         """
@@ -158,14 +215,26 @@ def expected_rows(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
             group by gameweek.season
         )
 
-        select players.season, players.players * rounds.rounds
+        select season, players.players, rounds.rounds
         from players
-        inner join rounds using (season)
-        order by players.season
+        full outer join rounds using (season)
         """,
         {"live_season": live_season()},
     ).fetchall()
-    return {season: expected for season, expected in rows}
+    players = {season: n or 0 for season, n, _ in rows}
+    rounds = {season: n or 0 for season, _, n in rows}
+
+    per_season = {
+        "fct_player_fixture": lambda s: players.get(s, 0) * rounds.get(s, 0),
+        "fct_player_gameweek": lambda s: players.get(s, 0) * rounds.get(s, 0),
+        "dim_team": lambda _s: TEAMS_PER_SEASON,
+        "dim_player": lambda s: players.get(s, 0),
+        "dim_fixture": lambda _s: FIXTURES_PER_SEASON,
+    }
+    return {
+        table: {season: per_season[table](season) for season in seasons}
+        for table in TABLES
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -230,18 +299,20 @@ def main() -> int:
     # read_only: this process must not be able to mutate the built warehouse.
     connection = duckdb.connect(str(DATABASE), read_only=True)
 
-    expected = expected_rows(connection)
+    seasons = staged_seasons(connection)
 
-    # An empty expectation means staging itself is empty, which the per-season
-    # loop below would otherwise wave through with nothing to compare against.
-    # The old static floor caught this case by accident; it has to be explicit
-    # now that the floor is derived from the same build it guards.
-    if not expected:
+    # No seasons means staging itself is empty, which the per-season loop
+    # below would otherwise wave through with nothing to compare against. The
+    # old static floor caught this case by accident; it has to be explicit now
+    # that the floor is derived from the same build it guards.
+    if not seasons:
         print(
             "::error::no seasons found in staging — the build has no data to "
             "publish. Refusing to overwrite the existing served data."
         )
         return 1
+
+    expected = expected_rows(connection, seasons)
 
     counts: dict[str, int] = {}
     by_season: dict[str, dict[str, int]] = {}
@@ -280,14 +351,14 @@ def main() -> int:
     # would have shown up as a 9.3% shortfall on the total, inside the 15%
     # this table needs for blank gameweeks. The same loss is unmissable against
     # that season's own expectation. Every season present in staging must also
-    # be present in the served table — a season that vanishes entirely is the
+    # be present in every served table — a season that vanishes entirely is the
     # failure this exists to catch, and it scores zero rows, not a small
     # shortfall.
     failures: list[str] = []
 
     for table in TABLES:
         tolerance = TOLERANCE[table]
-        for season, season_expected in sorted(expected.items()):
+        for season, season_expected in sorted(expected[table].items()):
             actual = by_season[table].get(season, 0)
             floor = int(season_expected * (1 - tolerance))
             if actual < floor:
@@ -400,7 +471,7 @@ def main() -> int:
         "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git_sha": os.environ.get("GITHUB_SHA", "unknown"),
-        "seasons": sorted(expected),
+        "seasons": seasons,
         "row_counts": counts,
         "row_counts_by_season": by_season,
         "restated_seasons": restated,
@@ -421,11 +492,14 @@ def main() -> int:
             f"{season} {n:,}" for season, n in sorted(by_season[table].items())
         )
         lines.append(f"- `{table}`: {counts[table]:,} rows ({breakdown})")
-    lines.append(
-        "- expected from staging: "
-        + ", ".join(f"{season} {n:,}" for season, n in sorted(expected.items()))
-        + f" — total {sum(expected.values()):,}"
-    )
+    for table in TABLES:
+        lines.append(
+            f"- `{table}` expected from staging: "
+            + ", ".join(
+                f"{season} {n:,}" for season, n in sorted(expected[table].items())
+            )
+            + f" — total {sum(expected[table].values()):,}"
+        )
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write("### Published to served/\n" + "\n".join(lines) + "\n")

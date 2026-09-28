@@ -5,9 +5,10 @@ exposures:
     type: application
     maturity: medium
     description: >
-      fpl-intelligence, the downstream decision layer. It reads the two served
-      `fct_` models and nothing else — staging and intermediate models are
-      `access: private` and outside the served contract.
+      fpl-intelligence, the downstream decision layer. It reads the served
+      models and nothing else: the two `fct_` facts and the three `dim_`
+      dimensions (#44). Staging and intermediate models are `access: private`
+      and outside the served contract.
 
       This exposure documents the dependency and makes it visible in the DAG
       and in `dbt ls --select +exposure:fpl_intelligence`. It does not enforce
@@ -20,3 +21,6 @@ exposures:
     depends_on:
       - ref('fct_player_fixture')
       - ref('fct_player_gameweek')
+      - ref('dim_team')
+      - ref('dim_player')
+      - ref('dim_fixture')

@@ -259,22 +259,31 @@ not silently corrected.
   no joins.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
-- Only the served `fct_` models are for external consumption. There is no `agg_` layer:
-  `fct_player_gameweek` is a fact table at gameweek grain, not a separate category.
+- Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
+  external consumption. There is no `agg_` layer: `fct_player_gameweek` is a fact table at
+  gameweek grain, not a separate category.
 
 ## Served contract
 
-fpl-intelligence must never query staging directly — only `fct_player_fixture` and
-`fct_player_gameweek`.
+fpl-intelligence must never query staging directly — only the served models:
+`fct_player_fixture`, `fct_player_gameweek`, `dim_team`, `dim_player` and `dim_fixture`.
+
+Three concepts recur across served columns and are each defined once, as a doc block in
+`models/marts/docs.md`: `ratified`, `season_scoped_key` and `pre_kickoff`. Every served
+column that uses one references it with `doc()`; change the definition there, never in a
+column's description.
 
 ### Where the served tables live
 
-Both `fct_` models are published as parquet to fixed keys, overwritten in place after every
-successful scheduled build (see "Scheduled build"):
+All five served models are published as parquet to fixed keys, overwritten in place after
+every successful scheduled build (see "Scheduled build"):
 
 ```
 s3://fpl-data-safari/served/fct_player_fixture.parquet
 s3://fpl-data-safari/served/fct_player_gameweek.parquet
+s3://fpl-data-safari/served/dim_team.parquet
+s3://fpl-data-safari/served/dim_player.parquet
+s3://fpl-data-safari/served/dim_fixture.parquet
 s3://fpl-data-safari/served/_manifest.json
 ```
 
@@ -338,6 +347,14 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it.
 
+- **2026-09-28 — `dim_team`, `dim_player`, `dim_fixture` served (#44). Additive.** Three new
+  objects under `served/`, each with an enforced contract, and three new table keys inside
+  the manifest's `row_counts` and `row_counts_by_season`. Both facts, their contracts and
+  every existing manifest field are unchanged. Each dimension is keyed `(season, natural
+  id)`; match its ids within season. `dim_player`'s label column is `position_short_name`
+  (renamed from `position` before it was ever served). No contract version: the manifest
+  does not carry one yet — see #74.
+
 - **2026-09-27 — `fct_player_fixture.team_fpl_id INTEGER`, appended last (#43). Additive.**
   The club the player played for in that fixture: the fixture's home side if `was_home`, else
   its away side, read from `dim_fixture` within the row's own season. Every existing column
@@ -356,8 +373,21 @@ learns of it.
 what the build's own data says it should hold. The expectation is derived per run rather
 than hardcoded, so it tracks the data instead of needing an edit whenever the data grows:
 
-- For each season, expected rows = that season's distinct player count x its round count,
-  both read from that season's own captures in `stg_player` and `stg_gameweek`.
+- For each season, the facts' expected rows = that season's distinct player count x its
+  round count, both read from that season's own captures in `stg_player` and
+  `stg_gameweek`.
+- The dimensions' expectations are exact: 20 teams and 380 fixtures per season (every
+  capture of both seasons holds exactly those, measured 2026-09-28; a postponed fixture
+  keeps its id and counts), and for `dim_player` the season's distinct `fpl_id` across every
+  `stg_player` capture — 841 for 2025-26. That last one is derived the way
+  `int_season_roster` is, so it guards the join and the export, not data lost upstream;
+  the previous-publish comparison below covers that.
+- **Which seasons are checked** is the union of seasons across every staging model
+  (`stg_player`, `stg_gameweek`, `stg_team`, `stg_fixture`, `stg_player_fixture`), and every
+  served table is checked for each of them. Drawing the list from all of staging is
+  deliberate (#44 AC7): a season whose bootstrap-static captures all came back empty never
+  reaches `stg_team`, but the fixtures endpoint and element-summary history still stage it,
+  so `dim_team` is still held to 20 for it.
 - Round count means **every** round for a closed season, and only the rounds the latest
   capture reports `finished` for the live season. That distinction is the whole point: the
   live calendar publishes all 38 rounds from day one, so counting them all would expect a
@@ -377,16 +407,23 @@ the current actuals.
 
 Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`,
 which is the expectation's own grain, and 15% for `fct_player_fixture`, roughly 2x its
-observed worst case (2025-26's fixed 6.9%). Double gameweeks push the other way and
-nothing caps the upside — a table larger than expected is not the failure this guards
+observed worst case (2025-26's fixed 6.9%). The three dimensions take 0%, because their
+expectations are exact counts rather than estimates. Double gameweeks push the other way
+and nothing caps the upside — a table larger than expected is not the failure this guards
 against.
 
 The check is applied **per season**, and a season present in staging but absent from a
 served table scores zero and fails outright. The summed total is reported but is not what
 is enforced: the per-season check is the more sensitive of the two, because a season's
 loss is measured against that season's own expectation rather than diluted by every other
-season's rows. An empty `expected` — no seasons in staging at all — is itself a failure,
-which the old static floor caught only by accident.
+season's rows. No seasons in staging at all is itself a failure, which the old static
+floor caught only by accident.
+
+The previous-publish comparison below covers every served table, the dimensions included.
+None of the three has a known legitimate shrink: 20 teams and 380 fixtures never change,
+and `dim_player` is the union of every capture, so it only grows. The first publish after
+the dimensions were added reads a manifest that lists none of them, so they were held to
+the floor alone that once.
 
 **What the floor cannot see is staging itself shrinking.** The expectation is computed
 from the same build's staging, so rows lost *upstream* of staging — a live raw tree that
@@ -454,16 +491,19 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   Verified 2026-09-03 with a throwaway model in `models/marts/`:
   `attempted to reference node model.fpl_warehouse.int_player_gameweek_spine, which is not
   allowed because the referenced node is private to the 'warehouse_internal' group`.
-- The two `fct_` models are `access: public` with `contract: enforced: true` and a full
+- The five served models are `access: public` with `contract: enforced: true` and a full
   explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
   retyping a served column now fails the build until the contract is updated, which makes
   every breaking change to the served shape a deliberate, reviewed edit.
 - Singular tests are subject to the same rule. The tests in `tests/` that `ref()`
   a staging or intermediate model carry `{{ config(group='warehouse_internal') }}`; without
   it dbt refuses to parse them. Any new test that reads staging needs the same line.
-- The `fct_` models are group members themselves — dbt allows a `ref()` of a private model
+- The served models are group members themselves — dbt allows a `ref()` of a private model
   only from inside the same group, and they must read staging to be built at all. Their
   `access: public` is what keeps them referenceable from outside.
+- CI's `validate` job checks the boundary from what dbt resolved: exactly the five served
+  models are public, and every `stg_`/`int_` model is private (#44 AC3). A new served model
+  must be added to that step's list as well as to `publish_served.py`.
 
 **Documented only, NOT enforced:**
 
@@ -471,11 +511,11 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   parse time. `stg_player_fixture` is a real table in the same DuckDB schema, so anything
   holding the built `.duckdb` file can run `select * from main.stg_player_fixture` — the
   boundary is enforced against dbt models and is a convention for everything else.
-  Publishing narrows this in practice rather than by enforcement: only the two `fct_`
+  Publishing narrows this in practice rather than by enforcement: only the five served
   parquet files are uploaded, so a consumer reading `served/` has no path to staging at
   all. That is a property of what the publish step happens to write, not a grant, and it
   holds only as long as nothing else is added under that prefix.
-- The `fpl_intelligence` exposure in `models/exposures.yml` declares the two `fct_` models
+- The `fpl_intelligence` exposure in `models/exposures.yml` declares the five served models
   as its dependencies. That documents the contract and puts it in the DAG; it enforces
   nothing.
 
@@ -872,7 +912,7 @@ real failure can land as a passing warning. `dbt build` is used rather than `dbt
 `dbt test` so each model's tests gate its own dependents in DAG order.
 
 **It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
-runs `scripts/publish_served.py`, which exports both `fct_` tables to parquet and uploads
+runs `scripts/publish_served.py`, which exports the five served tables to parquet and uploads
 them to `s3://fpl-data-safari/served/` alongside a `_manifest.json`. Layout, format and the
 publish-on-success guarantee are specified under "Served contract" — this section covers
 only how the workflow invokes it.

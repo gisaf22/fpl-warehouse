@@ -24,9 +24,10 @@
 --   which capture it comes from cannot matter; the constant_per_key test on
 --   stg_player.position_id fails the build if that ever stops holding.
 --
---   The label is read from the same capture's position list. Left joins, so a
---   position that capture does not define surfaces as a null the not_null
---   test reports, rather than as a player silently dropped.
+--   The label (position_short_name) is read from the same capture's position
+--   list. Left joins, so a position that capture does not define surfaces as
+--   a null the not_null test reports, rather than as a player silently
+--   dropped.
 --
 -- Team:
 --   Not carried. Team is per fixture (fct_player_fixture.team_fpl_id).
@@ -53,7 +54,7 @@ select
     roster.player_code,
     roster.web_name,
     latest_appearance.position_id,
-    stg_position.position_short_name as position
+    stg_position.position_short_name
 from {{ ref('int_season_roster') }} as roster
 left join latest_appearance
     on  latest_appearance.season = roster.season
