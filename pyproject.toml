@@ -21,11 +21,22 @@ package = false
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
     "ruff>=0.15.10",
     "vulture>=2.16",
 ]
 
-# No pytest config: this project has no Python source and no Python tests. The
-# whole suite is dbt tests under `tests/`, tiered by tag — see CLAUDE.md,
-# "Tests". The pre-migration pytest suite tested `fpl_warehouse.*`, deleted in
-# Phase 1.
+# Python tests for scripts/ live in scripts/tests/, never in tests/: tests/ is
+# dbt's test-paths (singular .sql tests and tests/fixtures/), so testpaths keeps
+# pytest out of it. scripts/tests/conftest.py enforces tracing and tiering at
+# collection — see CLAUDE.md, "Tests".
+[tool.pytest.ini_options]
+testpaths = ["scripts/tests"]
+strict_markers = true
+markers = [
+    # Tiers — exactly one per test, declared on the test like a dbt tier tag.
+    "unit: a single function or module in isolation — no S3, no built warehouse",
+    "integration: several components wired together, still with no S3",
+    # Traceability — at least one per test.
+    'covers: the acceptance criterion a test proves — covers("#<issue> AC<n>"); repeat for several',
+]
