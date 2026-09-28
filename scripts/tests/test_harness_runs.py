@@ -4,5 +4,6 @@ import pytest
 
 
 @pytest.mark.unit
+@pytest.mark.covers("#64 AC1")
 def test_a_traced_unit_test_runs():
     assert True
