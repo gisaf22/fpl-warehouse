@@ -25,6 +25,17 @@ models:
           - not_null:
               config:
                 tags: [unit]
+          # Never null and never changing across one player's captures within a
+          # season (#69 AC5, AC6). Unlike not_null above, a failure names the
+          # season and fpl_id, and the codes seen. Keyed by season because
+          # fpl_id is reassigned each season.
+          - constant_per_key:
+              arguments:
+                key: [season, fpl_id]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#69 AC6"
 
   - name: stg_team
     description: >
