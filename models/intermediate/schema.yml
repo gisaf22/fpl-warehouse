@@ -1,6 +1,38 @@
 version: 2
 
 models:
+  - name: int_season_roster
+    description: >
+      One row per (season, fpl_id) for every player seen in any bootstrap-static
+      capture of that season, departed players included. Identity and the
+      newest web_name only: other player attributes belong in dim_player
+      (#41). The single source of each season's player set (#69). Internal:
+      not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: season
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#69 AC3"
+      - name: fpl_id
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#69 AC3"
+      - name: player_code
+        description: >
+          FPL's cross-season player identifier, as captured. Carried only; never
+          joined, deduplicated or filtered on. Fixed within a season: see the
+          constant_per_key test on stg_player.player_code.
+      - name: web_name
+        description: The newest capture's spelling within the season.
+
   - name: int_player_gameweek_spine
     description: >
       Complete player x gameweek grid, stamped with the season var. Exists so
