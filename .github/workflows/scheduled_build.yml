@@ -51,7 +51,27 @@ on:
   # Manual trigger, for testing this workflow and for an on-demand rebuild
   # without waiting for the schedule:
   #   gh workflow run scheduled_build.yml
+  #
+  # The two inputs are the publish step's overrides and exist only for a
+  # manual run; a scheduled run has neither. Each is recorded in the published
+  # _manifest.json. See scripts/publish_served.py and CLAUDE.md, "The publish
+  # floor is computed, not configured".
+  #   gh workflow run scheduled_build.yml -f restate=2026-27
+  #   gh workflow run scheduled_build.yml -f without_baseline=true
   workflow_dispatch:
+    inputs:
+      restate:
+        description: >-
+          Seasons allowed to publish fewer rows than the previous publish,
+          comma- or space-separated (e.g. 2026-27). Leave empty normally.
+        type: string
+        default: ""
+      without_baseline:
+        description: >-
+          Publish even if the previous served/_manifest.json is missing or
+          unreadable.
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -205,6 +225,24 @@ jobs:
       # exits 0 having built a table that is empty, or missing a whole season,
       # for an upstream reason. That floor is computed per season from the
       # build's own staging tables rather than hardcoded — see the script.
+      #
+      # It also refuses a season that holds fewer rows than the previous
+      # publish's manifest recorded, which the staging-derived floor cannot see
+      # when rows are lost upstream of staging. The dispatch inputs are the
+      # overrides. They reach the script through env rather than being
+      # interpolated into the command, so an input value is never parsed as
+      # shell.
       - name: Publish served tables to S3
         if: success()
-        run: uv run python scripts/publish_served.py
+        env:
+          RESTATE: ${{ inputs.restate }}
+          WITHOUT_BASELINE: ${{ inputs.without_baseline }}
+        run: |
+          args=()
+          for season in ${RESTATE//,/ }; do
+            args+=(--restate "$season")
+          done
+          if [ "$WITHOUT_BASELINE" = "true" ]; then
+            args+=(--without-baseline)
+          fi
+          uv run python scripts/publish_served.py "${args[@]}"

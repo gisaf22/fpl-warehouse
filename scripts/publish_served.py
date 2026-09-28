@@ -18,6 +18,7 @@ established by aws-actions/configure-aws-credentials earlier in the job.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -27,11 +28,13 @@ from pathlib import Path
 import boto3
 import duckdb
 import yaml
+from botocore.exceptions import BotoCoreError, ClientError
 
 DATABASE = Path(".local/warehouse.duckdb")
 OUT_DIR = Path(".local/served")
 BUCKET = "fpl-data-safari"
 PREFIX = "served/"
+MANIFEST_KEY = f"{PREFIX}_manifest.json"
 
 TABLES = ("fct_player_fixture", "fct_player_gameweek")
 
@@ -165,7 +168,59 @@ def expected_rows(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
     return {season: expected for season, expected in rows}
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--restate",
+        action="append",
+        default=[],
+        metavar="SEASON",
+        help="let SEASON publish fewer rows than the previous publish held; "
+        "repeat for several. Recorded in the manifest's restated_seasons.",
+    )
+    parser.add_argument(
+        "--without-baseline",
+        action="store_true",
+        help="publish even if the previous manifest is missing or unreadable. "
+        "Recorded in the manifest's published_without_baseline.",
+    )
+    return parser.parse_args()
+
+
+def previous_counts(client) -> tuple[dict[str, dict[str, int]] | None, str | None]:
+    """The previous publish's per-season counts, or why they can't be read.
+
+    Returns (row_counts_by_season, None) or (None, problem). Only the per-season
+    counts are required: a manifest written before restated_seasons and
+    published_without_baseline existed is a valid baseline.
+    """
+    location = f"s3://{BUCKET}/{MANIFEST_KEY}"
+    try:
+        body = client.get_object(Bucket=BUCKET, Key=MANIFEST_KEY)["Body"].read()
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "unknown")
+        return None, f"previous manifest {location} could not be read ({code}: {error})"
+    except BotoCoreError as error:
+        return None, f"previous manifest {location} could not be read ({error})"
+
+    try:
+        by_season = json.loads(body)["row_counts_by_season"]
+        counts = {
+            table: {season: int(n) for season, n in seasons.items()}
+            for table, seasons in by_season.items()
+        }
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        return None, (
+            f"previous manifest {location} has no usable row_counts_by_season "
+            f"({type(error).__name__}: {error})"
+        )
+    return counts, None
+
+
 def main() -> int:
+    args = parse_args()
+    restated = sorted(set(args.restate))
+
     if not DATABASE.exists():
         print(f"::error::no database at {DATABASE} — did `dbt build` run?")
         return 1
@@ -244,6 +299,66 @@ def main() -> int:
                     f"of {floor:,}"
                 )
 
+    # Checked against the previous publish too, because the floor above cannot
+    # see a loss that happened upstream of staging. The floor's expectation is
+    # computed from this build's staging, so when rows vanish before staging —
+    # a raw tree that went unreadable, a key layout that changed — the
+    # expectation shrinks with them and the floor still passes. A season that
+    # left staging entirely is not in `expected` at all and is never checked
+    # there. The previous manifest is the only record of what was served, so
+    # every season it lists is held to its count, in each table, and may not
+    # go down unless the run names it with --restate.
+    #
+    # Strict, not a tolerance: a legitimate shrink is rare (FPL retracting a
+    # history row on a day no new fixture is played can drop one
+    # fct_player_fixture row) and a rerun with --restate covers it, whereas any
+    # tolerance is a loss this check would wave through.
+    #
+    # A season absent from the previous manifest has no previous count and is
+    # held only to the floor above, so a newly ported season can be published.
+
+    # Same construction as fpl-ingest's S3Backend._default_client.
+    client = boto3.client("s3")
+
+    previous, baseline_problem = previous_counts(client)
+    without_baseline = False
+    if baseline_problem:
+        if args.without_baseline:
+            without_baseline = True
+            print(
+                f"::warning::{baseline_problem} — publishing without a baseline "
+                f"because --without-baseline was given; nothing checks that "
+                f"this publish holds as much as the last one."
+            )
+        else:
+            failures.append(
+                f"{baseline_problem}. Without it there is no proof that no "
+                f"season shrank; rerun with --without-baseline if that is "
+                f"intended"
+            )
+    elif args.without_baseline:
+        print(
+            "--without-baseline was given but the previous manifest is "
+            "readable; checking against it anyway."
+        )
+
+    for table in TABLES:
+        for season, before in sorted((previous or {}).get(table, {}).items()):
+            now = by_season[table].get(season, 0)
+            if now >= before:
+                continue
+            if season in restated:
+                print(
+                    f"::warning::restating {season} (--restate): {table} "
+                    f"goes from {before:,} to {now:,} rows"
+                )
+                continue
+            failures.append(
+                f"{table} holds {now:,} rows for {season}, below the "
+                f"{before:,} in the previous publish; rerun with --restate "
+                f"{season} if that is intended"
+            )
+
     if failures:
         for failure in failures:
             print(
@@ -252,8 +367,8 @@ def main() -> int:
             )
         return 1
 
-    # Same construction as fpl-ingest's S3Backend._default_client.
-    client = boto3.client("s3")
+    if restated:
+        print(f"restated seasons (--restate): {', '.join(restated)}")
 
     for table, path in paths.items():
         key = f"{PREFIX}{table}.parquet"
@@ -274,6 +389,13 @@ def main() -> int:
     # `seasons` is deliberately a list rather than a "is this multi-season?"
     # flag: a flag would encode today's two-season state as the thing to branch
     # on, and the count changes again the moment another season is ported.
+    #
+    # `restated_seasons` and `published_without_baseline` record the overrides
+    # this publish ran under, so a shrink that was allowed stays visible to a
+    # consumer and to the next run's reader. Both are always written, empty
+    # and false on a normal run. The next publish reads only
+    # `row_counts_by_season` from here, so a manifest without them is still a
+    # valid baseline.
     manifest = {
         "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -281,15 +403,16 @@ def main() -> int:
         "seasons": sorted(expected),
         "row_counts": counts,
         "row_counts_by_season": by_season,
+        "restated_seasons": restated,
+        "published_without_baseline": without_baseline,
     }
-    manifest_key = f"{PREFIX}_manifest.json"
     client.put_object(
         Bucket=BUCKET,
-        Key=manifest_key,
+        Key=MANIFEST_KEY,
         Body=json.dumps(manifest, indent=2).encode(),
         ContentType="application/json",
     )
-    print(f"published s3://{BUCKET}/{manifest_key}")
+    print(f"published s3://{BUCKET}/{MANIFEST_KEY}")
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     lines = []

@@ -32,6 +32,8 @@ dev = [
 # collection — see CLAUDE.md, "Tests".
 [tool.pytest.ini_options]
 testpaths = ["scripts/tests"]
+# The scripts under test are plain modules in scripts/, not an installed package.
+pythonpath = ["scripts"]
 strict_markers = true
 markers = [
     # Tiers — exactly one per test, declared on the test like a dbt tier tag.
