@@ -19,7 +19,8 @@
 --
 -- position_id:
 --   FPL's `element_type`, as of the capture. Unlike team it is treated as
---   fixed within a season (decision 2 on #32); #41 asserts it in dim_player.
+--   fixed within a season (decision 2 on #32); a constant_per_key test on
+--   this column asserts it (#41).
 --
 -- player_code:
 --   FPL's `code`, the player's identifier across seasons — `fpl_id` is

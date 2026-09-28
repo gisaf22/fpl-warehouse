@@ -36,6 +36,20 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#69 AC6"
+      - name: position_id
+        data_tests:
+          # Position is fixed within a season (decision 2 on #32): a player
+          # whose captures in one season report two positions fails the build,
+          # naming the season, fpl_id and both ids. Asserted here, not on
+          # dim_player, because dim_player holds one row per player and cannot
+          # see a change.
+          - constant_per_key:
+              arguments:
+                key: [season, fpl_id]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC2"
 
   - name: stg_team
     description: >

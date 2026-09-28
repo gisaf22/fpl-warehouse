@@ -53,6 +53,16 @@ models:
             tags: [integration]
             meta:
               covers: "#43 AC4"
+      # Every row's player is in dim_player within its own season.
+      - relationships:
+          column_name: "season || '|' || fpl_id"
+          arguments:
+            to: ref('dim_player')
+            field: "season || '|' || fpl_id"
+          config:
+            tags: [integration]
+            meta:
+              covers: "#41 AC5"
     columns:
       - name: season
         data_type: VARCHAR
@@ -349,6 +359,78 @@ models:
       - name: team_code
       - name: team_name
       - name: team_short_name
+
+  - name: dim_player
+    description: >
+      One row per player per season, keyed (season, fpl_id), for every player
+      in int_season_roster — departed players included. position is the one
+      FPL assigns for the season, taken from the player's latest appearance;
+      it is fixed within a season (decision 2 on #32), which the
+      constant_per_key test on stg_player.position_id enforces. No team: team
+      is per fixture, on fct_player_fixture. Internal until the dimensions are
+      served (#34, B5).
+    group: warehouse_internal
+    access: private
+    # The grain as one expression, as in dim_team: a null in either half nulls
+    # the expression, which unique skips, so the key columns are also not_null.
+    data_tests:
+      - unique:
+          column_name: "season || '|' || fpl_id"
+          config:
+            tags: [unit]
+            meta:
+              covers: "#41 AC3"
+    columns:
+      - name: season
+        data_tests: &dim_player_not_null
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC3"
+      - name: fpl_id
+        data_tests: *dim_player_not_null
+      - name: player_code
+        description: >
+          FPL's cross-season player identifier. Carried only; never joined,
+          deduplicated or filtered on.
+      - name: web_name
+        description: The latest appearance's spelling within the season.
+      - name: position_id
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC3"
+          # FPL defines four positions. An id outside 1-4 is one the
+          # enumeration below does not know.
+          - value_between:
+              arguments:
+                min_value: 1
+                max_value: 4
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC6"
+      - name: position
+        description: >
+          The position's short name (GKP, DEF, MID, FWD), from the same capture
+          as position_id. A new value fails the enumeration, so adding a
+          position is a deliberate contract change.
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC3"
+          - accepted_values:
+              arguments:
+                values: [GKP, DEF, MID, FWD]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#41 AC3"
 
   - name: dim_fixture
     description: >
