@@ -885,8 +885,8 @@ required-checks list, which stays `validate` + `fixture-tests` + `python-tests` 
 credential-free). This
 job depends on live S3 and on fpl-ingest's output, so it fails for reasons unrelated to any
 open pull request; making it required would let a bad upstream capture block every
-unrelated merge. A failure here pages a human via GitHub's own run-failure notification —
-there is no custom alerting, by design.
+unrelated merge. A failure here alerts a human through GitHub's own run-failure
+notification and through healthchecks.io (see "Monitoring" below).
 
 **The offset is sized against GitHub's scheduler, not against ingest's runtime.** The
 scheduler is the larger term by far. Measured on 2026-09-10 over 26 scheduled fpl-ingest
@@ -916,6 +916,41 @@ fails, Actions' default `bash -e` propagates it, and the run is marked failed. V
 test in the project is `error` severity — there is no `severity: warn` anywhere — so no
 real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
+
+### Monitoring
+
+The scheduled build pings a [healthchecks.io](https://healthchecks.io) check at the end of
+every scheduled run (#79; design decisions on gisaf22/fpl-ingest#34). The check alerts by
+email when a run reports failure, and also when no ping arrives within its schedule plus
+grace. That second case covers runs that never start, runs killed by the 45-minute
+`timeout-minutes`, and GitHub Actions outages.
+
+| Check | Workflow | Schedule | Timezone | Grace | Ping URL secret |
+|---|---|---|---|---|---|
+| `fpl-warehouse scheduled build` | `scheduled_build.yml` | `45 7,19 * * *` | UTC | 1 h 30 min | `HEALTHCHECKS_PING_URL_SCHEDULED_BUILD` |
+
+fpl-ingest's two checks are documented in that repo.
+
+- **Success means the manifest landed.** The ping step runs after `Publish served tables to
+  S3`, and `publish_served.py` uploads `_manifest.json` last and exits non-zero on any error.
+  So `job.status == success` pings the plain URL only once the manifest is published. A
+  failed `dbt build` (publish skipped), a refused publish (floor or previous-manifest guard)
+  or an upload error leaves `job.status` at `failure` and pings `<url>/fail`, and so does
+  `cancelled`.
+- **Scheduled runs only.** A manual dispatch, including `restate` and `without_baseline`,
+  does not ping, so it can neither raise an alert nor clear one while the schedule is broken.
+- **The ping can never fail the job.** `scripts/healthchecks_ping.sh` always exits 0: it
+  logs a notice and sends nothing when the secret is empty (a fork or fresh clone), and it
+  logs a warning when the request fails. The step is also `continue-on-error` with a
+  2-minute timeout. A lost ping reads as absence and alerts after the grace, which is the
+  accepted false positive. The script is plain bash and curl, duplicated from fpl-ingest's
+  `.github/scripts/healthchecks_ping.sh` rather than shared, so it runs even when `uv sync`
+  failed. Keep the two in step.
+- **The ping URL is a secret, not a variable.** The repo is public, and anyone holding the
+  URL could send a false success ping. Never paste it into an issue, PR or log.
+- **Grace sizing:** 1 h 30 min covers about 25 minutes of scheduler lag plus the 45-minute
+  `timeout-minutes` (#34 D2). A build that reaches the timeout may not ping, and it then
+  alerts through absence.
 
 **It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
 runs `scripts/publish_served.py`, which exports the five served tables to parquet and uploads

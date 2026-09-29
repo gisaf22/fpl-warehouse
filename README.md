@@ -69,3 +69,4 @@ understat-ingest
 3. Governance should be checked before implementation changes.
 4. Warehouse outputs should remain PIT-safe and semantically orthogonal.
 5. The warehouse is currently operated as a twice-daily latest-reconstructed-truth rebuild, not a source-versioned historical archive.
+6. The scheduled build is monitored by a healthchecks.io check, `fpl-warehouse scheduled build`, whose ping URL is the `HEALTHCHECKS_PING_URL_SCHEDULED_BUILD` repository secret. See `CLAUDE.md`, "Scheduled build" → "Monitoring".
