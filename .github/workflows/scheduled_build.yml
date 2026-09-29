@@ -246,3 +246,25 @@ jobs:
             args+=(--without-baseline)
           fi
           uv run python scripts/publish_served.py "${args[@]}"
+
+      # Heartbeat to healthchecks.io (#79). The last step, on every outcome of
+      # a scheduled run, and it can never change the job's conclusion.
+      #
+      # job.status is `success` only if the publish above succeeded, and
+      # publish_served.py uploads _manifest.json last, so a success ping means
+      # the manifest landed. A failed build (publish skipped), a refused
+      # publish or an upload error all send /fail.
+      #
+      # Manual runs do not ping, including restate and without_baseline runs,
+      # so they neither raise nor clear an alert. job.status is passed through
+      # env, not interpolated into the script. The script is duplicated from
+      # fpl-ingest's and needs no uv environment, so it still runs when
+      # `uv sync` has failed. See CLAUDE.md, "Scheduled build".
+      - name: Ping healthchecks.io
+        if: always() && github.event_name == 'schedule'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL_SCHEDULED_BUILD }}
+          JOB_STATUS: ${{ job.status }}
+        run: bash scripts/healthchecks_ping.sh "$JOB_STATUS"
