@@ -86,6 +86,19 @@ sources:
           One object per run, so all captures are read and the latest is
           selected downstream by the same `{extraction_date}/{run_id}` key
           fields used for element-summary.
+        # Freshness (#39): checked by `dbt source freshness` before `dbt build`
+        # in scheduled_build.yml, which fails the job on error so nothing is
+        # published. Capture time is the `run_id` start instant in the object's
+        # key, parsed as staging parses `extracted_at`; the body carries no
+        # timestamp. Ingest runs every 12h and a build normally sees data ~0.6h
+        # old, so one missed run reads ~12.6h (warn) and two ~24.6h (error).
+        # element_summary has no freshness on purpose — see CLAUDE.md,
+        # "Source freshness".
+        config:
+          loaded_at_field: "strptime(split_part(str_split(filename, '/')[-2], '-', 1), '%Y%m%dT%H%M%SZ')"
+          freshness:
+            warn_after: {count: 6, period: hour}
+            error_after: {count: 18, period: hour}
         meta:
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
@@ -126,6 +139,12 @@ sources:
           one end-of-season snapshot (see
           scripts/rekey_history_season.py, which maps the archive's
           `fixtures.json` to this endpoint).
+        # Freshness: same rule and thresholds as bootstrap_static (#39).
+        config:
+          loaded_at_field: "strptime(split_part(str_split(filename, '/')[-2], '-', 1), '%Y%m%dT%H%M%SZ')"
+          freshness:
+            warn_after: {count: 6, period: hour}
+            error_after: {count: 18, period: hour}
         meta:
           # Same list-of-globs shape as bootstrap-static above, for the same
           # reasons.
@@ -172,6 +191,12 @@ sources:
 
           One object per run, same `{extraction_date}/{run_id}` key layout as
           bootstrap-static, parsed the same way in staging.
+        # Freshness: same rule and thresholds as bootstrap_static (#39).
+        config:
+          loaded_at_field: "strptime(split_part(str_split(filename, '/')[-2], '-', 1), '%Y%m%dT%H%M%SZ')"
+          freshness:
+            warn_after: {count: 6, period: hour}
+            error_after: {count: 18, period: hour}
         meta:
           external_location: >-
             read_json(
