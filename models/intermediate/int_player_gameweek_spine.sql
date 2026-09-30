@@ -22,11 +22,12 @@
 --   the grain".
 --
 -- Season scoping:
---   Every step below — the latest capture, the player union, the web_name
---   dedup and the players x rounds cross — is computed per season. fpl_id and
---   round are both reassigned each season, so an unscoped version would take
---   one season's calendar for another's players. Season is only ever a
---   partition here; no row pairs one season's data with another's.
+--   Every step below — the latest capture, the player set (per season in
+--   int_season_roster) and the players x rounds cross — is computed per
+--   season. fpl_id and round are both reassigned each season, so an unscoped
+--   version would take one season's calendar for another's players. Season
+--   is only ever a partition here; no row pairs one season's data with
+--   another's.
 --
 -- Round range:
 --   `finished` is the boundary. A round in progress or still upcoming has no
@@ -37,40 +38,11 @@
 --   if a consumer ever needs one.
 --
 -- Player list:
---   Every player seen in *any* bootstrap-static capture, not just the latest.
---
---   The latest capture alone tracks the squad as it stands now, which handles
---   a mid-season arrival correctly — they get spine rows for earlier rounds
---   that resolve to fixture_count = 0 — but silently loses a mid-season
---   *departure*. A player who leaves the league (transfer abroad, retirement,
---   or simply dropped from FPL's `elements`) vanishes from the spine, and with
---   it every fixture they actually played this season disappears from
---   fct_player_gameweek while remaining in fct_player_fixture. That is the
---   same silent row-loss class this model exists to prevent, arriving from the
---   player axis instead of the round axis.
---
---   Taking the union across all captures makes the treatment symmetric: a
---   departure keeps real rows for the weeks they played and fixture_count = 0
---   for the weeks after they left, exactly as an arrival gets fixture_count = 0
---   for the weeks before they joined. The two served tables then hold the same
---   player set by construction, asserted by
---   tests/fct_test_player_gameweek_covers_every_fixture.sql.
---
---   Verified 2026-09-14 against all 128 live bootstrap-static captures: the
---   union is 658 players and the latest capture is also 658, so this change is
---   currently a no-op on live data — FPL's `elements` list has only grown this
---   season (622 -> 658). It is a forward guard, not a repair.
---
---   Coverage limit: captures begin 2026-08-29, after GW1 (deadline
---   2026-08-21) had already been played. A player dropped from `elements`
---   inside that window appears in no capture at all and so cannot be
---   recovered by any union. Nothing in the warehouse can fix that; it is a
---   gap in what was captured.
---
---   web_name is deduplicated to the newest capture's spelling rather than
---   carried per capture. Without that, a player FPL renames mid-season
---   contributes two spine rows and doubles their gameweek grain — observed
---   live on fpl_id 551, captured as both "Angulo" and "N.Angulo".
+--   Read from int_season_roster (#70): every player seen in *any*
+--   bootstrap-static capture of the season, with the newest web_name. The
+--   spine computes no player set of its own, so it and dim_player cannot
+--   disagree about who played. Why every capture and not the latest, and the
+--   coverage limit, are in int_season_roster's header, "Why every capture".
 --
 -- Round range vs player list:
 --   The two axes deliberately use different capture scopes. Rounds come from
@@ -103,24 +75,13 @@ with latest_capture as (
 
 players as (
 
-    -- Every player from every capture of the season, one row each, carrying
-    -- the most recently captured spelling of web_name.
+    -- The season's player set, shared with dim_player: every player from every
+    -- capture of the season, one row each, with the newest web_name.
     select
         season,
         fpl_id,
         web_name
-    from (
-        select
-            season,
-            fpl_id,
-            web_name,
-            row_number() over (
-                partition by season, fpl_id
-                order by extracted_at desc, run_id desc
-            ) as name_rank
-        from {{ ref('stg_player') }}
-    )
-    where name_rank = 1
+    from {{ ref('int_season_roster') }}
 
 ),
 
