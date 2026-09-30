@@ -10,12 +10,36 @@
 --   they cannot disagree about who was in a season.
 --
 -- Why every capture and not the latest:
---   The latest capture is the squad as it stands now. A player who leaves the
---   league mid-season vanishes from it, yet their fixtures stay in
---   fct_player_fixture. Taking every capture keeps them — see
---   int_player_gameweek_spine's header, "Player list", for the full case and
---   its coverage limit (players dropped before capture began cannot be
---   recovered by any union).
+--   The latest capture alone tracks the squad as it stands now, which handles
+--   a mid-season arrival correctly — they get spine rows for earlier rounds
+--   that resolve to fixture_count = 0 — but silently loses a mid-season
+--   *departure*. A player who leaves the league (transfer abroad, retirement,
+--   or simply dropped from FPL's `elements`) vanishes from it, and with them
+--   every fixture they actually played this season would disappear from
+--   fct_player_gameweek while remaining in fct_player_fixture. That is the
+--   silent row-loss class the spine exists to prevent, arriving from the
+--   player axis instead of the round axis.
+--
+--   Taking the union across all captures makes the treatment symmetric: a
+--   departure keeps real rows for the weeks they played and fixture_count = 0
+--   for the weeks after they left, exactly as an arrival gets fixture_count = 0
+--   for the weeks before they joined. The two served facts then hold the same
+--   player set by construction, asserted by
+--   tests/fct_test_player_gameweek_covers_every_fixture.sql.
+--
+--   Verified 2026-09-14 against all 128 live bootstrap-static captures: the
+--   union was 658 players and the latest capture was also 658 — FPL's
+--   `elements` list had only grown that season (622 -> 658). It is a forward
+--   guard, not a repair.
+--
+--   Coverage limit: captures begin 2026-08-29, after GW1 (deadline
+--   2026-08-21) had already been played. A player dropped from `elements`
+--   inside that window appears in no capture at all and so cannot be
+--   recovered by any union. Nothing in the warehouse can fix that; it is a
+--   gap in what was captured.
+--
+--   This rationale moved here from int_player_gameweek_spine's header in #70,
+--   when the spine stopped computing its own player set.
 --
 -- Columns:
 --   Identity and the newest web_name only. Everything else about a player
