@@ -193,6 +193,30 @@ jobs:
       - name: Create the local database directory
         run: mkdir -p .local
 
+      # Input guard (#39): refuse to rebuild served/ from stale live captures.
+      # bootstrap-static, fixtures and event-status warn when their newest
+      # capture is over 6h old (one missed ingest run) and error over 18h (two).
+      # element-summary is exempt, and the history tree is never read here:
+      # --vars history_root is not passed, so only the live globs are checked.
+      # See CLAUDE.md, "Source freshness".
+      #
+      # An error fails this step, so `dbt build` and the publish are skipped
+      # and the healthchecks.io ping below sends /fail. A warning passes. Each
+      # source's age goes to the job summary either way, and a warning or error
+      # is also raised as an annotation.
+      - name: Check live source freshness
+        run: |
+          status=0
+          uv run dbt source freshness || status=$?
+          if [ -f target/sources.json ]; then
+            {
+              echo "### Source freshness"
+              jq -r '.results[] | "- `\(.unique_id | split(".") | last)`: \(.status), newest capture \(.max_loaded_at // "none"), \(((.max_loaded_at_time_ago_in_s // 0) / 360 | round) / 10)h old"' target/sources.json
+            } >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.results[] | select(.status == "warn" or .status == "error" or .status == "runtime error") | "::\(if .status == "warn" then "warning" else "error" end)::source freshness \(.status): \(.unique_id | split(".") | last), newest capture \(.max_loaded_at // "none")"' target/sources.json
+          fi
+          exit "$status"
+
       # `dbt build`, not `dbt run` then `dbt test`: build interleaves each
       # model with its own tests in DAG order, so a model whose tests fail does
       # not have its dependents built on top of it. All three tiers run,
@@ -252,8 +276,9 @@ jobs:
       #
       # job.status is `success` only if the publish above succeeded, and
       # publish_served.py uploads _manifest.json last, so a success ping means
-      # the manifest landed. A failed build (publish skipped), a refused
-      # publish or an upload error all send /fail.
+      # the manifest landed. A stale-input freshness error or a failed build
+      # (both skip the publish), a refused publish or an upload error all send
+      # /fail.
       #
       # Manual runs do not ping, including restate and without_baseline runs,
       # so they neither raise nor clear an alert. job.status is passed through
