@@ -18,7 +18,7 @@ select
     season,
     fpl_id,
     fixture_id,
-    round,
+    gameweek,
     minutes
 from {{ ref('fct_player_fixture') }}
 where minutes < 0

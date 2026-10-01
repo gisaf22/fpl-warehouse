@@ -57,7 +57,7 @@ STAGING = (
 # A Premier League season's fixed sizes: 20 clubs, each playing the other 19
 # home and away. Measured on 2026-09-28, every bootstrap-static capture of
 # both seasons holds exactly 20 teams and every fixtures capture exactly 380
-# fixtures. A postponed fixture keeps its id and a null round, so it still
+# fixtures. A postponed fixture keeps its id and a null gameweek, so it still
 # counts toward 380.
 TEAMS_PER_SEASON = 20
 FIXTURES_PER_SEASON = 380
@@ -68,20 +68,20 @@ PROJECT_FILE = Path("dbt_project.yml")
 # before the publish is refused, as a fraction.
 #
 # Per table, because the two tables stand in different relationships to the
-# same expectation (players x rounds — see expected_rows below):
+# same expectation (players x gameweeks — see expected_rows below):
 #
 #   fct_player_gameweek IS that grain. It is built by LEFT JOIN off
-#   int_player_gameweek_spine, which is the same players-crossed-with-rounds
+#   int_player_gameweek_spine, which is the same players-crossed-with-gameweeks
 #   product computed from the same staging tables, so a correct build matches
 #   the expectation exactly — measured 31,958 / 31,958 and 2,668 / 2,668 on
 #   2026-09-21. The 2% is not room for legitimate variance, of which there is
 #   none; it is there so a publish guard is not an exact-equality assertion.
 #
 #   fct_player_fixture is a different grain — one row per fixture a player
-#   actually has history for, not per round — and it sits below the
+#   actually has history for, not per gameweek — and it sits below the
 #   expectation by however much the season blanked. Measured 2026-09-21:
 #   2025-26 returned 29,747 against an expected 31,958, 6.9% low, which is
-#   2,211 player-rounds in which that player's club did not play. 15% is
+#   2,211 player-gameweeks in which that player's club did not play. 15% is
 #   roughly 2x that observed worst case. It is deliberately loose: this is a
 #   guard against a season vanishing, not a data-quality test, and dbt's own
 #   suite owns correctness.
@@ -92,7 +92,7 @@ PROJECT_FILE = Path("dbt_project.yml")
 #
 # The dimensions take no tolerance. Each one's expectation is exact rather
 # than an estimate: a season has 20 teams and 380 fixtures, and dim_player
-# holds every player staged in the season (int_season_roster's set). One row
+# holds every player staged in the season (int_player_season's set). One row
 # short is a lost row, not variance.
 TOLERANCE = {
     "fct_player_fixture": 0.15,
@@ -108,7 +108,7 @@ def live_season() -> str:
 
     Read from the project file rather than duplicated here, because the same
     value already drives sources.yml's live globs and fct_player_fixture's
-    round-1 fallback, and a second copy would drift the moment the season rolls
+    gameweek-1 fallback, and a second copy would drift the moment the season rolls
     over. PyYAML arrives transitively with dbt-core; this script only ever runs
     in an environment where dbt has just built the database it reads.
     """
@@ -142,24 +142,25 @@ def expected_rows(
     dropped all of 2025-26 would clear it comfortably and overwrite good
     published data with a single-season table.
 
-    The expectation for a season is its own player count times its own round
+    The expectation for a season is its own player count times its own gameweek
     count, both read from that season's captures only:
 
-      players  distinct fpl_id across every bootstrap-static capture of the
-               season, matching int_player_gameweek_spine's union — a
-               mid-season departure is part of the season's history whether or
-               not they are still in `elements`.
+      players    distinct fpl_id across every bootstrap-static capture of the
+                 season, matching int_player_gameweek_spine's union — a
+                 mid-season departure is part of the season's history whether
+                 or not they are still in `elements`.
 
-      rounds   for a CLOSED season, every round on its calendar: the season is
-               over, so all of them count. For the LIVE season, only the rounds
-               its latest capture reports `finished`. That distinction is the
-               whole reason this is not one uniform rule — the live calendar
-               publishes all 38 rounds from day one, so counting them all would
-               have expected 667 x 38 = 25,346 rows for 2026-27 on 2026-09-21
-               against a real 3,216. For a closed season the two readings
-               coincide by definition, and
-               tests/fct_test_player_fixture_closed_season_settled.sql fails
-               the build unless every round of it is finished and data_checked.
+      gameweeks  for a CLOSED season, every gameweek on its calendar: the
+                 season is over, so all of them count. For the LIVE season,
+                 only the gameweeks its latest capture reports `finished`. That
+                 distinction is the whole reason this is not one uniform rule —
+                 the live calendar publishes all 38 gameweeks from day one, so
+                 counting them all would have expected 667 x 38 = 25,346 rows
+                 for 2026-27 on 2026-09-21 against a real 3,216. For a closed
+                 season the two readings coincide by definition, and
+                 tests/fct_test_player_fixture_closed_season_settled.sql fails
+                 the build unless every gameweek of it is finished and
+                 data_checked.
 
     Deliberately computed from staging rather than from
     int_player_gameweek_spine, which is already exactly this product. The spine
@@ -167,13 +168,13 @@ def expected_rows(
     would compare a number against itself and pass unconditionally. Recomputing
     from stg_player and stg_gameweek makes it an independent second opinion.
 
-    That players x rounds product is the facts' expectation. The dimensions'
+    That players x gameweeks product is the facts' expectation. The dimensions'
     are simpler: TEAMS_PER_SEASON teams, FIXTURES_PER_SEASON fixtures, and the
     season's staged players, the same distinct fpl_id count as above.
 
     Every season in `seasons` gets an entry for every table. A season that
-    lacks players or rounds expects 0 fact rows, which is right at the start
-    of a season, before any round has finished; the fixed dimension counts
+    lacks players or gameweeks expects 0 fact rows, which is right at the start
+    of a season, before any gameweek has finished; the fixed dimension counts
     still apply to it, so a season cannot vanish without failing somewhere.
 
     Returns {table: {season: expected_rows}}.
@@ -204,29 +205,29 @@ def expected_rows(
             group by season
         ),
 
-        rounds as (
+        gameweeks as (
             select
-                gameweek.season,
+                calendar.season,
                 count(*) filter (
-                    where gameweek.season <> $live_season or gameweek.finished
-                ) as rounds
-            from main.stg_gameweek as gameweek
+                    where calendar.season <> $live_season or calendar.finished
+                ) as gameweeks
+            from main.stg_gameweek as calendar
             inner join latest_capture using (season, run_id)
-            group by gameweek.season
+            group by calendar.season
         )
 
-        select season, players.players, rounds.rounds
+        select season, players.players, gameweeks.gameweeks
         from players
-        full outer join rounds using (season)
+        full outer join gameweeks using (season)
         """,
         {"live_season": live_season()},
     ).fetchall()
     players = {season: n or 0 for season, n, _ in rows}
-    rounds = {season: n or 0 for season, _, n in rows}
+    gameweeks = {season: n or 0 for season, _, n in rows}
 
     per_season = {
-        "fct_player_fixture": lambda s: players.get(s, 0) * rounds.get(s, 0),
-        "fct_player_gameweek": lambda s: players.get(s, 0) * rounds.get(s, 0),
+        "fct_player_fixture": lambda s: players.get(s, 0) * gameweeks.get(s, 0),
+        "fct_player_gameweek": lambda s: players.get(s, 0) * gameweeks.get(s, 0),
         "dim_team": lambda _s: TEAMS_PER_SEASON,
         "dim_player": lambda s: players.get(s, 0),
         "dim_fixture": lambda _s: FIXTURES_PER_SEASON,

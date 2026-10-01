@@ -71,7 +71,7 @@ old and new logic agree everywhere and prove nothing.
 
 The 08-29 and 09-06 captures are included so a round is present in the
 provisional state *before* the capture that ratifies it, which is what makes
-the "ever observed ratified" rollup in int_round_ratification non-vacuous:
+the "ever observed ratified" rollup in int_gameweek_status non-vacuous:
 with only the ratified captures, bool_or would have nothing to override.
 
 R4 exists so the departed player (4, below) has finished rounds *after* their
@@ -151,7 +151,7 @@ WHAT EACH PLAYER COVERS
           fct_player_gameweek must therefore show round 1 with fixture_count 0
           rather than dropping the row, which is the original bug the whole
           rebuild exists to fix. Exercises
-          fct_test_player_gameweek_blank_round_is_zero.
+          fct_test_player_gameweek_blank_gameweek_is_zero.
 
 4         Departed player — SYNTHETIC removal, the second edited case in this
           tree. Played rounds 1 and 2 for real (90 min / 5 pts, 76 min /
@@ -352,7 +352,7 @@ PLAYERS = {
          "the spine gives them a row in both finished rounds, but their "
          "history carries no round-1 fixture. fct_player_gameweek must show "
          "round 1 with fixture_count 0, not drop the row. Feeds "
-         "fct_test_player_gameweek_blank_round_is_zero.",
+         "fct_test_player_gameweek_blank_gameweek_is_zero.",
 }
 
 # The synthetic departure, stated in one place so the edit is auditable.

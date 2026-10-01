@@ -12,7 +12,7 @@
 --   the key (decision 1 on #32).
 --
 -- Player set:
---   int_season_roster — every player seen in any capture of the season,
+--   int_player_season — every player seen in any capture of the season,
 --   departed players included — so dim_player and the spine cannot disagree
 --   about who was in a season (#69).
 --
@@ -55,7 +55,7 @@ select
     roster.web_name,
     latest_appearance.position_id,
     stg_position.position_short_name
-from {{ ref('int_season_roster') }} as roster
+from {{ ref('int_player_season') }} as roster
 left join latest_appearance
     on  latest_appearance.season = roster.season
     and latest_appearance.fpl_id = roster.fpl_id

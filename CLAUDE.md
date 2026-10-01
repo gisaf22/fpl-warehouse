@@ -28,18 +28,23 @@ and states it can be deleted on migration.
 - Derive `fct_player_gameweek` from it, spine-joined, with an explicit `fixture_count`
   column: `0` = blank gameweek, `1` = normal, `2+` = double.
 - **Never model at gameweek grain directly from raw data.**
+- **Gameweek, not round.** FPL calls the same number `round` (element-summary history)
+  and `event` (fixtures, event-status, bootstrap-static). This project calls it `gameweek`
+  from the intermediate layer onward (#89); staging still says `round` until #88 renames it,
+  and each model that reads staging maps it at that boundary. Dated measurement records in
+  this file keep the word "round" as written; there it means gameweek.
 - **`season` is part of the grain project-wide** — `fct_player_fixture` is
   `(season, fpl_id, fixture_id)`, `int_player_gameweek_spine` and `fct_player_gameweek` are
-  `(season, fpl_id, round)`. Each row reads its season from its own raw key via the
+  `(season, fpl_id, gameweek)`. Each row reads its season from its own raw key via the
   `season_from_filename` macro: a season-shaped segment before `/fpl/` means a ported
   history season and states its own season, anything else is the live tree and takes the
   `season` var (currently `2026-27`). The live key layout still has no season segment, so
   for live rows the var remains the only available source of the value — **extending it is
   an open item for fpl-ingest, not fpl-warehouse.**
 - **`season` partitions; it never relates.** Every dedup, retraction check, ratification
-  rollup and spine cross is keyed by season, because `fpl_id`, `fixture_id` and `round` are
+  rollup and spine cross is keyed by season, because `fpl_id`, `fixture_id` and `gameweek` are
   all reassigned each season and unscoped logic would silently merge two different people
-  or two different rounds. Season appears in joins only as same-season equality. **No model
+  or two different gameweeks. Season appears in joins only as same-season equality. **No model
   anywhere joins, matches or combines one season's rows with another's.**
 - **`player_code` is carried, never used.** FPL's cross-season player identifier
   (`elements[].code`) sits on `stg_player` as a plain column so a consumer can follow a
@@ -47,7 +52,7 @@ and states it can be deleted on migration.
   `fpl_id` remains the key within a season.
 - **ASSUMED, not verified: the double-gameweek rule for the event-level fields.**
   `fct_player_gameweek` takes `value`, `selected` and the `transfers_*` family from the
-  round's last fixture (`max_by(..., kickoff_time)` — last write wins) on the basis that FPL
+  gameweek's last fixture (`max_by(..., kickoff_time)` — last write wins) on the basis that FPL
   states them per event, so both rows of a double would repeat the same number and summing
   would double-count. **No double gameweek has occurred in the captured data, so this has
   never been observed.** Re-verify at the first real double before trusting these columns
@@ -86,41 +91,41 @@ ties. There is no `metadata.json` alongside element-summary payloads to read ins
 
 ---
 
-## Round ratification — `is_ratified` is sourced, not inferred
+## Gameweek ratification — `is_ratified` is sourced, not inferred
 
 `is_ratified` on both served models comes from FPL's `event-status` endpoint, via
-`stg_event_status` -> `int_round_ratification`. **Do not re-derive it from the scoreline.**
+`stg_event_status` -> `int_gameweek_status`. **Do not re-derive it from the scoreline.**
 
 Until 2026-09-14 it was inferred in `fct_player_fixture` as `team_h_score is not null and
 team_a_score is not null`, i.e. scoreline publication used as a proxy for points
 ratification. Those are different events. Scores appear at full time; bonus points are
 applied hours later, typically the next morning. In that window the inference reported
 `is_ratified = true` while `bonus` was still 0 — the served flag said "safe to use" about
-rows whose points were not final. It was also blind to the rest of the round: a player
-whose Saturday fixture had finished read ratified while the round's Monday match was
+rows whose points were not final. It was also blind to the rest of the gameweek: a player
+whose Saturday fixture had finished read ratified while the gameweek's Monday match was
 still unplayed.
 
 Confirmed against live S3 on 2026-09-14, over every `event-status` capture in the bucket:
 
 - The payload is `{"status": [...], "leagues": "..."}`. **`status` is one row per
-  `(event, match-date)`, not one per round** — a round spanning three match days
-  contributes three entries, and a round mid-transition carries a mix of values across
-  them within a single payload. Round-level finality is therefore an aggregate.
+  `(event, match-date)`, not one per gameweek** — a gameweek spanning three match days
+  contributes three entries, and a gameweek mid-transition carries a mix of values across
+  them within a single payload. Gameweek-level finality is therefore an aggregate.
 - `status[].points` is a string with three observed values: `"r"`, `"p"` and `""`. The
   empty string is an in-progress state seen alongside `"p"`, not a missing one; both are
   treated as not-ratified. `status[].bonus_added` is the boolean companion and moves with
   `points` in every capture observed.
-- **Only the current round's dates are served.** A finished round rolls out of the window
+- **Only the current gameweek's dates are served.** A finished gameweek rolls out of the window
   completely — the 2026-09-14 payload mentions round 4 and nothing else.
 
-That last point drives the rollup rule in `int_round_ratification`, which is two-level and
+That last point drives the rollup rule in `int_gameweek_status`, which is two-level and
 must stay that way:
 
-1. **Within one capture**, a round is ratified only when *every* dated entry for it is
+1. **Within one capture**, a gameweek is ratified only when *every* dated entry for it is
    ratified — `bool_and`, never `bool_or`.
-2. **Across captures**, a round is ratified if *any* capture ever said so. Resolving to the
+2. **Across captures**, a gameweek is ratified if *any* capture ever said so. Resolving to the
    latest capture the way `fct_player_fixture` resolves competing element-summary captures
-   would lose every past round, because the latest capture reports nothing about them.
+   would lose every past gameweek, because the latest capture reports nothing about them.
    Ratification is monotonic, so "ever observed ratified" is sound.
 
 ### Ratification lead before a round leaves the window — measured 2026-09-23
@@ -161,15 +166,15 @@ ratified rule: it would capture and mark a provisional event-live payload as fin
 
 ### The 2026-08-29 fallback — bounded, and meant to die
 
-All three raw endpoints' capture history begins **2026-08-29**, after round 1 of 2026-27
-had already finished and settled. Round 1 therefore appears in **zero** `event-status`
+All three raw endpoints' capture history begins **2026-08-29**, after gameweek 1 of 2026-27
+had already finished and settled. Gameweek 1 therefore appears in **zero** `event-status`
 captures and its finality is unrecoverable from the source. A plain join would flip an
-entire round from `true` to `NULL`.
+entire gameweek from `true` to `NULL`.
 
-So `fct_player_fixture` accepts a final scoreline as proof of ratification for a round that
+So `fct_player_fixture` accepts a final scoreline as proof of ratification for a gameweek that
 is absent from `event-status` entirely *and* whose kickoff predates that date. This is a
-dated backfill for one round of one season, not a revival of the general inference — a
-round absent from `event-status` with a kickoff on or after the cutoff reads `false`, never
+dated backfill for one gameweek of one season, not a revival of the general inference — a
+gameweek absent from `event-status` with a kickoff on or after the cutoff reads `false`, never
 fallback. When raw history for 2026-27 is superseded, **delete the clause rather than
 re-dating it.**
 
@@ -207,12 +212,12 @@ than "a scoreline exists for this fixture". Any future consumer that started rea
 
 ### What the column means to a consumer
 
-The flag is a property of the *round*, carried on each of its fixture rows. On
-`fct_player_gameweek` it stays a `bool_and` over the round's fixtures rather than a direct
+The flag is a property of the *gameweek*, carried on each of its fixture rows. On
+`fct_player_gameweek` it stays a `bool_and` over the gameweek's fixtures rather than a direct
 join, deliberately: every contributing fixture carries the same value, so the aggregate is
-a pass-through that keeps returning `NULL` for a blank round — the contract
-`fct_test_player_gameweek_counted_round_has_kickoff` asserts. Joining
-`int_round_ratification` there instead would hand a blank round the round's real flag and
+a pass-through that keeps returning `NULL` for a blank gameweek — the contract
+`fct_test_player_gameweek_counted_gameweek_has_kickoff` asserts. Joining
+`int_gameweek_status` there instead would hand a blank gameweek the gameweek's real flag and
 break it.
 
 ---
@@ -305,9 +310,9 @@ to make, and a build that quietly dropped a season would overwrite good served d
 single-season table.
 
 **Any query that assumes one season must filter on `season` explicitly.** This is the
-consumer consequence and it has teeth: `fpl_id`, `fixture_id` and `round` are all
+consumer consequence and it has teeth: `fpl_id`, `fixture_id` and `gameweek` are all
 reassigned every season and therefore repeat across them, so an unfiltered group-by on any
-of them silently merges two different people or two different rounds. Row counts went up
+of them silently merges two different people or two different gameweeks. Row counts went up
 roughly 10x at the switchover (measured on 2026-09-21). For current counts per table and per
 season, read `row_counts_by_season` in `served/_manifest.json` — this file deliberately
 records none, because the live season's figures are stale by the next build.
@@ -322,8 +327,8 @@ computed per season rather than on the total, since the live season is small eno
 vanish inside the total's noise.
 
 The season's `is_ratified` is true on every row, set unconditionally by the `closed_seasons`
-var rather than derived from event-status, which only ever serves the current round. See
-"Round ratification".
+var rather than derived from event-status, which only ever serves the current gameweek. See
+"Gameweek ratification".
 
 `_manifest.json` describes what is currently published, not a history of publishes. It
 carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
@@ -347,6 +352,14 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it.
 
+- **2026-09-30 — `round` renamed `gameweek` (#89). Breaking.** In `fct_player_fixture`,
+  `fct_player_gameweek` and `dim_fixture` the column `round INTEGER` is now
+  `gameweek INTEGER`, at the same position with the same type and nullability; values are
+  unchanged. `fct_player_gameweek`'s grain reads `(season, fpl_id, gameweek)`. `dim_team`,
+  `dim_player` and every manifest field are unchanged, and the publish guard compares row
+  counts only, so no restatement is needed. A consumer selecting `round` by name must switch
+  to `gameweek`; one reading by position is unaffected. No consumer read `served/` at the
+  time (checked 2026-09-30).
 - **2026-09-28 — manifest `seasons` restored to a list of season strings (#76). Fix.**
   Publishes from #75's merge (first: scheduled-build run 36378178500) until this fix wrote
   `seasons` as `[season, count]` pairs, the last table's per-season rows, instead of the
@@ -370,7 +383,7 @@ learns of it.
   team column, because a player transferred between the two fixtures of a double gameweek has
   no single club (decision 5 on #32). The next scheduled build publishes it for every season;
   no backfill.
-- **2026-09-15 — `is_ratified` values change, shape unchanged. Breaking.** See "Round
+- **2026-09-15 — `is_ratified` values change, shape unchanged. Breaking.** See "Gameweek
   ratification — Migration".
 
 ### The publish floor is computed, not configured
@@ -380,13 +393,13 @@ what the build's own data says it should hold. The expectation is derived per ru
 than hardcoded, so it tracks the data instead of needing an edit whenever the data grows:
 
 - For each season, the facts' expected rows = that season's distinct player count x its
-  round count, both read from that season's own captures in `stg_player` and
+  gameweek count, both read from that season's own captures in `stg_player` and
   `stg_gameweek`.
 - The dimensions' expectations are exact: 20 teams and 380 fixtures per season (every
   capture of both seasons holds exactly those, measured 2026-09-28; a postponed fixture
   keeps its id and counts), and for `dim_player` the season's distinct `fpl_id` across every
   `stg_player` capture — 841 for 2025-26. That last one is derived the way
-  `int_season_roster` is, so it guards the join and the export, not data lost upstream;
+  `int_player_season` is, so it guards the join and the export, not data lost upstream;
   the previous-publish comparison below covers that.
 - **Which seasons are checked** is the union of seasons across every staging model
   (`stg_player`, `stg_gameweek`, `stg_team`, `stg_fixture`, `stg_player_fixture`), and every
@@ -394,17 +407,17 @@ than hardcoded, so it tracks the data instead of needing an edit whenever the da
   deliberate (#44 AC7): a season whose bootstrap-static captures all came back empty never
   reaches `stg_team`, but the fixtures endpoint and element-summary history still stage it,
   so `dim_team` is still held to 20 for it.
-- Round count means **every** round for a closed season, and only the rounds the latest
+- Gameweek count means **every** gameweek for a closed season, and only the gameweeks the latest
   capture reports `finished` for the live season. That distinction is the whole point: the
-  live calendar publishes all 38 rounds from day one, so counting them all would expect a
-  full season's rows for the live season while only its finished rounds have any.
+  live calendar publishes all 38 gameweeks from day one, so counting them all would expect a
+  full season's rows for the live season while only its finished gameweeks have any.
 - Computed from staging, not from `int_player_gameweek_spine` — which is already exactly
   this product. The spine is `fct_player_gameweek`'s direct parent, so checking that table
   against it would compare a number against itself and pass unconditionally.
 
 For the closed 2025-26 season the figures are fixed — they will never change: expected
 31,958 (841 x 38). `fct_player_gameweek` matches it exactly. `fct_player_fixture` is 6.9%
-low, 2,211 player-rounds in which that player's club did not play — legitimately, because
+low, 2,211 player-gameweeks in which that player's club did not play — legitimately, because
 it is a different grain: one row per fixture a player actually has history for, so a blank
 gameweek removes rows the expectation counted. The live season follows the same pattern
 (measured on 2026-09-21, run 35632785680), but its figures move every build; the publish
@@ -617,7 +630,7 @@ tag configs rather than overriding them, so a `data_tests: +tags: [unit]` defaul
 Singular tests live flat in `tests/` (dbt's default `test-paths`) and are named
 `<layer>_test_<subject>_<assertion>.sql` — layer `stg`, `int` or `fct`, subject the model,
 assertion the claim. `int` is for a test whose subject is an intermediate model, e.g.
-`int_test_season_roster_grain_uniqueness.sql` (#69); the spine's older tests predate it and
+`int_test_player_season_grain_uniqueness.sql` (#69); the spine's older tests predate it and
 keep their `fct_test_` names. Each opens with a header stating its layer, model, the claim in one
 sentence, its origin, and its tier:
 
@@ -625,7 +638,7 @@ sentence, its origin, and its tier:
 -- Layer: fct
 -- Tests: fct_player_gameweek
 -- Asserts: fixture_count equals the real number of fct_player_fixture rows for
---          that (season, fpl_id, round).
+--          that (season, fpl_id, gameweek).
 -- Origin: new in Phase 2, modelled on
 --         tests/team_fixture/sql/fct_test_fixture_count_nonneg.sql
 -- Tier: integration
@@ -974,8 +987,8 @@ Before `dbt build`, the scheduled build runs `dbt source freshness` over the liv
   overwritten, and the healthchecks.io ping sends `/fail`. A warning passes. Both are
   raised as annotations, and every source's age goes to the job summary.
 - **element-summary is exempt, because its age is not a staleness signal.** fpl-ingest stops
-  capturing it once the latest round is settled and captured, so its newest capture is days
-  or weeks old at every settled round. On 2026-09-29 it was 2026-09-21, with round 6's
+  capturing it once the latest gameweek is settled and captured, so its newest capture is days
+  or weeks old at every settled gameweek. On 2026-09-29 it was 2026-09-21, with round 6's
   deadline on 10-10. Measured by age, it would have failed 17 of those 39 builds. Its failure
   modes are covered elsewhere: #68's gate (a finished fixture with no player rows) and the
   ingest heartbeat (fpl-ingest#57).

@@ -1,6 +1,6 @@
 -- Layer: fct
 -- Tests: fct_player_gameweek
--- Asserts: where a round holds exactly one fixture, the aggregate reproduces that
+-- Asserts: where a gameweek holds exactly one fixture, the aggregate reproduces that
 --          fixture's values verbatim — aggregation is the identity on one row.
 -- Origin: new in Phase 2
 -- Tier: integration
@@ -18,13 +18,13 @@
 select
     agg.season,
     agg.fpl_id,
-    agg.round,
+    agg.gameweek,
     agg.total_points,
     fct.total_points as fct_total_points,
     agg.ict_index,
     fct.ict_index    as fct_ict_index
 from {{ ref('fct_player_gameweek') }} as agg
-inner join {{ ref('fct_player_fixture') }} as fct using (season, fpl_id, round)
+inner join {{ ref('fct_player_fixture') }} as fct using (season, fpl_id, gameweek)
 where agg.fixture_count = 1
   and (
         agg.minutes      <> fct.minutes

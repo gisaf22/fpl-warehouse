@@ -128,12 +128,12 @@ unit_tests:
       rows:
         - {season: "2026-27", fixture_id: 40, team_h_score: 2, team_a_score: 1, finished: true}
 
-  - name: double_and_blank_rounds_keep_every_fixture
+  - name: double_and_blank_gameweeks_keep_every_fixture
     description: >
       Round 2 is a double: 11 fixtures, with team 1 playing twice. Round 3 is
       a blank with one fixture. Every fixture in both is one row with its own
-      teams and round. Nothing is dropped to reach 10 per round or one per
-      team per round.
+      teams and gameweek. Nothing is dropped to reach 10 per gameweek or one per
+      team per gameweek.
     model: dim_fixture
     config:
       tags: [unit]
@@ -156,24 +156,24 @@ unit_tests:
           - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 22, round: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 2,  team_a_fpl_id: 5,  team_h_difficulty: 3, team_a_difficulty: 3}
     expect:
       rows:
-        - {fixture_id: 11, round: 2, team_h_fpl_id: 1,  team_a_fpl_id: 2}
-        - {fixture_id: 12, round: 2, team_h_fpl_id: 3,  team_a_fpl_id: 4}
-        - {fixture_id: 13, round: 2, team_h_fpl_id: 5,  team_a_fpl_id: 6}
-        - {fixture_id: 14, round: 2, team_h_fpl_id: 7,  team_a_fpl_id: 8}
-        - {fixture_id: 15, round: 2, team_h_fpl_id: 9,  team_a_fpl_id: 10}
-        - {fixture_id: 16, round: 2, team_h_fpl_id: 11, team_a_fpl_id: 12}
-        - {fixture_id: 17, round: 2, team_h_fpl_id: 13, team_a_fpl_id: 14}
-        - {fixture_id: 18, round: 2, team_h_fpl_id: 15, team_a_fpl_id: 16}
-        - {fixture_id: 19, round: 2, team_h_fpl_id: 17, team_a_fpl_id: 18}
-        - {fixture_id: 20, round: 2, team_h_fpl_id: 19, team_a_fpl_id: 20}
-        - {fixture_id: 21, round: 2, team_h_fpl_id: 3,  team_a_fpl_id: 1}
-        - {fixture_id: 22, round: 3, team_h_fpl_id: 2,  team_a_fpl_id: 5}
+        - {fixture_id: 11, gameweek: 2, team_h_fpl_id: 1,  team_a_fpl_id: 2}
+        - {fixture_id: 12, gameweek: 2, team_h_fpl_id: 3,  team_a_fpl_id: 4}
+        - {fixture_id: 13, gameweek: 2, team_h_fpl_id: 5,  team_a_fpl_id: 6}
+        - {fixture_id: 14, gameweek: 2, team_h_fpl_id: 7,  team_a_fpl_id: 8}
+        - {fixture_id: 15, gameweek: 2, team_h_fpl_id: 9,  team_a_fpl_id: 10}
+        - {fixture_id: 16, gameweek: 2, team_h_fpl_id: 11, team_a_fpl_id: 12}
+        - {fixture_id: 17, gameweek: 2, team_h_fpl_id: 13, team_a_fpl_id: 14}
+        - {fixture_id: 18, gameweek: 2, team_h_fpl_id: 15, team_a_fpl_id: 16}
+        - {fixture_id: 19, gameweek: 2, team_h_fpl_id: 17, team_a_fpl_id: 18}
+        - {fixture_id: 20, gameweek: 2, team_h_fpl_id: 19, team_a_fpl_id: 20}
+        - {fixture_id: 21, gameweek: 2, team_h_fpl_id: 3,  team_a_fpl_id: 1}
+        - {fixture_id: 22, gameweek: 3, team_h_fpl_id: 2,  team_a_fpl_id: 5}
 
-  - name: postponed_fixture_is_kept_with_null_round_and_kickoff
+  - name: postponed_fixture_is_kept_with_null_gameweek_and_kickoff
     description: >
-      A fixture scheduled in round 5 and then postponed has no round and no
+      A fixture scheduled in gameweek 5 and then postponed has no gameweek and no
       kickoff in its latest capture. It is kept, with both null. It is not
-      dropped, and the earlier capture's round and kickoff are not carried
+      dropped, and the earlier capture's gameweek and kickoff are not carried
       forward. It has not been played, so every capture is before kickoff and
       its difficulty is flagged pre-kickoff.
     model: dim_fixture
@@ -188,16 +188,16 @@ unit_tests:
           - {season: "2026-27", run_id: "20260914T211204Z-bbbb", extracted_at: "2026-09-14 21:12:04", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
     expect:
       rows:
-        - {season: "2026-27", fixture_id: 41, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, difficulty_is_pre_kickoff: true}
+        - {season: "2026-27", fixture_id: 41, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, difficulty_is_pre_kickoff: true}
 
   # --- fct_player_fixture: team per fixture (#43) ------------------------------
 
   - name: transfer_between_the_fixtures_of_a_double_gives_each_row_its_own_club
     description: >
-      Player 500 plays twice in round 2 and changes clubs in between: at home
+      Player 500 plays twice in gameweek 2 and changes clubs in between: at home
       for club 1 against club 2 in fixture 21, then away for club 4 at club 3
       in fixture 22. Each row carries the club of its own fixture, so the two
-      rows differ. Resolving the team once per round would give one of them
+      rows differ. Resolving the team once per gameweek would give one of them
       the wrong club.
     model: fct_player_fixture
     config:
@@ -209,12 +209,12 @@ unit_tests:
         rows:
           - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 21, round: 2, was_home: true,  opponent_team_fpl_id: 2, kickoff_time: "2026-08-29 14:00:00", team_h_score: 1, team_a_score: 0}
           - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 22, round: 2, was_home: false, opponent_team_fpl_id: 3, kickoff_time: "2026-09-01 19:00:00", team_h_score: 2, team_a_score: 2}
-      - input: ref('int_round_ratification')
+      - input: ref('int_gameweek_status')
         rows: []
       - input: ref('dim_fixture')
         rows:
-          - {season: "2026-27", fixture_id: 21, round: 2, team_h_fpl_id: 1, team_a_fpl_id: 2}
-          - {season: "2026-27", fixture_id: 22, round: 2, team_h_fpl_id: 3, team_a_fpl_id: 4}
+          - {season: "2026-27", fixture_id: 21, gameweek: 2, team_h_fpl_id: 1, team_a_fpl_id: 2}
+          - {season: "2026-27", fixture_id: 22, gameweek: 2, team_h_fpl_id: 3, team_a_fpl_id: 4}
     expect:
       rows:
         - {season: "2026-27", fpl_id: 500, fixture_id: 21, team_fpl_id: 1}

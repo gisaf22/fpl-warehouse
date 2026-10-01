@@ -2,7 +2,7 @@
 -- Tests: fct_player_fixture
 -- Asserts: every season fct_player_fixture treats as closed is backed by its
 --          own calendar — its latest bootstrap-static capture reports every
---          round finished and data_checked — every row of it reads
+--          gameweek finished and data_checked — every row of it reads
 --          is_ratified = true, and the live season is never listed as closed.
 -- Origin: new in the 2025-26 history port, Step 3
 -- Tier: integration
@@ -57,13 +57,13 @@ latest_capture as (
 calendar as (
 
     select
-        gameweek.season,
-        count(*)                                          as rounds,
-        count(*) filter (where not (gameweek.finished
-                                    and gameweek.data_checked)) as unsettled_rounds
-    from {{ ref('stg_gameweek') }} as gameweek
+        stg_calendar.season,
+        count(*)                                          as gameweeks,
+        count(*) filter (where not (stg_calendar.finished
+                                    and stg_calendar.data_checked)) as unsettled_gameweeks
+    from {{ ref('stg_gameweek') }} as stg_calendar
     inner join latest_capture using (season, run_id)
-    group by gameweek.season
+    group by stg_calendar.season
 
 )
 
@@ -78,11 +78,11 @@ union all
 
 select
     calendar.season,
-    'closed season calendar has ' || calendar.unsettled_rounds
-        || ' of ' || calendar.rounds || ' rounds not finished and data_checked'
+    'closed season calendar has ' || calendar.unsettled_gameweeks
+        || ' of ' || calendar.gameweeks || ' gameweeks not finished and data_checked'
 from closed_rows
 inner join calendar using (season)
-where calendar.unsettled_rounds > 0
+where calendar.unsettled_gameweeks > 0
 
 union all
 

@@ -48,7 +48,7 @@ vars:
 
   # Seasons that are over and fully settled. Every fct_player_fixture row of a
   # closed season reads is_ratified = true: event-status only ever serves the
-  # current round, so there is no per-round verdict to read for them. The claim
+  # current gameweek, so there is no per-gameweek verdict to read for them. The claim
   # is checked against each closed season's own calendar by
   # tests/fct_test_player_fixture_closed_season_settled.sql, which also fails if
   # the live `season` above is ever listed here.
