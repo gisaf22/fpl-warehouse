@@ -62,7 +62,7 @@ class FakeS3:
 
 def season(
     players: int,
-    gameweeks: int,
+    finished_gameweeks: int,
     fixture: int | None = None,
     gameweek: int | None = None,
     *,
@@ -75,17 +75,18 @@ def season(
 ) -> dict:
     """One season's staging shape and served row counts.
 
-    `players`, `gameweeks`, `teams`, `fixtures` and `player_fixture_rows`
-    shape staging: the players and gameweeks in bootstrap-static, the teams in
-    its team list, the fixtures in the fixtures endpoint, and element-summary
-    history rows. Served counts default to exactly what staging implies, which
-    clears every table's floor: players x gameweeks for both facts, and the
-    staged teams, players and fixtures for the dimensions.
+    `players`, `finished_gameweeks`, `teams`, `fixtures` and
+    `player_fixture_rows` shape staging: the players and finished gameweeks in
+    bootstrap-static, the teams in its team list, the fixtures in the fixtures
+    endpoint, and element-summary history rows. Served counts default to
+    exactly what staging implies, which clears every table's floor: players x
+    finished gameweeks for both facts, and the staged teams, players and
+    fixtures for the dimensions.
     """
-    expected = players * gameweeks
+    expected = players * finished_gameweeks
     return {
         "players": players,
-        "gameweeks": gameweeks,
+        "finished_gameweeks": finished_gameweeks,
         "teams": teams,
         "fixtures": fixtures,
         "player_fixture_rows": player_fixture_rows,
@@ -167,7 +168,7 @@ def make_publish(tmp_path, monkeypatch):
                 connection.execute(
                     "insert into stg_gameweek select ?, 'run', timestamp '2026-09-27', "
                     "range + 1, true from range(?)",
-                    [name, shape["gameweeks"]],
+                    [name, shape["finished_gameweeks"]],
                 )
                 for table in SERVED:
                     connection.execute(
