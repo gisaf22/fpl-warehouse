@@ -1,5 +1,5 @@
 -- Layer: int
--- Tests: int_season_roster
+-- Tests: int_player_season
 -- Asserts: each season's roster holds exactly the fpl_ids seen in any of that
 --          season's bootstrap-static captures, no more and no fewer, each
 --          carrying the web_name of its newest capture.
@@ -8,7 +8,7 @@
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#69 AC1'}) }}
 
 -- Group membership is required: this test ref()s stg_player and
--- int_season_roster, both access: private. See CLAUDE.md, "Served contract".
+-- int_player_season, both access: private. See CLAUDE.md, "Served contract".
 --
 -- Compared both ways, per season: a staged player missing from the roster
 -- and a roster row with no staged player both fail, and so does a roster
@@ -36,7 +36,7 @@ with newest as (
 roster as (
 
     select distinct season, fpl_id, web_name
-    from {{ ref('int_season_roster') }}
+    from {{ ref('int_player_season') }}
 
 )
 

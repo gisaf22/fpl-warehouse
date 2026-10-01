@@ -58,7 +58,7 @@ def test_a_season_lost_upstream_of_staging_is_refused(publish, capsys):
 def test_a_season_that_loses_some_rows_while_clearing_its_floor_is_refused(
     publish, capsys
 ):
-    # A round of captures vanished upstream: staging expects 3 rounds, not 4,
+    # A round of captures vanished upstream: staging expects 3 gameweeks, not 4,
     # so the floor passes at 30 while the last publish served 40.
     previous = manifest(**{CLOSED: season(10, 38), LIVE: season(10, 4)})
 

@@ -29,7 +29,14 @@ with staging_columns as (
 
 expected as (
 
-    select ordinal_position, column_name, data_type
+    -- Boundary mapping (#89): the fact serves staging's `round` as `gameweek`,
+    -- at the same position and type. #88 renames it in staging and removes
+    -- this case.
+    select
+        ordinal_position,
+        case when column_name = 'round' then 'gameweek' else column_name end
+            as column_name,
+        data_type
     from staging_columns
 
     union all

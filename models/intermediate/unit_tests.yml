@@ -6,15 +6,15 @@ version: 2
 
 unit_tests:
 
-  # --- int_round_ratification: the two-level rollup (#45) ---------------------
-  # See the model header and CLAUDE.md, "Round ratification".
+  # --- int_gameweek_status: the two-level rollup (#45) ---------------------
+  # See the model header and CLAUDE.md, "Gameweek ratification".
 
-  - name: round_with_one_provisional_date_in_a_capture_is_not_ratified
+  - name: gameweek_with_one_provisional_date_in_a_capture_is_not_ratified
     description: >
-      Within one capture a round is ratified only when every dated entry is.
-      One ratified date alongside one provisional date leaves the round
+      Within one capture a gameweek is ratified only when every dated entry is.
+      One ratified date alongside one provisional date leaves the gameweek
       unratified.
-    model: int_round_ratification
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -26,14 +26,14 @@ unit_tests:
           - {season: "2026-27", round: 4, run_id: "20260914T190000Z-aaaa", match_date: "2026-09-13", points: "p", bonus_added: false}
     expect:
       rows:
-        - {season: "2026-27", round: 4, is_ratified: false}
+        - {season: "2026-27", gameweek: 4, is_ratified: false}
 
-  - name: round_ratified_earlier_and_omitted_later_stays_ratified
+  - name: gameweek_ratified_earlier_and_omitted_later_stays_ratified
     description: >
-      Across captures a round is ratified if any capture ever said so. A later
-      capture that no longer lists the round (it rolled out of the window) does
+      Across captures a gameweek is ratified if any capture ever said so. A later
+      capture that no longer lists the gameweek (it rolled out of the window) does
       not undo that.
-    model: int_round_ratification
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -45,14 +45,14 @@ unit_tests:
           - {season: "2026-27", round: 5, run_id: "20260919T190000Z-bbbb", match_date: "2026-09-20", points: "p", bonus_added: false}
     expect:
       rows:
-        - {season: "2026-27", round: 4, is_ratified: true}
-        - {season: "2026-27", round: 5, is_ratified: false}
+        - {season: "2026-27", gameweek: 4, is_ratified: true}
+        - {season: "2026-27", gameweek: 5, is_ratified: false}
 
-  - name: round_ratified_earlier_and_provisional_later_stays_ratified
+  - name: gameweek_ratified_earlier_and_provisional_later_stays_ratified
     description: >
-      Ratification is monotonic: once any capture reads the round ratified, a
+      Ratification is monotonic: once any capture reads the gameweek ratified, a
       later capture reading it provisional does not flip it back.
-    model: int_round_ratification
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -64,13 +64,13 @@ unit_tests:
           - {season: "2026-27", round: 4, run_id: "20260916T070000Z-bbbb", match_date: "2026-09-13", points: "p", bonus_added: false}
     expect:
       rows:
-        - {season: "2026-27", round: 4, is_ratified: true}
+        - {season: "2026-27", gameweek: 4, is_ratified: true}
 
-  - name: round_never_ratified_reads_false_not_null
+  - name: gameweek_never_ratified_reads_false_not_null
     description: >
-      A round no capture ever ratified reads false, never null, so consumers
+      A gameweek no capture ever ratified reads false, never null, so consumers
       can filter on the boolean directly.
-    model: int_round_ratification
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -82,13 +82,13 @@ unit_tests:
           - {season: "2026-27", round: 5, run_id: "20260920T190000Z-bbbb", match_date: "2026-09-20", points: "p", bonus_added: false}
     expect:
       rows:
-        - {season: "2026-27", round: 5, is_ratified: false}
+        - {season: "2026-27", gameweek: 5, is_ratified: false}
 
-  - name: round_never_ratified_with_unknown_bonus_reads_false_not_null
+  - name: gameweek_never_ratified_with_unknown_bonus_reads_false_not_null
     description: >
       Same as above when bonus_added is missing from the payload: the
-      per-capture verdict is then null, and the round must still read false.
-    model: int_round_ratification
+      per-capture verdict is then null, and the gameweek must still read false.
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -99,13 +99,13 @@ unit_tests:
           - {season: "2026-27", round: 5, run_id: "20260919T190000Z-aaaa", match_date: "2026-09-20", points: "r", bonus_added: null}
     expect:
       rows:
-        - {season: "2026-27", round: 5, is_ratified: false}
+        - {season: "2026-27", gameweek: 5, is_ratified: false}
 
   - name: empty_points_status_alongside_provisional_is_not_ratified
     description: >
       An empty-string points status is an in-progress state, seen alongside
-      "p" in the same capture. The round is not ratified.
-    model: int_round_ratification
+      "p" in the same capture. The gameweek is not ratified.
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -117,13 +117,13 @@ unit_tests:
           - {season: "2026-27", round: 4, run_id: "20260914T070000Z-aaaa", match_date: "2026-09-13", points: "p", bonus_added: false}
     expect:
       rows:
-        - {season: "2026-27", round: 4, is_ratified: false}
+        - {season: "2026-27", gameweek: 4, is_ratified: false}
 
   - name: empty_points_status_is_not_ratified_even_with_bonus_added
     description: >
-      Isolates the empty string itself: a round whose only date has points ""
+      Isolates the empty string itself: a gameweek whose only date has points ""
       is not ratified, even if bonus_added reads true.
-    model: int_round_ratification
+    model: int_gameweek_status
     config:
       tags: [unit]
       meta:
@@ -134,9 +134,9 @@ unit_tests:
           - {season: "2026-27", round: 4, run_id: "20260914T070000Z-aaaa", match_date: "2026-09-12", points: "", bonus_added: true}
     expect:
       rows:
-        - {season: "2026-27", round: 4, is_ratified: false}
+        - {season: "2026-27", gameweek: 4, is_ratified: false}
 
-  # --- int_season_roster: one row per player per season (#69) ------------------
+  # --- int_player_season: one row per player per season (#69) ------------------
   # The fixture tree has no rename and no mid-season arrival, so these AC1
   # examples are pinned here against mocked captures. AC4's cross-season cases
   # also exist in the fixture tree (fpl_ids 4, 166 and 426 in both seasons);
@@ -144,7 +144,7 @@ unit_tests:
 
   - name: player_in_many_captures_has_one_roster_row
     description: A player seen in three captures of one season gets one row.
-    model: int_season_roster
+    model: int_player_season
     config:
       tags: [unit]
       meta:
@@ -162,7 +162,7 @@ unit_tests:
   - name: mid_season_arrival_has_a_roster_row
     description: >
       A player first seen in a later capture still gets one row for the season.
-    model: int_season_roster
+    model: int_player_season
     config:
       tags: [unit]
       meta:
@@ -182,7 +182,7 @@ unit_tests:
     description: >
       A player FPL renames between captures (observed live on fpl_id 551,
       "Angulo" then "N.Angulo") gets one row carrying the newest spelling.
-    model: int_season_roster
+    model: int_player_season
     config:
       tags: [unit]
       meta:
@@ -200,7 +200,7 @@ unit_tests:
     description: >
       fpl_id is reassigned each season, so fpl_id 4 in 2025-26 and 2026-27 is
       two different people: two rows, each with only its own season's values.
-    model: int_season_roster
+    model: int_player_season
     config:
       tags: [unit]
       meta:
@@ -219,7 +219,7 @@ unit_tests:
     description: >
       player_code is carried, never a key: one person under fpl_id 449 in
       2025-26 and fpl_id 426 in 2026-27 stays two rows, never merged.
-    model: int_season_roster
+    model: int_player_season
     config:
       tags: [unit]
       meta:

@@ -4,9 +4,9 @@
 -- =============================================================================
 --
 -- Purpose:
---   Every (fpl_id, round) pair that *should* exist, so fct_player_gameweek can
---   be built by LEFT JOIN and a player with no fixture in a round surfaces as
---   fixture_count = 0 rather than as a missing row.
+--   Every (fpl_id, gameweek) pair that *should* exist, so fct_player_gameweek
+--   can be built by LEFT JOIN and a player with no fixture in a gameweek
+--   surfaces as fixture_count = 0 rather than as a missing row.
 --
 -- Why it is not derived from fixtures:
 --   Deriving the gameweek grain from whichever fixtures happened to be
@@ -16,21 +16,21 @@
 --   and the gameweek calendar only — it never reads fct_player_fixture.
 --
 -- Grain:
---   One row per (season, fpl_id, round): each season's players crossed with
---   every round that season's latest bootstrap-static capture reports as
---   finished. `season` comes from staging — see CLAUDE.md, "Season is part of
---   the grain".
+--   One row per (season, fpl_id, gameweek): each season's players crossed
+--   with every gameweek that season's latest bootstrap-static capture reports
+--   as finished. `season` comes from staging — see CLAUDE.md, "Season is part
+--   of the grain".
 --
 -- Season scoping:
 --   Every step below — the latest capture, the player set (per season in
---   int_season_roster) and the players x rounds cross — is computed per
---   season. fpl_id and round are both reassigned each season, so an unscoped
---   version would take one season's calendar for another's players. Season
---   is only ever a partition here; no row pairs one season's data with
+--   int_player_season) and the players x gameweeks cross — is computed per
+--   season. fpl_id and gameweek are both reassigned each season, so an
+--   unscoped version would take one season's calendar for another's players.
+--   Season is only ever a partition here; no row pairs one season's data with
 --   another's.
 --
--- Round range:
---   `finished` is the boundary. A round in progress or still upcoming has no
+-- Gameweek range:
+--   `finished` is the boundary. A gameweek in progress or still upcoming has no
 --   settled per-fixture data, and including it would manufacture
 --   fixture_count = 0 rows indistinguishable from a genuine blank gameweek —
 --   the exact ambiguity this model exists to remove. `data_checked` (bonus
@@ -38,16 +38,16 @@
 --   if a consumer ever needs one.
 --
 -- Player list:
---   Read from int_season_roster (#70): every player seen in *any*
+--   Read from int_player_season (#70): every player seen in *any*
 --   bootstrap-static capture of the season, with the newest web_name. The
 --   spine computes no player set of its own, so it and dim_player cannot
 --   disagree about who played. Why every capture and not the latest, and the
---   coverage limit, are in int_season_roster's header, "Why every capture".
+--   coverage limit, are in int_player_season's header, "Why every capture".
 --
--- Round range vs player list:
---   The two axes deliberately use different capture scopes. Rounds come from
---   the latest capture because the calendar is a statement about now and an
---   older capture reports fewer rounds finished. Players come from every
+-- Gameweek range vs player list:
+--   The two axes deliberately use different capture scopes. Gameweeks come
+--   from the latest capture because the calendar is a statement about now and
+--   an older capture reports fewer gameweeks finished. Players come from every
 --   capture because squad membership is cumulative — someone who played is
 --   part of the season's history whether or not they are still registered.
 -- =============================================================================
@@ -81,29 +81,30 @@ players as (
         season,
         fpl_id,
         web_name
-    from {{ ref('int_season_roster') }}
+    from {{ ref('int_player_season') }}
 
 ),
 
-rounds as (
+gameweeks as (
 
     select
-        gameweek.season,
-        gameweek.round,
-        gameweek.deadline_time
-    from {{ ref('stg_gameweek') }} as gameweek
+        calendar.season,
+        -- Boundary mapping: staging names this column round until #88.
+        calendar.round as gameweek,
+        calendar.deadline_time
+    from {{ ref('stg_gameweek') }} as calendar
     inner join latest_capture using (season, run_id)
-    where gameweek.finished
+    where calendar.finished
 
 )
 
 select
     players.season,
     players.fpl_id,
-    rounds.round,
+    gameweeks.gameweek,
     players.web_name,
-    rounds.deadline_time
+    gameweeks.deadline_time
 from players
 -- The within-season cross join: each season's players against that same
--- season's rounds, and nothing else.
-inner join rounds using (season)
+-- season's gameweeks, and nothing else.
+inner join gameweeks using (season)

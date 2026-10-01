@@ -59,7 +59,7 @@ select
     fct.season,
     fct.fpl_id,
     fct.fixture_id,
-    fct.round
+    fct.gameweek
 from {{ ref('fct_player_fixture') }} as fct
 left join current_keys using (season, fpl_id, fixture_id)
 where current_keys.fpl_id is null

@@ -1,5 +1,5 @@
 -- Layer: int
--- Tests: int_season_roster
+-- Tests: int_player_season
 -- Asserts: a player seen in an earlier capture of a season but absent from
 --          that season's latest capture still has a roster row.
 -- Origin: new in #69, modelled on
@@ -47,7 +47,7 @@ select
     departed.fpl_id,
     'departed player has no roster row' as failure
 from departed
-left join {{ ref('int_season_roster') }} as roster
+left join {{ ref('int_player_season') }} as roster
     on roster.season = departed.season
     and roster.fpl_id = departed.fpl_id
 where roster.fpl_id is null

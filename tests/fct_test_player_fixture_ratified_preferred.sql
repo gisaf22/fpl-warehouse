@@ -13,7 +13,7 @@
 -- Dedup must never keep a provisional capture when a ratified one exists for
 -- the same key.
 --
--- A provisional capture (taken before the round settled) has NULL
+-- A provisional capture (taken before the gameweek settled) has NULL
 -- team_h_score / team_a_score and carries "0.0" in the whole ICT family. The
 -- NULL scores are the visible marker; the zeroed stats ride along silently, so
 -- this assertion is the guard against reintroducing that corruption class.

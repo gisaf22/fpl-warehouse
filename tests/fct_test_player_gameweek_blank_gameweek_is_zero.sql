@@ -1,6 +1,6 @@
 -- Layer: fct
 -- Tests: fct_player_gameweek
--- Asserts: a round in which a player has no fixture is present with
+-- Asserts: a gameweek in which a player has no fixture is present with
 --          fixture_count 0, never absent.
 -- Origin: new in Phase 2
 -- Tier: integration
@@ -15,8 +15,8 @@
 --
 -- This is the blank-gameweek invariant stated directly, rather than inferred
 -- from the spine-completeness and fixture_count tests. It holds for a true
--- blank gameweek (the player's team has no fixture in the round) and for the
--- mechanically identical case of a player carrying no history row for a round
+-- blank gameweek (the player's team has no fixture in the gameweek) and for the
+-- mechanically identical case of a player carrying no history row for a gameweek
 -- they were not registered for.
 --
 -- Fails with one row per spine key that has no fixtures and is either absent
@@ -27,13 +27,13 @@ with blank_keys as (
     select
         spine.season,
         spine.fpl_id,
-        spine.round
+        spine.gameweek
     from {{ ref('int_player_gameweek_spine') }} as spine
     left join {{ ref('fct_player_fixture') }} as fct
         on fct.season = spine.season
        and fct.fpl_id = spine.fpl_id
-       and fct.round  = spine.round
-    group by spine.season, spine.fpl_id, spine.round
+       and fct.gameweek  = spine.gameweek
+    group by spine.season, spine.fpl_id, spine.gameweek
     having count(fct.fixture_id) = 0
 
 )
@@ -41,9 +41,9 @@ with blank_keys as (
 select
     blank_keys.season,
     blank_keys.fpl_id,
-    blank_keys.round,
+    blank_keys.gameweek,
     agg.fixture_count
 from blank_keys
-left join {{ ref('fct_player_gameweek') }} as agg using (season, fpl_id, round)
+left join {{ ref('fct_player_gameweek') }} as agg using (season, fpl_id, gameweek)
 where agg.fpl_id is null
    or agg.fixture_count <> 0

@@ -17,14 +17,14 @@
 --   from staging. See CLAUDE.md, "Season is part of the grain".
 --
 -- Season scoping:
---   fpl_id, fixture_id and round are all reassigned every season, so the
+--   fpl_id, fixture_id and gameweek are all reassigned every season, so the
 --   latest-capture lookup, the retraction check, the dedup partition and the
 --   ratification join below all carry season. That keeps each piece of
 --   within-season logic inside its own season; season is never used to relate
 --   one season's rows to another's.
 --
 -- Dedup rule — provisional vs ratified:
---   A capture taken before a round's scores are ratified carries NULL
+--   A capture taken before a gameweek's scores are ratified carries NULL
 --   team_h_score / team_a_score, and its influence / creativity / threat /
 --   ict_index all read "0.0" while the real values are simply not published
 --   yet. Staging is 1:1 with the raw source and so carries both provisional
@@ -35,9 +35,9 @@
 --     2. within that, the most recent capture.
 --
 --   This ordering stays score-based deliberately. It ranks two *captures* of
---   the same fixture, and event-status is round-level — it cannot say which of
---   them carries the better data. It is unrelated to the `is_ratified` column
---   below, which no longer derives from scores.
+--   the same fixture, and event-status is gameweek-level — it cannot say which
+--   of them carries the better data. It is unrelated to the `is_ratified`
+--   column below, which no longer derives from scores.
 --
 --   Picking arbitrarily here reintroduces the zeroed-stat corruption class
 --   that fpl-ingest's settlement-transition fix exists to prevent. See
@@ -70,14 +70,16 @@
 --
 -- Columns:
 --   Every stg_player_fixture column passes through unchanged — staging owns
---   the typing — plus `is_ratified`, false while the round this fixture belongs
---   to is still mid-settlement. Consumers wanting settled data only should
+--   the typing — except `round`, served as `gameweek` (renamed where this
+--   model reads staging, until #88 renames it there). Plus `is_ratified`,
+--   false while the gameweek this fixture belongs to is still
+--   mid-settlement. Consumers wanting settled data only should
 --   filter on it rather than re-deriving it from the scores.
 --
 --   `team_fpl_id`, last, is the club the player played for in this fixture:
 --   dim_fixture's home side when the row's was_home is true, its away side
 --   otherwise. It is resolved per fixture, as of that fixture, never once per
---   player or per round — a player transferred mid-season, even between the
+--   player or per gameweek — a player transferred mid-season, even between the
 --   two fixtures of a double gameweek, carries each fixture's own club. A
 --   build-time lookup is known bug 1 in CLAUDE.md. The join is a left join so
 --   a fixture missing from dim_fixture surfaces as a null team, which the
@@ -85,33 +87,33 @@
 --   fct_player_gameweek, where a double-gameweek transfer has no single club.
 --
 -- is_ratified — sourced, not inferred:
---   The flag comes from int_round_ratification, which rolls up FPL's own
+--   The flag comes from int_gameweek_status, which rolls up FPL's own
 --   event-status endpoint. It previously read `both scores are non-NULL`,
 --   using scoreline publication as a proxy for points ratification. Those are
 --   different events: scores appear at full time, bonus points are applied
 --   hours later, so the proxy reported ratified during the settle window while
---   `bonus` was still 0. It also could not see the rest of the round — a
---   player whose Saturday fixture finished read ratified while the round's
+--   `bonus` was still 0. It also could not see the rest of the gameweek — a
+--   player whose Saturday fixture finished read ratified while the gameweek's
 --   Monday match was unplayed.
 --
---   Note the meaning this sharpens: the flag is a property of the *round*,
+--   Note the meaning this sharpens: the flag is a property of the *gameweek*,
 --   carried on each of its fixture rows. A fixture with a final score in a
---   round that has not settled is now false, which is the correction.
+--   gameweek that has not settled is now false, which is the correction.
 --
---   Bounded fallback — rounds predating capture history:
---   event-status serves only the current round's dates, and all three raw
---   endpoints' capture history begins 2026-08-29, after round 1 of 2026-27 had
---   already finished and settled. Round 1 therefore appears in zero
+--   Bounded fallback — gameweeks predating capture history:
+--   event-status serves only the current gameweek's dates, and all three raw
+--   endpoints' capture history begins 2026-08-29, after gameweek 1 of 2026-27
+--   had already finished and settled. Gameweek 1 therefore appears in zero
 --   event-status captures and its finality is unrecoverable from the source.
---   For a round absent from event-status entirely whose fixtures kicked off
---   before that date, a final scoreline is accepted as proof of ratification —
---   safely, because such a round settled weeks ago.
+--   For a gameweek absent from event-status entirely whose fixtures kicked
+--   off before that date, a final scoreline is accepted as proof of
+--   ratification — safely, because such a gameweek settled weeks ago.
 --
---   This is a dated, bounded backfill for one round of one season, not a
---   revival of the general inference. A round absent from event-status with a
---   kickoff on or after the cutoff reads false, never fallback. When raw
+--   This is a dated, bounded backfill for one gameweek of one season, not a
+--   revival of the general inference. A gameweek absent from event-status
+--   with a kickoff on or after the cutoff reads false, never fallback. When raw
 --   history for 2026-27 is superseded the clause becomes dead and should be
---   deleted rather than re-dated. See CLAUDE.md, "Round ratification".
+--   deleted rather than re-dated. See CLAUDE.md, "Gameweek ratification".
 --
 --   The fallback is scoped to season 2026-27 explicitly. It is a statement
 --   about that season's capture history, and every closed season's fixtures
@@ -121,10 +123,10 @@
 --   Closed seasons — ratified by definition:
 --   A season listed in the `closed_seasons` var is over and fully settled, and
 --   its rows read is_ratified = true unconditionally. event-status cannot
---   speak for it: the endpoint serves only the current round, and no capture
---   of it exists for any closed season. The override is not trusted blindly —
---   tests/fct_test_player_fixture_closed_season_settled.sql fails unless that
---   season's own latest calendar reports every round finished and
+--   speak for it: the endpoint serves only the current gameweek, and no
+--   capture of it exists for any closed season. The override is not trusted
+--   blindly — tests/fct_test_player_fixture_closed_season_settled.sql fails unless that
+--   season's own latest calendar reports every gameweek finished and
 --   data_checked, and fails if the live season is ever listed as closed. The
 --   override reads a season's own rows only; it never consults another
 --   season's data.
@@ -132,7 +134,8 @@
 
 with captures as (
 
-    select * from {{ ref('stg_player_fixture') }}
+    -- Boundary mapping: staging names this column round until #88.
+    select * rename (round as gameweek) from {{ ref('stg_player_fixture') }}
 
 ),
 
@@ -181,7 +184,7 @@ ranked as (
                 then true
             else coalesce(
                 ratification.is_ratified,
-                -- Bounded fallback for 2026-27 rounds predating capture
+                -- Bounded fallback for 2026-27 gameweeks predating capture
                 -- history; see header.
                 captures.season = '2026-27'
                     and captures.kickoff_time < timestamp '2026-08-29 00:00:00'
@@ -199,9 +202,9 @@ ranked as (
         ) as capture_rank
     from captures
     inner join current_keys using (season, fpl_id, fixture_id)
-    left join {{ ref('int_round_ratification') }} as ratification
+    left join {{ ref('int_gameweek_status') }} as ratification
         on ratification.season = captures.season
-       and ratification.round = captures.round
+       and ratification.gameweek = captures.gameweek
 
 )
 

@@ -1,6 +1,6 @@
 -- Layer: fct
 -- Tests: fct_player_gameweek, fct_player_fixture
--- Asserts: a departed player's finished rounds *after* their last capture read
+-- Asserts: a departed player's finished gameweeks *after* their last capture read
 --          fixture_count = 0 in fct_player_gameweek, and carry no row at all in
 --          fct_player_fixture.
 -- Origin: new — the other half of the departure behaviour from
@@ -21,7 +21,7 @@
 --
 -- The property asserted here is the post-departure tail: once FPL stops
 -- publishing a player, no element-summary is written for them, so no fixture
--- row can exist for any later round, and every later finished round must
+-- row can exist for any later gameweek, and every later finished gameweek must
 -- aggregate to fixture_count = 0 — the same treatment a genuine blank
 -- gameweek gets, and distinguishable from a dropped row only because the row
 -- is there to inspect.
@@ -34,19 +34,19 @@
 -- union of `elements` across all 128 captures is 658 and the latest capture
 -- is also 658.
 --
--- "After their last capture" is defined by deadline, not by round number: a
--- round whose deadline falls after the player's final capture is one FPL
+-- "After their last capture" is defined by deadline, not by gameweek number: a
+-- gameweek whose deadline falls after the player's final capture is one FPL
 -- could not have published data for them in. In the fixture tree the departed
--- player (4) last appears in the R2 capture of 2026-08-31, so rounds 3
+-- player (4) last appears in the R2 capture of 2026-08-31, so gameweeks 3
 -- (deadline 2026-09-04) and 4 (deadline 2026-09-12) are both in scope and
--- rounds 1-2, which they really played, are correctly not.
+-- gameweeks 1-2, which they really played, are correctly not.
 --
--- Two rounds rather than one is deliberate: a single zero row can be produced
+-- Two gameweeks rather than one is deliberate: a single zero row can be produced
 -- by accident, and R4 plus SYNTHETIC_FINISHED in build_fixtures.py exist to
 -- make the tail more than one row deep.
 
 -- Every step is per season: a departure means absence from that season's own
--- latest capture, and its tail rounds come from that season's own calendar.
+-- latest capture, and its tail gameweeks come from that season's own calendar.
 
 with latest_player_capture as (
 
@@ -100,36 +100,40 @@ departed as (
 
 ),
 
--- The finished rounds whose deadline falls after the player stopped being
--- published — the rounds FPL cannot have served data for them in.
-tail_rounds as (
+-- The finished gameweeks whose deadline falls after the player stopped being
+-- published — the gameweeks FPL cannot have served data for them in.
+tail_gameweeks as (
 
     select
         departed.season,
         departed.fpl_id,
-        gameweek.round
+        finished_calendar.gameweek
     from departed
     inner join (
-        select distinct calendar.season, calendar.round, calendar.deadline_time
+        -- Boundary mapping: staging names this column round until #88.
+        select distinct
+            calendar.season,
+            calendar.round as gameweek,
+            calendar.deadline_time
         from {{ ref('stg_gameweek') }} as calendar
         inner join latest_calendar_capture using (season, run_id)
         where calendar.finished
-    ) as gameweek
-        on gameweek.season = departed.season
-    where gameweek.deadline_time > departed.last_seen_at
+    ) as finished_calendar
+        on finished_calendar.season = departed.season
+    where finished_calendar.deadline_time > departed.last_seen_at
 
 )
 
--- The aggregate must hold the round, and it must read zero.
+-- The aggregate must hold the gameweek, and it must read zero.
 select
-    tail_rounds.season,
-    tail_rounds.fpl_id,
-    tail_rounds.round,
+    tail_gameweeks.season,
+    tail_gameweeks.fpl_id,
+    tail_gameweeks.gameweek,
     coalesce(cast(agg.fixture_count as varchar), 'ROW MISSING') as fixture_count,
-    'post-departure round is not fixture_count = 0'             as failure
-from tail_rounds
+    'post-departure gameweek is not fixture_count = 0'             as failure
+from tail_gameweeks
 left join {{ ref('fct_player_gameweek') }} as agg
-    using (season, fpl_id, round)
+    using (season, fpl_id, gameweek)
 where agg.fpl_id is null
    or agg.fixture_count <> 0
 
@@ -137,12 +141,12 @@ union all
 
 -- ...and no fixture row may exist for it in the first place.
 select
-    tail_rounds.season,
-    tail_rounds.fpl_id,
-    tail_rounds.round,
+    tail_gameweeks.season,
+    tail_gameweeks.fpl_id,
+    tail_gameweeks.gameweek,
     cast(count(*) as varchar)                        as fixture_count,
-    'fixture rows exist for a post-departure round'  as failure
-from tail_rounds
+    'fixture rows exist for a post-departure gameweek'  as failure
+from tail_gameweeks
 inner join {{ ref('fct_player_fixture') }} as fixtures
-    using (season, fpl_id, round)
-group by tail_rounds.season, tail_rounds.fpl_id, tail_rounds.round
+    using (season, fpl_id, gameweek)
+group by tail_gameweeks.season, tail_gameweeks.fpl_id, tail_gameweeks.gameweek

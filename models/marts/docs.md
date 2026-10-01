@@ -5,13 +5,13 @@
 #}
 
 {% docs ratified %}
-**Ratified:** FPL has finalised this round's points, bonus included. The
+**Ratified:** FPL has finalised this gameweek's points, bonus included. The
 value is sourced from FPL's `event-status` endpoint, not inferred from a
 scoreline: scores appear at full time, but bonus is applied hours later, and
 until then a row's `bonus` and `bps` are not final. It is a property of the
-round, carried on each of its rows. A round is ratified when every one of its
-match dates reads ratified in one capture, and it stays ratified once any
-capture has said so. For a closed season it is true on every row.
+gameweek, carried on each of its rows. A gameweek is ratified when every one
+of its match dates reads ratified in one capture, and it stays ratified once
+any capture has said so. For a closed season it is true on every row.
 {% enddocs %}
 
 {% docs season_scoped_key %}

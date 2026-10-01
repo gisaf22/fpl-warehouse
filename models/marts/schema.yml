@@ -84,7 +84,7 @@ models:
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
-      - name: round
+      - name: gameweek
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
@@ -199,7 +199,7 @@ models:
 
   - name: fct_player_gameweek
     description: >
-      Player-gameweek aggregate: one row per (season, fpl_id, round),
+      Player-gameweek aggregate: one row per (season, fpl_id, gameweek),
       one-for-one with the gameweek spine so blanks are present with
       fixture_count 0. Part of the served contract consumed by
       fpl-intelligence — the column list below is enforced, so any change to
@@ -217,7 +217,7 @@ models:
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
-      - name: round
+      - name: gameweek
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"
         data_tests: *unit_not_null
@@ -321,7 +321,7 @@ models:
       - name: ict_index
         data_type: DOUBLE
         data_tests: *unit_not_null
-      # Event-level, taken from the round's last fixture, so NULL for a blank
+      # Event-level, taken from the gameweek's last fixture, so NULL for a blank
       # gameweek for the same reason as the kickoff times above.
       - name: value
         data_type: INTEGER
@@ -388,7 +388,7 @@ models:
   - name: dim_player
     description: >
       One row per player per season, keyed (season, fpl_id), for every player
-      in int_season_roster — departed players included. position is the one
+      in int_player_season — departed players included. position is the one
       FPL assigns for the season, taken from the player's latest appearance;
       it is fixed within a season (decision 2 on #32), which the
       constant_per_key test on stg_player.position_id enforces. No team: team
@@ -470,10 +470,10 @@ models:
 
   - name: dim_fixture
     description: >
-      One row per fixture per season, keyed (season, fixture_id). Teams, round,
+      One row per fixture per season, keyed (season, fixture_id). Teams, gameweek,
       kickoff and result come from the fixture's latest capture; difficulty
-      is pre-kickoff (decision 3 on #32, see its columns). A double round has
-      more than 10 fixtures and a team playing twice; a blank round has fewer
+      is pre-kickoff (decision 3 on #32, see its columns). A double gameweek has
+      more than 10 fixtures and a team playing twice; a blank gameweek has fewer
       than 10. Nothing here assumes either count. Part of the served contract,
       published to served/dim_fixture.parquet (#44); the column list below is
       enforced.
@@ -522,7 +522,7 @@ models:
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"
         data_tests: *dim_fixture_key_not_null
-      - name: round
+      - name: gameweek
         data_type: INTEGER
         description: >
           {{ doc('season_scoped_key') }}
@@ -540,7 +540,7 @@ models:
         data_type: TIMESTAMP
         description: >
           Nullable, no not_null test: null for a fixture FPL has not scheduled,
-          for the same reason as round.
+          for the same reason as gameweek.
       - name: team_h_fpl_id
         data_type: INTEGER
         description: "{{ doc('season_scoped_key') }}"

@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Layer: int_ (intermediate)
--- Model: int_season_roster
+-- Model: int_player_season
 -- =============================================================================
 --
 -- Purpose:
@@ -11,14 +11,14 @@
 --
 -- Why every capture and not the latest:
 --   The latest capture alone tracks the squad as it stands now, which handles
---   a mid-season arrival correctly — they get spine rows for earlier rounds
+--   a mid-season arrival correctly — they get spine rows for earlier gameweeks
 --   that resolve to fixture_count = 0 — but silently loses a mid-season
 --   *departure*. A player who leaves the league (transfer abroad, retirement,
 --   or simply dropped from FPL's `elements`) vanishes from it, and with them
 --   every fixture they actually played this season would disappear from
 --   fct_player_gameweek while remaining in fct_player_fixture. That is the
 --   silent row-loss class the spine exists to prevent, arriving from the
---   player axis instead of the round axis.
+--   player axis instead of the gameweek axis.
 --
 --   Taking the union across all captures makes the treatment symmetric: a
 --   departure keeps real rows for the weeks they played and fixture_count = 0

@@ -5,14 +5,14 @@
 --
 -- Purpose:
 --   Player-gameweek aggregate, built by LEFT JOIN of fct_player_fixture onto
---   int_player_gameweek_spine so that every (fpl_id, round) that should exist
---   does exist. Never model this grain directly from raw data.
+--   int_player_gameweek_spine so that every (fpl_id, gameweek) that should
+--   exist does exist. Never model this grain directly from raw data.
 --
 -- Grain:
---   One row per (season, fpl_id, round), one-for-one with the spine. `season`
---   is carried from the spine, which reads it from staging — see CLAUDE.md,
---   "Season is part of the grain". The join below carries season, so a round
---   number is only ever matched within the season it belongs to.
+--   One row per (season, fpl_id, gameweek), one-for-one with the spine.
+--   `season` is carried from the spine, which reads it from staging — see
+--   CLAUDE.md, "Season is part of the grain". The join below carries season, so
+--   a gameweek number is only ever matched within the season it belongs to.
 --
 -- fixture_count:
 --   0 = blank gameweek (spine row with no fixture), 1 = normal, 2+ = double.
@@ -24,11 +24,11 @@
 --
 -- Aggregation classes:
 --
---   Additive — summed across the round's fixtures, 0 when the gameweek is
+--   Additive — summed across the gameweek's fixtures, 0 when the gameweek is
 --   blank. A blank gameweek genuinely scores zero, and fixture_count is what
 --   distinguishes "played and scored nothing" from "had no fixture"; any
 --   consumer computing a per-appearance rate must divide by fixture_count
---   rather than assuming one fixture per round.
+--   rather than assuming one fixture per gameweek.
 --
 --   influence / creativity / threat are additive per-match component scores,
 --   and so is ict_index itself. Verified on 2026-09-03 against FPL's own
@@ -55,7 +55,7 @@
 --   Point-in-time — value, selected and the transfers family are stated by FPL
 --   per event, not per fixture: both rows of a double gameweek repeat the same
 --   event-level number, so summing would double-count. The value from the
---   round's last fixture is taken instead, and is NULL for a blank gameweek
+--   gameweek's last fixture is taken instead, and is NULL for a blank gameweek
 --   because no fixture row states it. NOTE: this is FPL's documented field
 --   semantics, not something the current data can prove — no double gameweek
 --   has occurred yet to observe the repetition. Revisit at the first double.
@@ -84,7 +84,7 @@ select
     -- Keys
     spine.season,
     spine.fpl_id,
-    spine.round,
+    spine.gameweek,
 
     -- Gameweek context
     spine.web_name,
@@ -93,12 +93,12 @@ select
     min(fixtures.kickoff_time)                          as first_kickoff_time,
     max(fixtures.kickoff_time)                          as last_kickoff_time,
 
-    -- The round's finality, per FPL's event-status (see fct_player_fixture);
+    -- The gameweek's finality, per FPL's event-status (see fct_player_fixture);
     -- every contributing fixture carries the same value, so this aggregate is
-    -- a pass-through that stays NULL for a blank round — which
-    -- fct_test_player_gameweek_counted_round_has_kickoff asserts. Joining
-    -- int_round_ratification here instead would give a blank round the round's
-    -- real flag and break that contract.
+    -- a pass-through that stays NULL for a blank gameweek — which
+    -- fct_test_player_gameweek_counted_gameweek_has_kickoff asserts. Joining
+    -- int_gameweek_status here instead would give a blank gameweek the
+    -- gameweek's real flag and break that contract.
     bool_and(fixtures.is_ratified)                      as is_ratified,
 
     -- Appearance (additive)
@@ -151,7 +151,7 @@ select
     round(coalesce(sum(fixtures.threat), 0), 1)         as threat,
     round(coalesce(sum(fixtures.ict_index), 0), 1)      as ict_index,
 
-    -- Market: event-level, taken from the round's last fixture
+    -- Market: event-level, taken from the gameweek's last fixture
     max_by(fixtures.value, fixtures.kickoff_time)       as value,
     max_by(fixtures.selected, fixtures.kickoff_time)    as selected,
     max_by(fixtures.transfers_in, fixtures.kickoff_time)
@@ -165,10 +165,10 @@ from spine
 left join fixtures
     on fixtures.season = spine.season
    and fixtures.fpl_id = spine.fpl_id
-   and fixtures.round  = spine.round
+   and fixtures.gameweek = spine.gameweek
 group by
     spine.season,
     spine.fpl_id,
-    spine.round,
+    spine.gameweek,
     spine.web_name,
     spine.deadline_time

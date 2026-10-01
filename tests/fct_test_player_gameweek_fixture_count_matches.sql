@@ -1,14 +1,14 @@
 -- Layer: fct
 -- Tests: fct_player_gameweek
 -- Asserts: fixture_count equals the real number of fct_player_fixture rows for
---          that (season, fpl_id, round).
+--          that (season, fpl_id, gameweek).
 -- Origin: new in Phase 2, modelled on
 --         tests/team_fixture/sql/fct_test_fixture_count_nonneg.sql
 -- Tier: integration
 {{ config(tags=['integration']) }}
 
 -- fixture_count must equal the real number of fct_player_fixture rows for that
--- (season, fpl_id, round) — 0 for a blank gameweek, 1 normally, 2+ for a double.
+-- (season, fpl_id, gameweek) — 0 for a blank gameweek, 1 normally, 2+ for a double.
 --
 -- Stronger than the fixture_count >= 0 assertion this is modelled on: it
 -- catches a count inflated by undeduplicated captures as well as one deflated
@@ -19,19 +19,19 @@ with actual as (
     select
         season,
         fpl_id,
-        round,
+        gameweek,
         count(*) as actual_fixture_count
     from {{ ref('fct_player_fixture') }}
-    group by season, fpl_id, round
+    group by season, fpl_id, gameweek
 
 )
 
 select
     agg.season,
     agg.fpl_id,
-    agg.round,
+    agg.gameweek,
     agg.fixture_count,
     coalesce(actual.actual_fixture_count, 0) as actual_fixture_count
 from {{ ref('fct_player_gameweek') }} as agg
-left join actual using (season, fpl_id, round)
+left join actual using (season, fpl_id, gameweek)
 where agg.fixture_count <> coalesce(actual.actual_fixture_count, 0)

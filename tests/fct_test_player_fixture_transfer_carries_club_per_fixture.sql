@@ -1,6 +1,6 @@
 -- Layer: fct
 -- Tests: fct_player_fixture
--- Asserts: player 166, who changed clubs between rounds 1 and 2 of 2026-27,
+-- Asserts: player 166, who changed clubs between gameweeks 1 and 2 of 2026-27,
 --          carries the old club on the fixture before the move and the new
 --          club on every fixture after it.
 -- Origin: new in #43
@@ -9,7 +9,7 @@
 
 -- Expected clubs are the fixture tree's, read from each fixture's home and
 -- away sides and the player's opponent (tests/fixtures/build_fixtures.py, 166):
--- round 1's fixture 10 was played for club 6, and rounds 2-4 (fixtures 20, 25,
+-- gameweek 1's fixture 10 was played for club 6, and gameweeks 2-4 (fixtures 20, 25,
 -- 31) for club 2. The retracted fixture 16 is not in the fact.
 --
 -- Resolving the team once per player, at build time, is known bug 1 in

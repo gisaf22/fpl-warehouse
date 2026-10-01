@@ -4,21 +4,21 @@
 -- =============================================================================
 --
 -- Purpose:
---   One row per fixture per season: teams, round, kickoff, result and
+--   One row per fixture per season: teams, gameweek, kickoff, result and
 --   difficulty, so a fixture id on a fact resolves to its context within its
 --   own season.
 --
 -- Grain:
 --   (season, fixture_id). fixture_id is reassigned every season, so season is
---   part of the key. A round may hold more or fewer than 10 fixtures (doubles
---   and blanks) and a team may play twice in one round; nothing here is keyed
---   on round or team.
+--   part of the key. A gameweek may hold more or fewer than 10 fixtures
+--   (doubles and blanks) and a team may play twice in one gameweek; nothing
+--   here is keyed on gameweek or team.
 --
 -- Latest capture:
---   Teams, round, kickoff, score and finished come from each fixture's latest
+--   Teams, gameweek, kickoff, score and finished come from each fixture's latest
 --   capture, ordered by extracted_at with run_id breaking a same-second tie,
 --   as in dim_team. So the score is the final one once there is one, and a
---   postponed fixture reads null round and kickoff — kept, not dropped and
+--   postponed fixture reads null gameweek and kickoff — kept, not dropped and
 --   not given an earlier capture's schedule.
 --
 -- Difficulty (decision 3 on #32):
@@ -99,7 +99,8 @@ difficulty as (
 select
     latest.season,
     latest.fixture_id,
-    latest.round,
+    -- Boundary mapping: staging names this column round until #88.
+    latest.round as gameweek,
     latest.kickoff_time,
     latest.team_h_fpl_id,
     latest.team_a_fpl_id,

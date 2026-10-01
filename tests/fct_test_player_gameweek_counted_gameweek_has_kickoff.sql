@@ -1,7 +1,7 @@
 -- Layer: fct
 -- Tests: fct_player_gameweek
--- Asserts: a round with fixture_count > 0 carries non-NULL kickoff times and a
---          non-NULL is_ratified, and a blank round carries none of them.
+-- Asserts: a gameweek with fixture_count > 0 carries non-NULL kickoff times and a
+--          non-NULL is_ratified, and a blank gameweek carries none of them.
 -- Origin: ported from
 --         tests/availability/sql/fact_test_active_player_minutes_not_null.sql
 -- Tier: unit
@@ -14,13 +14,13 @@
 -- is_ratified are the aggregates that are NULL exactly when no fixture joined.
 --
 -- Both directions are asserted, so the test also fails if a genuinely blank
--- round somehow acquires a kickoff time — the reverse inconsistency, which the
+-- gameweek somehow acquires a kickoff time — the reverse inconsistency, which the
 -- original could not see.
 
 select
     season,
     fpl_id,
-    round,
+    gameweek,
     fixture_count,
     first_kickoff_time,
     last_kickoff_time,

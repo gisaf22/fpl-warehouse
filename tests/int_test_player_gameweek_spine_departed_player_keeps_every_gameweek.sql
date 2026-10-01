@@ -1,7 +1,7 @@
 -- Layer: int
 -- Tests: int_player_gameweek_spine
 -- Asserts: a player seen in an earlier capture of a season but absent from
---          that season's latest capture has a spine row for every round the
+--          that season's latest capture has a spine row for every gameweek the
 --          latest capture reports as finished.
 -- Origin: new in #70, modelled on int_test_season_roster_keeps_departed_player
 -- Tier: integration
@@ -13,8 +13,8 @@
 --
 -- fct_test_player_gameweek_spine_covers_departed_players asserts a departed
 -- player is present in the spine at all. This asserts they keep their rows:
--- one per finished round, so fct_player_gameweek still carries the rounds
--- they played and fixture_count = 0 for the rounds after they left.
+-- one per finished gameweek, so fct_player_gameweek still carries the gameweeks
+-- they played and fixture_count = 0 for the gameweeks after they left.
 --
 -- Departure is read from stg_player directly rather than from the roster, so
 -- the test does not trust the model the spine now reads. Non-vacuous on the
@@ -55,7 +55,7 @@ departed as (
 
 latest_calendar_capture as (
 
-    -- The same per-season capture int_player_gameweek_spine takes rounds from.
+    -- The same per-season capture int_player_gameweek_spine takes gameweeks from.
     select season, run_id
     from (
         select
@@ -71,9 +71,10 @@ latest_calendar_capture as (
 
 ),
 
-finished_rounds as (
+finished_gameweeks as (
 
-    select calendar.season, calendar.round
+    -- Boundary mapping: staging names this column round until #88.
+    select calendar.season, calendar.round as gameweek
     from {{ ref('stg_gameweek') }} as calendar
     inner join latest_calendar_capture using (season, run_id)
     where calendar.finished
@@ -83,12 +84,12 @@ finished_rounds as (
 select
     departed.season,
     departed.fpl_id,
-    finished_rounds.round,
-    'departed player has no spine row for this finished round' as failure
+    finished_gameweeks.gameweek,
+    'departed player has no spine row for this finished gameweek' as failure
 from departed
-inner join finished_rounds using (season)
+inner join finished_gameweeks using (season)
 left join {{ ref('int_player_gameweek_spine') }} as spine
     on  spine.season = departed.season
     and spine.fpl_id = departed.fpl_id
-    and spine.round = finished_rounds.round
+    and spine.gameweek = finished_gameweeks.gameweek
 where spine.fpl_id is null

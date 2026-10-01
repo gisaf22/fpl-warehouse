@@ -162,7 +162,7 @@ def test_the_floor_finds_a_season_that_only_fixtures_and_history_still_stage(
     publish, capsys
 ):
     # Every bootstrap-static capture of the season came back empty: no
-    # players, no rounds, no teams. Only the fixtures endpoint and
+    # players, no gameweeks, no teams. Only the fixtures endpoint and
     # element-summary history still carry the season, so a season list read
     # from bootstrap-derived staging alone would never check it.
     result = publish(
