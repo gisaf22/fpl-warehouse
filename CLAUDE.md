@@ -416,17 +416,20 @@ than hardcoded, so it tracks the data instead of needing an edit whenever the da
   against it would compare a number against itself and pass unconditionally.
 
 For the closed 2025-26 season the figures are fixed — they will never change: expected
-31,958 (841 x 38). `fct_player_gameweek` matches it exactly. `fct_player_fixture` is 6.9%
-low, 2,211 player-gameweeks in which that player's club did not play — legitimately, because
-it is a different grain: one row per fixture a player actually has history for, so a blank
-gameweek removes rows the expectation counted. The live season follows the same pattern
+31,958 (841 x 38). `fct_player_gameweek` matches it exactly. `fct_player_fixture` sits below
+it legitimately, because it is a different grain: one row per fixture a player actually has
+history for. The expectation counts every player for every gameweek, so two things remove rows
+it counted: a player added to the game mid-season has no history for the gameweeks before they
+joined, and a gameweek in which the player's club did not play has no fixture row. Double
+gameweeks push the other way, adding a second row for the gameweek, so the observed gap is the
+net of the three. The live season follows the same pattern
 (measured on 2026-09-21, run 35632785680), but its figures move every build; the publish
 step logs each season's actual and expected counts, and `served/_manifest.json` carries
 the current actuals.
 
 Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`,
-which is the expectation's own grain, and 15% for `fct_player_fixture`, roughly 2x its
-observed worst case (2025-26's fixed 6.9%). The three dimensions take 0%, because their
+which is the expectation's own grain, and 15% for `fct_player_fixture`, roughly twice the
+gap observed for the closed 2025-26 season. The three dimensions take 0%, because their
 expectations are exact counts rather than estimates. Double gameweeks push the other way
 and nothing caps the upside — a table larger than expected is not the failure this guards
 against.
