@@ -334,11 +334,12 @@ var rather than derived from event-status, which only ever serves the current ga
 carries `run_id`, the build timestamp (UTC, seconds precision), the git SHA the build ran
 from, `seasons` (a sorted list of what is in the files), `row_counts` (per table),
 `row_counts_by_season` (per table, per season), `restated_seasons` (the seasons this
-publish was allowed to shrink, normally `[]`) and `published_without_baseline` (normally
-`false`). A consumer that wants a consistency check can compare those counts against what
-it actually reads. The last two were added on 2026-09-28 (#63), additively; the next
-publish reads only `row_counts_by_season` back from here, so an older manifest without
-them is still a valid baseline. See "The publish floor is computed, not configured".
+publish was allowed to shrink, normally `[]`), `published_without_baseline` (normally
+`false`), `contract_version` and `columns` (see "Contract version" below). A consumer
+that wants a consistency check can compare those counts against what it actually reads.
+`restated_seasons` and `published_without_baseline` were added on 2026-09-28 (#63),
+additively; the next publish requires only `row_counts_by_season` from here, so an older
+manifest without them is still a valid baseline. See "The publish floor is computed, not configured".
 
 `row_counts` deliberately kept its original `{table: total}` shape instead of becoming
 nested when the second season arrived, so nothing reading it has to change; the breakdown
@@ -346,11 +347,43 @@ was added alongside it. `seasons` is a list rather than a multi-season boolean f
 reason — a flag would encode today's two-season state as the thing to branch on, and the
 count changes again the next time a season is ported.
 
+### Contract version
+
+`served/_manifest.json` carries `contract_version`, one integer for the whole served set
+(#74). A consumer checks it against the version it was written for before reading.
+
+- **It lives in `dbt_project.yml`** as the `served_contract_version` var, and
+  `publish_served.py` reads it from there. Bump it by one in the same pull request as the
+  breaking change, so the bump is reviewed beside the `schema.yml` edit.
+- **Breaking, so bump:** a served column dropped, renamed, retyped or moved; a served table
+  removed; a grain or key change; a change to what an existing column's values mean (the
+  `is_ratified` case of 2026-09-15).
+- **Not breaking, so no bump:** a column appended last, a new served table, a new manifest
+  field.
+- **The publish guards the shape.** The manifest also carries `columns`: each served
+  table's `[name, type]` pairs in order, read back from the uploaded parquet. A publish is
+  refused when `contract_version` is lower than the previous manifest's, or when, at the
+  same version, a table the previous manifest listed no longer starts with its previous
+  columns or is missing. A higher version is the override.
+- **It cannot see a change in meaning.** A column whose values change meaning keeps its
+  shape and passes the guard. That bump is caught by review only.
+- **It fires at the scheduled build, after merge,** not on the pull request. A forgotten
+  bump stops the next publish, and `served/` keeps the last good publish until the bump
+  lands.
+- Started at **1** on 2026-10-03: version 1 is the five tables as served then. A previous
+  manifest without `contract_version` or `columns` skips that check, so the first publish
+  after #74 was not blocked. Past changes are not versioned retroactively.
+
 ### Column changes to the served tables
 
 Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
-learns of it.
+learns of it. From #74 on, each entry states the `contract_version` it ships in.
+
+- **2026-10-03 — manifest gains `contract_version` and `columns` (#74). Additive,
+  `contract_version` 1.** Two new manifest fields; every served table and every existing
+  field is unchanged. A consumer that reads `served/` should assert `contract_version == 1`
+  from now on.
 
 - **2026-09-30 — `round` renamed `gameweek` (#89). Breaking.** In `fct_player_fixture`,
   `fct_player_gameweek` and `dim_fixture` the column `round INTEGER` is now

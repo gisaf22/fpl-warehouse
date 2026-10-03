@@ -31,6 +31,11 @@ DIMENSIONS = ("dim_team", "dim_player", "dim_fixture")
 # tests instead of silently dropping out of them.
 SERVED = FACTS + DIMENSIONS
 
+# Every served table's columns in the harness build, as the manifest records
+# them: [name, type] in order, read back from the exported parquet.
+COLUMNS = "season varchar, row_number integer"
+SHAPE = [["season", "VARCHAR"], ["row_number", "INTEGER"]]
+
 
 class FakeS3:
     """Serves one previous manifest and records every upload."""
@@ -98,18 +103,27 @@ def season(
     }
 
 
-def manifest(tables: tuple[str, ...] = SERVED, **by_season: dict) -> dict:
+def manifest(
+    tables: tuple[str, ...] = SERVED,
+    *,
+    contract_version: int | None = None,
+    columns: dict[str, list] | None = None,
+    **by_season: dict,
+) -> dict:
     """A previous manifest recording each season's served counts.
 
     `tables` names what that publish served. Pass FACTS for a manifest written
     before the dimensions were served, which is what the first publish after
     they are added reads.
+
+    `contract_version` and `columns` are left out unless given, as in every
+    manifest published before #74.
     """
     by_table = {
         table: {name: shape[table] for name, shape in by_season.items()}
         for table in tables
     }
-    return {
+    previous = {
         "run_id": "previous",
         "seasons": sorted(by_season),
         "row_counts": {
@@ -117,20 +131,37 @@ def manifest(tables: tuple[str, ...] = SERVED, **by_season: dict) -> dict:
         },
         "row_counts_by_season": by_table,
     }
+    if contract_version is not None:
+        previous["contract_version"] = contract_version
+    if columns is not None:
+        previous["columns"] = columns
+    return previous
 
 
 def make_publish(tmp_path, monkeypatch):
-    """Return run(build, previous, args): build a warehouse, then run main()."""
+    """Return run(build, previous, args): build a warehouse, then run main().
+
+    `version` is the build's served_contract_version var. `columns` overrides a
+    served table's column DDL, {table: "name type, ..."}; every other table
+    takes COLUMNS.
+    """
 
     project = tmp_path / "dbt_project.yml"
-    project.write_text(f"vars:\n  season: '{LIVE}'\n")
     monkeypatch.setattr(publish_served, "PROJECT_FILE", project)
     monkeypatch.setattr(publish_served, "OUT_DIR", tmp_path / "served")
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
 
     def run(
-        build: dict[str, dict], previous: dict | bytes | None, args: list[str] = ()
+        build: dict[str, dict],
+        previous: dict | bytes | None,
+        args: list[str] = (),
+        *,
+        version: int = 1,
+        columns: dict[str, str] | None = None,
     ):
+        project.write_text(
+            f"vars:\n  season: '{LIVE}'\n  served_contract_version: {version}\n"
+        )
         database = tmp_path / "warehouse.duckdb"
         database.unlink(missing_ok=True)
         with duckdb.connect(str(database)) as connection:
@@ -151,9 +182,8 @@ def make_publish(tmp_path, monkeypatch):
                 "create table stg_player_fixture (season varchar, fpl_id integer)"
             )
             for table in SERVED:
-                connection.execute(
-                    f"create table {table} (season varchar, row_number integer)"
-                )
+                ddl = (columns or {}).get(table, COLUMNS)
+                connection.execute(f"create table {table} ({ddl})")
             for name, shape in build.items():
                 for table, count in (
                     ("stg_player", shape["players"]),
@@ -171,8 +201,10 @@ def make_publish(tmp_path, monkeypatch):
                     [name, shape["finished_gameweeks"]],
                 )
                 for table in SERVED:
+                    # Only season is filled, so an overridden shape keeps
+                    # loading as long as it keeps that column.
                     connection.execute(
-                        f"insert into {table} select ?, range from range(?)",
+                        f"insert into {table} (season) select ? from range(?)",
                         [name, shape[table]],
                     )
         monkeypatch.setattr(publish_served, "DATABASE", database)
