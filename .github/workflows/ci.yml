@@ -218,8 +218,12 @@ jobs:
       - name: Create the local database directory
         run: mkdir -p .local
 
-      # Models only. The tiers run as their own steps below so a failure names
-      # the tier it came from.
+      # Seeds and models only. The tiers run as their own steps below so a
+      # failure names the tier it came from. `dbt run` loads no seed, so the
+      # seed step comes first (seed_run_origin, #96).
+      - name: Load seeds
+        run: uv run dbt seed --target fixtures
+
       - name: Build models against the fixture capture
         run: uv run dbt run --target fixtures
 
@@ -357,6 +361,9 @@ jobs:
       # passes. Peak RSS is the number to watch when raising DBT_DUCKDB_THREADS:
       # the element-summary read OOM'd at 12.7 GiB before
       # preserve_insertion_order was turned off, and a runner has ~16 GB.
+      - name: Load seeds
+        run: uv run dbt seed
+
       - name: Build models
         run: >-
           /usr/bin/time -v uv run dbt run

@@ -37,7 +37,9 @@ def test_a_run_named_in_exactly_one_main_ingest_log_is_ci_with_that_run():
         [run],
         history_runs=set(),
         actions_runs=[actions(1, DAILY, "2026-08-31T19:11:44Z")],
-        log_of=logs(**{"1": f"Captured fixtures -> fpl/fixtures/2026-08-31/{run}/payload.json"}),
+        log_of=logs(
+            **{"1": f"Captured fixtures -> fpl/fixtures/2026-08-31/{run}/payload.json"}
+        ),
     )
 
     assert only(rows) == {
