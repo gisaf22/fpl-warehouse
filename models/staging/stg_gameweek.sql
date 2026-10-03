@@ -8,15 +8,16 @@
 --   into one row per gameweek. Typing and renaming only.
 --
 -- Grain:
---   One row per (round) *per captured object* — 1:1 with the raw source, so
+--   One row per (gameweek) *per captured object* — 1:1 with the raw source, so
 --   each of the 38 gameweeks contributes one row per bootstrap-static run.
---   A round's `finished` / `data_checked` flags therefore differ between
+--   A gameweek's `finished` / `data_checked` flags therefore differ between
 --   captures; that is the point, and resolving to one capture is the served
 --   layer's job.
 --
 -- Naming:
 --   FPL calls this entity an `event`; the per-fixture history rows call the
---   same number `round`. `round` is used throughout this warehouse.
+--   same number `round`. This warehouse calls it `gameweek` from staging onward
+--   (#89, #101).
 -- =============================================================================
 
 with raw as (
@@ -39,7 +40,7 @@ select
     )                                          as extracted_at,
 
     -- Keys
-    cast(ev.id as integer)                     as round,
+    cast(ev.id as integer)                     as gameweek,
 
     -- Calendar
     cast(ev.deadline_time as timestamp)        as deadline_time,

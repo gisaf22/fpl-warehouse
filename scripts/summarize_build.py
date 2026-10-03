@@ -57,7 +57,7 @@ MODELS = (
     "stg_player",
     "stg_player_fixture",
     "stg_gameweek",
-    "stg_event_status",
+    "stg_gameweek_status",
     "int_player_gameweek_spine",
     "int_gameweek_status",
     "fct_player_fixture",

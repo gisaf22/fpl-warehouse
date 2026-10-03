@@ -36,7 +36,7 @@ unit_tests:
               3::bigint as team_h_difficulty, 4::bigint as team_a_difficulty
     expect:
       rows:
-        - {season: "2026-27", run_id: "20260914T211204Z-a730c3", fixture_id: 57, round: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
+        - {season: "2026-27", run_id: "20260914T211204Z-a730c3", fixture_id: 57, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
 
   - name: postponed_fixture_keeps_each_captures_round_as_reported
     description: >
@@ -67,9 +67,9 @@ unit_tests:
               2::bigint as team_h_difficulty, 3::bigint as team_a_difficulty)
     expect:
       rows:
-        - {run_id: "20260906T191056Z-6d5820", fixture_id: 41, round: 5,    kickoff_time: "2026-09-27 14:00:00"}
-        - {run_id: "20260914T211204Z-a730c3", fixture_id: 41, round: null, kickoff_time: null}
-        - {run_id: "20260920T191100Z-0f0f0f", fixture_id: 41, round: 12,   kickoff_time: "2026-11-25 19:30:00"}
+        - {run_id: "20260906T191056Z-6d5820", fixture_id: 41, gameweek: 5,    kickoff_time: "2026-09-27 14:00:00"}
+        - {run_id: "20260914T211204Z-a730c3", fixture_id: 41, gameweek: null, kickoff_time: null}
+        - {run_id: "20260920T191100Z-0f0f0f", fixture_id: 41, gameweek: 12,   kickoff_time: "2026-11-25 19:30:00"}
 
   - name: same_fixture_id_in_two_seasons_is_two_rows_each_with_its_own_season
     description: >

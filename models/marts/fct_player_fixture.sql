@@ -70,8 +70,7 @@
 --
 -- Columns:
 --   Every stg_player_fixture column passes through unchanged — staging owns
---   the typing — except `round`, served as `gameweek` (renamed where this
---   model reads staging, until #88 renames it there). Plus `is_ratified`,
+--   the typing. Plus `is_ratified`,
 --   false while the gameweek this fixture belongs to is still
 --   mid-settlement. Consumers wanting settled data only should
 --   filter on it rather than re-deriving it from the scores.
@@ -134,8 +133,7 @@
 
 with captures as (
 
-    -- Boundary mapping: staging names this column round until #88.
-    select * rename (round as gameweek) from {{ ref('stg_player_fixture') }}
+    select * from {{ ref('stg_player_fixture') }}
 
 ),
 

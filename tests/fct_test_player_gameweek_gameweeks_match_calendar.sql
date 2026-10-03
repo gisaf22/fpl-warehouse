@@ -48,8 +48,7 @@ with latest_capture as (
 
 calendar as (
 
-    -- Boundary mapping: staging names this column round until #88.
-    select distinct stg_calendar.season, stg_calendar.round as gameweek
+    select distinct stg_calendar.season, stg_calendar.gameweek
     from {{ ref('stg_gameweek') }} as stg_calendar
     inner join latest_capture using (season, run_id)
     where stg_calendar.finished
