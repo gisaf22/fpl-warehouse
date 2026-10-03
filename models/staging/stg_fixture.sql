@@ -12,7 +12,7 @@
 --   source, so each fixture contributes one row per fixtures run. Selecting a
 --   single capture is the model layer's job, not staging's.
 --
--- round / kickoff_time:
+-- gameweek / kickoff_time:
 --   Nullable and never coalesced. FPL withdraws both from a postponed or
 --   unscheduled fixture and restores them when it is rescheduled, so a capture
 --   taken in between reports the fixture with neither. It still exists.
@@ -36,7 +36,7 @@ select
     cast(id as integer)                        as fixture_id,
 
     -- Schedule, null while unscheduled or postponed
-    cast(event as integer)                     as round,
+    cast(event as integer)                     as gameweek,
     cast(kickoff_time as timestamp)            as kickoff_time,
 
     -- Sides

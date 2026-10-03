@@ -175,7 +175,7 @@ sources:
           row per (event, match-date), NOT one per round: a round spanning
           three match days contributes three entries, and a round mid-transition
           carries a mix of `points` values across them. Round-level finality is
-          therefore an aggregate, built in int_round_ratification — see that
+          therefore an aggregate, built in int_gameweek_status — see that
           model for the rule.
 
           `status[].points` is a string with three observed values: `"r"`

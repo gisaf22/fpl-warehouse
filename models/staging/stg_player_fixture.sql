@@ -44,7 +44,7 @@
 --   resolve competing captures of the same (fpl_id, fixture_id).
 --
 -- Season:
---   `season` is part of capture identity. fpl_id, fixture_id and round are
+--   `season` is part of capture identity. fpl_id, fixture_id and gameweek are
 --   all reassigned every season, so every downstream dedup, retraction check
 --   and ratification lookup partitions by season as well — it keeps that
 --   within-season logic from ever reaching across a season boundary. It is
@@ -75,7 +75,7 @@ select
     -- Keys
     cast(h.element             as integer)   as fpl_id,
     cast(h.fixture             as integer)   as fixture_id,
-    cast(h.round               as integer)   as round,
+    cast(h.round               as integer)   as gameweek,
 
     -- Fixture context
     cast(h.opponent_team       as integer)   as opponent_team_fpl_id,

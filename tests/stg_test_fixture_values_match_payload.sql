@@ -1,6 +1,6 @@
 -- Layer: stg
 -- Tests: stg_fixture
--- Asserts: every staged fixture's teams, round, kickoff, scores, finished flag
+-- Asserts: every staged fixture's teams, gameweek, kickoff, scores, finished flag
 --          and both difficulty values equal its own capture's payload.
 -- Origin: new in #37
 -- Tier: unit
@@ -42,7 +42,7 @@ paired as (
         source_fixtures.*,
         staged.team_h_fpl_id,
         staged.team_a_fpl_id,
-        staged.round,
+        staged.gameweek,
         staged.kickoff_time            as staged_kickoff_time,
         staged.team_h_score            as staged_team_h_score,
         staged.team_a_score            as staged_team_a_score,
@@ -65,7 +65,7 @@ mismatches as (
         select unnest([
             case when team_h_fpl_id            is distinct from team_h            then 'home team' end,
             case when team_a_fpl_id            is distinct from team_a            then 'away team' end,
-            case when round                    is distinct from event             then 'round' end,
+            case when gameweek                 is distinct from event             then 'gameweek' end,
             case when staged_kickoff_time      is distinct from kickoff_time      then 'kickoff' end,
             case when staged_team_h_score      is distinct from team_h_score      then 'home score' end,
             case when staged_team_a_score      is distinct from team_a_score      then 'away score' end,

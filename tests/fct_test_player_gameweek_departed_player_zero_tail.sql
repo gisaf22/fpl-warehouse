@@ -110,10 +110,9 @@ tail_gameweeks as (
         finished_calendar.gameweek
     from departed
     inner join (
-        -- Boundary mapping: staging names this column round until #88.
         select distinct
             calendar.season,
-            calendar.round as gameweek,
+            calendar.gameweek,
             calendar.deadline_time
         from {{ ref('stg_gameweek') }} as calendar
         inner join latest_calendar_capture using (season, run_id)

@@ -89,8 +89,7 @@ gameweeks as (
 
     select
         calendar.season,
-        -- Boundary mapping: staging names this column round until #88.
-        calendar.round as gameweek,
+        calendar.gameweek,
         calendar.deadline_time
     from {{ ref('stg_gameweek') }} as calendar
     inner join latest_capture using (season, run_id)

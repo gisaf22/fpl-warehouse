@@ -253,7 +253,7 @@ Nested lists on `elements[]`:
 | `h2h_ko_matches_created` | ✓ | ✓ | bool `False` | STATE | ✗ final state | ✓ per capture | — |
 | `highest_score` | ✓ | ✓ | int → int or null `131` | OUTCOME | ✓ (past GWs final) | ✓ after GW | — |
 | `highest_scoring_entry` | ✓ | ✓ | int → int or null `120245` | OUTCOME | ✓ (past GWs final) | ✓ after GW | — |
-| `id` | ✓ | ✓ | int `1` | STATIC | ✓ | ✓ | stg_gameweek.round |
+| `id` | ✓ | ✓ | int `1` | STATIC | ✓ | ✓ | stg_gameweek.gameweek |
 | `is_current` | ✓ | ✓ | bool `False` | STATE | ✗ final state | ✓ per capture | stg_gameweek.is_current |
 | `is_next` | ✓ | ✓ | bool `False` | STATE | ✗ final state | ✓ per capture | — |
 | `is_previous` | ✓ | ✓ | bool `False` | STATE | ✗ final state | ✓ per capture | — |
@@ -422,7 +422,7 @@ all 667 (2026-27) payloads of each season's last run.
 | `penalties_saved` | ✓ | ✓ | int `0` | OUTCOME | ✓ | ✓ | stg_player_fixture.penalties_saved |
 | `recoveries` | ✓ | ✓ | int `0` | OUTCOME | ✓ | ✓ | stg_player_fixture.recoveries |
 | `red_cards` | ✓ | ✓ | int `0` | OUTCOME | ✓ | ✓ | stg_player_fixture.red_cards |
-| `round` | ✓ | ✓ | int `1` | STATIC | ✓ | ✓ | stg_player_fixture.round |
+| `round` | ✓ | ✓ | int `1` | STATIC | ✓ | ✓ | stg_player_fixture.gameweek |
 | `saves` | ✓ | ✓ | int `0` | OUTCOME | ✓ | ✓ | stg_player_fixture.saves |
 | `selected` | ✓ | ✓ | int `1493302` | PRE-DL (per round) | ✓ (INFERRED) | ✓ (INFERRED) | stg_player_fixture.selected |
 | `starts` | ✓ | ✓ | int `1` | OUTCOME | ✓ | ✓ | stg_player_fixture.starts |
@@ -481,10 +481,10 @@ PRIOR-SEASON: closed seasons only. **No leakage in either season (OBSERVED):**
 
 | Field | 25-26 | 26-27 | Type / example | Class | As-of 25-26 | As-of 26-27 | Extracted |
 |---|---|---|---|---|---|---|---|
-| `bonus_added` | — | ✓ | bool `True` | STATE | ✗ not captured | ✓ per capture | stg_event_status.bonus_added |
-| `date` | — | ✓ | str `2026-09-18` | STATE | ✗ not captured | ✓ per capture | stg_event_status.match_date |
-| `event` | — | ✓ | int `5` | STATE | ✗ not captured | ✓ per capture | stg_event_status.round |
-| `points` | — | ✓ | str `r` | STATE | ✗ not captured | ✓ per capture | stg_event_status.points |
+| `bonus_added` | — | ✓ | bool `True` | STATE | ✗ not captured | ✓ per capture | stg_gameweek_status.bonus_added |
+| `date` | — | ✓ | str `2026-09-18` | STATE | ✗ not captured | ✓ per capture | stg_gameweek_status.match_date |
+| `event` | — | ✓ | int `5` | STATE | ✗ not captured | ✓ per capture | stg_gameweek_status.gameweek |
+| `points` | — | ✓ | str `r` | STATE | ✗ not captured | ✓ per capture | stg_gameweek_status.points |
 
 ### 1.6 Staging coverage (OBSERVED)
 
@@ -493,7 +493,7 @@ PRIOR-SEASON: closed seasons only. **No leakage in either season (OBSERVED):**
 | `stg_player` | bootstrap `elements[]` | 4 / 109 | 3.7% | ✓ | ✓ |
 | `stg_gameweek` | bootstrap `events[]` | 5 / 29 | 17.2% | ✓ | ✓ |
 | `stg_player_fixture` | element-summary `history[]` | 41 / 41 | 100% | ✓ | ✓ |
-| `stg_event_status` | event-status `status[]` | 4 / 4 (`leagues` not read) | 100% | n/a (not captured) | ✓ |
+| `stg_gameweek_status` | event-status `status[]` | 4 / 4 (`leagues` not read) | 100% | n/a (not captured) | ✓ |
 | — | bootstrap `teams[]`, `element_types[]`, `chips`, `phases`, `element_stats`, `game_*` | 0 | 0% | | |
 | — | **fixtures** (whole endpoint) | 0 / 17 + `stats[]` | 0% | | |
 | — | **event-live** (whole endpoint) | 0 / 29 + `explain[]` | 0% | | |

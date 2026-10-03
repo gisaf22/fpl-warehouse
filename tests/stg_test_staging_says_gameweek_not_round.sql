@@ -8,7 +8,14 @@
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#101 AC1'}) }}
 
 -- Models are read from dbt's graph, not from the database file, so a table
--- left behind by an older build cannot satisfy or fail the check.
+-- left behind by an older build cannot satisfy or fail the check. The graph
+-- read creates no dependency, so the four models that carried `round` are
+-- declared explicitly; without them `dbt build` can run this test before they
+-- are rebuilt.
+-- depends_on: {{ ref('stg_gameweek') }}
+-- depends_on: {{ ref('stg_fixture') }}
+-- depends_on: {{ ref('stg_player_fixture') }}
+-- depends_on: {{ ref('stg_gameweek_status') }}
 
 {% set staging = [] %}
 {% if execute %}

@@ -29,7 +29,7 @@ select null as failure where false
 
 with history as (
 
-    select distinct season, fixture_id, round, was_home
+    select distinct season, fixture_id, gameweek, was_home
     from {{ ref('stg_player_fixture') }}
     where season = '{{ var("season") }}'
       and fpl_id = 166
@@ -41,7 +41,7 @@ fixtures as (
     select distinct
         {{ season_from_filename() }} as season,
         cast(id as integer)          as fixture_id,
-        cast(event as integer)       as round,
+        cast(event as integer)       as gameweek,
         cast(team_h as integer)      as team_h,
         cast(team_a as integer)      as team_a
     from {{ source('fpl_raw', 'fixtures') }}
@@ -67,7 +67,7 @@ resolved as (
             as club_fpl_id,
         history.season
     from history
-    left join fixtures using (season, fixture_id, round)
+    left join fixtures using (season, fixture_id, gameweek)
 
 )
 
