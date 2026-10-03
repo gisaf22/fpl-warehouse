@@ -233,3 +233,92 @@ unit_tests:
       rows:
         - {season: "2025-26", fpl_id: 449, player_code: 141746, web_name: "B.Fernandes"}
         - {season: "2026-27", fpl_id: 426, player_code: 141746, web_name: "B.Fernandes"}
+
+  # --- int_capture_admission: which captures are admitted (#97) -------------
+  # See the model header and #87 decisions D1-D6.
+
+  - name: production_is_ci_on_main_from_the_manifest_origin
+    description: >
+      From contract 2.2.0 a run is production only when its manifest says ci on
+      refs/heads/main. A local run, or ci on another ref, is not_production.
+    model: int_capture_admission
+    config:
+      tags: [unit]
+      meta:
+        covers: "#97 AC1"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "k-main", run_id: "20261003T052050Z-aaaaaa", season: "2026-27", usable: true, shape_ok: true, shape_source: "sidecar"}
+          - {capture_key: "k-local", run_id: "20261003T060000Z-bbbbbb", season: "2026-27", usable: true, shape_ok: true, shape_source: "sidecar"}
+          - {capture_key: "k-branch", run_id: "20261003T070000Z-cccccc", season: "2026-27", usable: true, shape_ok: true, shape_source: "sidecar"}
+      - input: ref('stg_run')
+        rows:
+          - {run_id: "20261003T052050Z-aaaaaa", origin_kind: "ci", origin_ref: "refs/heads/main"}
+          - {run_id: "20261003T060000Z-bbbbbb", origin_kind: "local", origin_ref: null}
+          - {run_id: "20261003T070000Z-cccccc", origin_kind: "ci", origin_ref: "refs/heads/feat/x"}
+      - input: ref('seed_run_origin')
+        rows: []
+    expect:
+      rows:
+        - {capture_key: "k-main", admitted: true, flagged_revalidation: false, unadmitted_reason: null}
+        - {capture_key: "k-local", admitted: false, flagged_revalidation: false, unadmitted_reason: "not_production"}
+        - {capture_key: "k-branch", admitted: false, flagged_revalidation: false, unadmitted_reason: "not_production"}
+
+  - name: unusable_unfinalized_and_seasonless_captures_are_not_admitted
+    description: >
+      A usable = false capture, a capture whose run has no finalized manifest,
+      and a capture with no season are each not admitted, with their own reason.
+      All three runs are ci in the seed, so production is not what excludes them.
+    model: int_capture_admission
+    config:
+      tags: [unit]
+      meta:
+        covers: "#97 AC3"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "k-unusable", run_id: "20260901T071823Z-aaaaaa", season: "2026-27", usable: false, shape_ok: true, shape_source: "sidecar"}
+          - {capture_key: "k-unfinalized", run_id: "20260902T071823Z-bbbbbb", season: "2026-27", usable: true, shape_ok: true, shape_source: "sidecar"}
+          - {capture_key: "k-seasonless", run_id: "20260903T071823Z-cccccc", season: null, usable: true, shape_ok: true, shape_source: "sidecar"}
+      - input: ref('stg_run')
+        rows:
+          - {run_id: "20260901T071823Z-aaaaaa", origin_kind: null, origin_ref: null}
+          - {run_id: "20260903T071823Z-cccccc", origin_kind: null, origin_ref: null}
+      - input: ref('seed_run_origin')
+        rows:
+          - {run_id: "20260901T071823Z-aaaaaa", origin_kind: "ci"}
+          - {run_id: "20260902T071823Z-bbbbbb", origin_kind: "ci"}
+          - {run_id: "20260903T071823Z-cccccc", origin_kind: "ci"}
+    expect:
+      rows:
+        - {capture_key: "k-unusable", admitted: false, flagged_revalidation: false, unadmitted_reason: "unusable"}
+        - {capture_key: "k-unfinalized", admitted: false, flagged_revalidation: false, unadmitted_reason: "run_not_finalized"}
+        - {capture_key: "k-seasonless", admitted: false, flagged_revalidation: false, unadmitted_reason: "null_season"}
+
+  - name: a_failed_revalidation_is_admitted_and_flagged
+    description: >
+      shape_source = revalidated with shape_ok = false on an otherwise admissible
+      capture is admitted with flagged_revalidation = true. A passing
+      revalidation, and a sidecar verdict of shape_ok = false, are not flagged.
+    model: int_capture_admission
+    config:
+      tags: [unit]
+      meta:
+        covers: "#97 AC4"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "k-failed", run_id: "20260526T034626Z-2a6b73", season: "2025-26", usable: true, shape_ok: false, shape_source: "revalidated"}
+          - {capture_key: "k-passed", run_id: "20260526T034626Z-2a6b73", season: "2025-26", usable: true, shape_ok: true, shape_source: "revalidated"}
+          - {capture_key: "k-sidecar", run_id: "20260526T034626Z-2a6b73", season: "2025-26", usable: true, shape_ok: false, shape_source: "sidecar"}
+      - input: ref('stg_run')
+        rows: []
+      - input: ref('seed_run_origin')
+        rows:
+          - {run_id: "20260526T034626Z-2a6b73", origin_kind: "history_port"}
+    expect:
+      rows:
+        - {capture_key: "k-failed", admitted: true, flagged_revalidation: true, unadmitted_reason: null}
+        - {capture_key: "k-passed", admitted: true, flagged_revalidation: false, unadmitted_reason: null}
+        - {capture_key: "k-sidecar", admitted: true, flagged_revalidation: false, unadmitted_reason: null}

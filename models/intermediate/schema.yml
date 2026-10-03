@@ -51,3 +51,36 @@ models:
       models. Internal: not part of the served contract.
     group: warehouse_internal
     access: private
+
+  - name: int_capture_admission
+    description: >
+      One row per indexed capture: whether it is admitted, and if not, why
+      (#97, #87 D1 and D4-D6). Admitted means its run is finalized, its run
+      is production, and the capture is usable and has a season. Production is
+      the manifest's own `origin` from contract 2.2.0 (ci on refs/heads/main),
+      and seed_run_origin before it (ci or history_port). A failed
+      revalidation is admitted but flagged. Internal.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#97 AC5"
+          - not_null:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#97 AC5"
+      - name: unadmitted_reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["run_not_finalized", "origin_unknown", "not_production", "unusable", "null_season"]
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#97 AC5"

@@ -136,6 +136,18 @@ Beside the payloads, the tree carries what ingest writes to index them (#95):
     requires for that status. No live manifest has ever been left in
     progress (measured 2026-10-03), so a real one does not exist to copy.
 
+  - The real manifest of LOCAL_RUN, 20260902T163935Z-07eb06: a laptop run that wrote
+    into production raw/ (#87). Its catalog file is trimmed to the six fixture
+    players' element-summary entries, every one with `season: null`, and their
+    payloads are deliberately NOT in the tree. It exists so admission (#97) has a
+    real `local` run to exclude; its bytes duplicate production captures (#87
+    evidence), so leaving them out loses nothing.
+  - Two SYNTHETIC catalog entries appended to the last run's catalog file, with
+    no payload: one `usable: false` and one `shape_source: revalidated` with
+    `shape_ok: false`. Neither state exists in live data (measured 2026-10-03),
+    and admission (#97) must handle both. They use fpl_id 9999, which no
+    fixture player has.
+
 `--index-only` rewrites just these files and leaves the payloads untouched.
 
 WHAT EACH PLAYER COVERS
@@ -337,6 +349,10 @@ RUNS = [
 # synthetic in-progress run modelled on it.
 INDEX_22_RUN = ("20261003T052050Z-fa64a9", "2026-10-03")
 IN_PROGRESS_RUN = ("20261003T060000Z-0000a1", "2026-10-03")
+LOCAL_RUN = ("20260902T163935Z-07eb06", "2026-09-02")
+# fpl_ids of the two synthetic admission entries; no fixture player has either.
+SYNTHETIC_UNUSABLE_FPL_ID = 9998
+SYNTHETIC_REVALIDATED_FPL_ID = 9999
 
 # (run_id, extraction_date) for event-status — a separate axis from RUNS above.
 # See EVENT-STATUS CAPTURES for why these dates and not the four runs.
@@ -548,6 +564,58 @@ def build_index() -> None:
             "are verbatim. See CAPTURE INDEX in build_fixtures.py."
         )
         write(OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json", catalog)
+
+    # The local run: its manifest, and its catalog trimmed to fixture players.
+    run_id, date = LOCAL_RUN
+    write(
+        OUT_ROOT / "_manifests" / date / run_id / "manifest.json",
+        s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json"),
+    )
+    catalog = s3_get(f"{RAW_PREFIX}/_catalog/backfill/{run_id}.json")
+    total = len(catalog["captures"])
+    catalog["captures"] = [
+        c for c in catalog["captures"]
+        if c["endpoint"] in {f"element-summary/{p}" for p in PLAYERS}
+    ]
+    if not catalog["captures"] or any(c["season"] is not None for c in catalog["captures"]):
+        sys.exit(f"{run_id} no longer gives fixture players with a null season")
+    catalog["_fixture_note"] = (
+        f"Catalog of the LOCAL run {run_id}, trimmed from {total} entries to the "
+        f"{len(catalog['captures'])} fixture players'. Their payloads are "
+        "deliberately not in this tree. See CAPTURE INDEX in build_fixtures.py."
+    )
+    write(OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json", catalog)
+
+    # Two synthetic admission cases, appended to the last run's catalog.
+    run_id, date = RUNS[-1]
+    path = OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json"
+    catalog = json.loads(path.read_text())
+    template = next(
+        c for c in catalog["captures"] if c["endpoint"].startswith("element-summary/")
+    )
+    def synthetic(fpl_id: int, **changes) -> dict:
+        return {
+            **template,
+            "key": f"raw/fpl/element-summary/{fpl_id}/{date}/{run_id}/payload.json",
+            "endpoint": f"element-summary/{fpl_id}",
+            **changes,
+        }
+
+    catalog["captures"] += [
+        synthetic(SYNTHETIC_UNUSABLE_FPL_ID, usable=False),
+        synthetic(
+            SYNTHETIC_REVALIDATED_FPL_ID,
+            shape_source="revalidated",
+            shape_ok=False,
+            validator_version="fpl-ingest/synthetic",
+        ),
+    ]
+    catalog["_fixture_note"] += (
+        " Plus two SYNTHETIC entries with no payload: fpl_id "
+        f"{SYNTHETIC_UNUSABLE_FPL_ID} unusable, fpl_id "
+        f"{SYNTHETIC_REVALIDATED_FPL_ID} a failed revalidation."
+    )
+    write(path, catalog)
 
     run_id, date = INDEX_22_RUN
     manifest = s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json")
