@@ -262,6 +262,13 @@ not silently corrected.
 
 - `stg_` staging is 1:1 with its raw source — typing and renaming only. No business logic,
   no joins.
+- `base_` models sit in `models/staging/base/` and assemble one staging-level list from
+  several raw sources. `base_capture_index` (#95) is the one so far: every capture
+  ingest has indexed, from finalized manifests' `captures[]` (contract 2.1.0+) and the
+  backfill catalog (older runs and the history port), keyed by the object's key from its
+  tree's root. The `capture_key_from_filename` macro is the one place a payload's
+  `filename` becomes that key. `stg_run` holds the finalized runs, and is the one place
+  "finalized" (any status but `IN_PROGRESS`) is decided.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
 - Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
@@ -557,7 +564,7 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   only from inside the same group, and they must read staging to be built at all. Their
   `access: public` is what keeps them referenceable from outside.
 - CI's `validate` job checks the boundary from what dbt resolved: exactly the five served
-  models are public, and every `stg_`/`int_` model is private (#44 AC3). A new served model
+  models are public, and every `stg_`/`int_`/`base_` model is private (#44 AC3, #95). A new served model
   must be added to that step's list as well as to `publish_served.py`.
 
 **Documented only, NOT enforced:**
