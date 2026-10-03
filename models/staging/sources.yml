@@ -204,3 +204,48 @@ sources:
               union_by_name = true,
               filename = true
             )
+
+      - name: run_manifests
+        description: >
+          fpl-ingest's run manifest, one object per run at
+          `_manifests/{extraction_date}/{run_id}/manifest.json`, contract
+          1.0.0 to 2.2.0. Read with explicit columns so every version yields the
+          same shape: a field a version lacks (`trigger` before 2026-09-24,
+          `origin` before 2.2.0, `captures` before 2.1.0 and on any
+          IN_PROGRESS manifest) reads as null. Live tree only: the ported
+          history season has no manifest (#87 D3).
+        meta:
+          external_location: >-
+            read_json(
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/_manifests/*/*/manifest.json',
+              columns = struct_pack(
+                raw_contract_version := 'VARCHAR',
+                run_id := 'VARCHAR',
+                status := 'VARCHAR',
+                started_at := 'VARCHAR',
+                ended_at := 'VARCHAR',
+                trigger := 'VARCHAR',
+                origin := 'STRUCT(kind VARCHAR, workflow VARCHAR, ref VARCHAR, github_run_id VARCHAR, aws_principal VARCHAR)',
+                captures := 'STRUCT(key VARCHAR, endpoint VARCHAR, received_at VARCHAR, content_sha256 VARCHAR, content_length BIGINT, http_status INTEGER, shape_ok BOOLEAN, usable BOOLEAN, season VARCHAR)[]'
+              ),
+              filename = true
+            )
+
+      - name: backfill_catalog
+        description: >
+          fpl-ingest's backfill catalog (gisaf22/fpl-ingest#66), one file per
+          run older than contract 2.1.0 at `_catalog/backfill/{run_id}.json`,
+          listing every capture that run wrote with its shape verdict and
+          season. Covers the live tree and the ported history season (`scope`
+          `live` / `history`); both files sit under the live raw root.
+        meta:
+          external_location: >-
+            read_json(
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/_catalog/backfill/*.json',
+              columns = struct_pack(
+                run_id := 'VARCHAR',
+                scope := 'VARCHAR',
+                captures := 'STRUCT(key VARCHAR, endpoint VARCHAR, received_at VARCHAR, content_sha256 VARCHAR, content_length BIGINT, http_status INTEGER, shape_ok BOOLEAN, usable BOOLEAN, season VARCHAR, shape_source VARCHAR, validator_version VARCHAR)[]'
+              ),
+              filename = true
+            )

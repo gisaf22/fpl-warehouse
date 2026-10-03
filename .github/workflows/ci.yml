@@ -145,9 +145,9 @@ jobs:
               problems.append(
                   f"public models {sorted(public)} are not the served set "
                   f"{sorted(SERVED)}")
-          internal = [n for n in models if n.startswith(("stg_", "int_"))]
+          internal = [n for n in models if n.startswith(("stg_", "int_", "base_"))]
           if not internal:
-              problems.append("no stg_/int_ models listed; nothing was checked")
+              problems.append("no stg_/int_/base_ models listed; nothing was checked")
           problems += [f"{n} is {models[n]}, not private"
                        for n in internal if models[n] != "private"]
           for problem in problems:

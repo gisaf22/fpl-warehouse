@@ -1,0 +1,100 @@
+{
+ "_fixture_note": "Backfill catalog for 20260526T034626Z-2a6b73, trimmed from 881 entries to the 7 whose payload is in this tree. Entries are verbatim. See CAPTURE INDEX in build_fixtures.py.",
+ "captures": [
+  {
+   "content_length": 2000657,
+   "content_sha256": "d9e9da8ce2730821d693a0c4762a08d30682651eb157ec3957a4dd995e96b629",
+   "endpoint": "bootstrap-static",
+   "http_status": null,
+   "key": "history/2025-26/fpl/bootstrap-static/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 31571,
+   "content_sha256": "590882cdbb296072f4c88fc8861535a631fc1a078731ac5e4f59bf04d6be40bb",
+   "endpoint": "element-summary/119",
+   "http_status": null,
+   "key": "history/2025-26/fpl/element-summary/119/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 30641,
+   "content_sha256": "788c3763d01d5784f1f4fc1f4a32761c67eb24f5f23a469091cb43c95aa9d233",
+   "endpoint": "element-summary/166",
+   "http_status": null,
+   "key": "history/2025-26/fpl/element-summary/166/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 29224,
+   "content_sha256": "0b18a8bf3523ee08d572ffd719b7af0eb712ae4f699caf818adadeacaaedfd14",
+   "endpoint": "element-summary/4",
+   "http_status": null,
+   "key": "history/2025-26/fpl/element-summary/4/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 31038,
+   "content_sha256": "a07e2b4c25df3437132e671d7756587fabfb12b02c198381775777c4571a6ec2",
+   "endpoint": "element-summary/426",
+   "http_status": null,
+   "key": "history/2025-26/fpl/element-summary/426/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 32843,
+   "content_sha256": "8b4e7fa6560070650fea916911f64453b876f580f09db5912f6a50562eb5245e",
+   "endpoint": "element-summary/449",
+   "http_status": null,
+   "key": "history/2025-26/fpl/element-summary/449/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  },
+  {
+   "content_length": 973929,
+   "content_sha256": "df0dfe040e7d194e0831c1f1b54e5f0274d851603e021425a191c9273eca89a0",
+   "endpoint": "fixtures",
+   "http_status": null,
+   "key": "history/2025-26/fpl/fixtures/2026-05-26/20260526T034626Z-2a6b73/payload.json",
+   "received_at": "2026-05-26T03:46:26Z",
+   "season": "2025-26",
+   "shape_ok": true,
+   "shape_source": "revalidated",
+   "usable": true,
+   "validator_version": "fpl-ingest/1.0.0+2ccdbcc"
+  }
+ ],
+ "generated_at": "2026-10-02T17:20:57Z",
+ "run_id": "20260526T034626Z-2a6b73",
+ "scope": "history",
+ "source": "fpl"
+}

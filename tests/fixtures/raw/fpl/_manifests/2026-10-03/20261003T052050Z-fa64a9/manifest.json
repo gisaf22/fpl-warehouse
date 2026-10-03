@@ -1,0 +1,88 @@
+{
+ "_fixture_note": "Verbatim 2.2.0 manifest. Its captures' payloads are deliberately not in this tree. See CAPTURE INDEX in build_fixtures.py.",
+ "captures": [
+  {
+   "content_length": 1778916,
+   "content_sha256": "7dd47a347b8b729ec7ee540b3a23e4df1f6bc7f47c63de3e4ed3be79bbcb8fcf",
+   "endpoint": "bootstrap-static",
+   "http_status": 200,
+   "key": "raw/fpl/bootstrap-static/2026-10-03/20261003T052050Z-fa64a9/payload.json",
+   "received_at": "2026-10-03T05:20:50.948489Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 231760,
+   "content_sha256": "113c3c674e681542b8a7926a02036cab9d438f7f1c0bd5d4410afa367a31ad04",
+   "endpoint": "fixtures",
+   "http_status": 200,
+   "key": "raw/fpl/fixtures/2026-10-03/20261003T052050Z-fa64a9/payload.json",
+   "received_at": "2026-10-03T05:20:52.531848Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  }
+ ],
+ "config": {
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 2.418,
+ "ended_at": "2026-10-03T05:20:53.185251Z",
+ "endpoints": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "failed": 0,
+   "failures": [],
+   "outcome": "SUCCESS",
+   "usable": 1
+  },
+  "fixtures": {
+   "attempted": 1,
+   "failed": 0,
+   "failures": [],
+   "outcome": "SUCCESS",
+   "usable": 1
+  }
+ },
+ "extraction_date": "2026-10-03",
+ "failures": [],
+ "git_sha": "0f63f1340b00035d27c33c0ea13c6ef70ab2e7f0",
+ "ingest_version": "1.0.0",
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1778916,
+   "failed": 0,
+   "written": 1
+  },
+  "fixtures": {
+   "attempted": 1,
+   "bytes": 231760,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "origin": {
+  "aws_principal": "github-actions-fpl-ingest",
+  "github_run_id": "37099518527",
+  "kind": "ci",
+  "ref": "refs/heads/main",
+  "workflow": "Scheduled Ingestion \u2014 Pre-deadline"
+ },
+ "raw_contract_version": "2.2.0",
+ "run_id": "20261003T052050Z-fa64a9",
+ "source": "fpl",
+ "started_at": "2026-10-03T05:20:50.767173Z",
+ "status": "SUCCESS",
+ "totals": {
+  "attempted": 2,
+  "bytes": 2010676,
+  "failed": 0,
+  "written": 2
+ },
+ "trigger": "manual"
+}

@@ -28,6 +28,12 @@ with read_objects as (
     union all
     select 'fixtures', filename
     from {{ source('fpl_raw', 'fixtures') }}
+    union all
+    select 'run_manifests', filename
+    from {{ source('fpl_raw', 'run_manifests') }}
+    union all
+    select 'backfill_catalog', filename
+    from {{ source('fpl_raw', 'backfill_catalog') }}
 
 )
 

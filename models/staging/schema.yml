@@ -106,3 +106,63 @@ models:
       int_round_ratification. Internal: not part of the served contract.
     group: warehouse_internal
     access: private
+
+  - name: stg_run
+    description: >
+      One row per finalized ingest run (manifest status other than
+      IN_PROGRESS), from every manifest under `_manifests/`, contract 1.0.0 to
+      2.2.0. Typing only. The `origin_*` columns are the manifest's own
+      `origin` object, null before contract 2.2.0. Internal.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: run_id
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC4"
+          - not_null:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC4"
+      - name: run_started_at
+        data_tests:
+          - not_null:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC4"
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["SUCCESS", "PARTIAL", "FAILED"]
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC4"
+
+  - name: base_capture_index
+    description: >
+      One row per indexed capture: the `captures[]` of every finalized
+      manifest that carries them (2.1.0 and later), plus every entry of the
+      backfill catalog (older runs and the ported history season). No
+      admission logic. Internal.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC1"
+          - not_null:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#95 AC1"
