@@ -1,0 +1,43 @@
+version: 2
+
+seeds:
+  - name: seed_run_origin
+    description: >
+      Where each ingest run older than contract 2.2.0 came from, derived once
+      from fpl-ingest's GitHub Actions history by scripts/derive_run_origin.py
+      and frozen here (#96, #87 D2), because Actions logs expire after 90 days.
+      `ci` means exactly one ingest workflow run on main logged the run_id,
+      starting at most 300s before it; `history_port` is the ported 2025-26
+      season; anything else is `local`. Runs from 2.2.0 on record their origin
+      in the manifest and are not listed. Internal.
+    group: warehouse_internal
+    access: private
+    config:
+      column_types:
+        run_id: varchar
+        origin_kind: varchar
+        github_run_id: varchar
+        workflow: varchar
+        ref: varchar
+    columns:
+      - name: run_id
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#96 AC2"
+          - not_null:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#96 AC2"
+      - name: origin_kind
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["ci", "local", "history_port"]
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#96 AC2"

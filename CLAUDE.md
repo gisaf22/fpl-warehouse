@@ -269,6 +269,14 @@ not silently corrected.
   tree's root. The `capture_key_from_filename` macro is the one place a payload's
   `filename` becomes that key. `stg_run` holds the finalized runs, and is the one place
   "finalized" (any status but `IN_PROGRESS`) is decided.
+- `seed_run_origin` (#96) records where each run older than contract 2.2.0 came from:
+  `ci`, `local` or `history_port`. Those manifests carry no `origin`. It was derived once
+  by `scripts/derive_run_origin.py` from fpl-ingest's Actions logs: a run is `ci` only if
+  exactly one ingest workflow log on `main` names its run_id. Timing alone misreads
+  `20260902T163935Z-07eb06` as CI. It is frozen as a seed because Actions logs expire
+  after 90 days, and it never grows: every new run records its own origin.
+  `stg_test_run_origin_seed_covers_every_pre_origin_run` fails the build on any run
+  whose origin is unknown.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
 - Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
@@ -597,6 +605,7 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
 
 ```bash
 # Fast tiers — no AWS session, no S3. Build once, then run either tier.
+dbt seed --target fixtures                            # load seeds (dbt run does not)
 dbt run  --target fixtures                            # build from tests/fixtures/raw
 dbt test --target fixtures --select tag:unit
 dbt test --target fixtures --select tag:integration
