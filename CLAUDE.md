@@ -277,6 +277,16 @@ not silently corrected.
   after 90 days, and it never grows: every new run records its own origin.
   `stg_test_run_origin_seed_covers_every_pre_origin_run` fails the build on any run
   whose origin is unknown.
+- `int_capture_admission` (#97) decides which indexed captures may be read. A capture is
+  admitted when its run is finalized and production, and it is usable and has a season.
+  Production means `ci` on `refs/heads/main` from the manifest's `origin` (2.2.0+), or
+  `ci`/`history_port` in the seed before that. A capture with a null season is never
+  given a guessed one. A failed revalidation is admitted with `flagged_revalidation =
+  true` until reviewed. Every unadmitted capture carries one `unadmitted_reason`: the
+  first that applies of `run_not_finalized`, `origin_unknown`, `not_production`,
+  `unusable` and `null_season`. Measured on 2026-10-03 against live S3: 79,702 admitted,
+  and 651 not admitted, all from 07eb06 (`not_production`). C2 (#88) makes staging read
+  only admitted captures.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
 - Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
