@@ -116,6 +116,21 @@ def live_season() -> str:
     return project["vars"]["season"]
 
 
+def contract_version() -> int:
+    """The served_contract_version var from dbt_project.yml (#74).
+
+    Bumped by hand on every breaking change to the served contract, in the same
+    pull request as the change. Kept beside the models rather than here so the
+    bump is reviewed with the schema.yml edit that needs it.
+    """
+    version = yaml.safe_load(PROJECT_FILE.read_text())["vars"][
+        "served_contract_version"
+    ]
+    if type(version) is not int:
+        raise ValueError(f"served_contract_version must be an integer, not {version!r}")
+    return version
+
+
 def staged_seasons(connection: duckdb.DuckDBPyConnection) -> list[str]:
     """Every season any staging model holds.
 
@@ -257,12 +272,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def previous_counts(client) -> tuple[dict[str, dict[str, int]] | None, str | None]:
-    """The previous publish's per-season counts, or why they can't be read.
+def previous_manifest(client) -> tuple[dict | None, str | None]:
+    """The previous publish's manifest, or why it can't be used as a baseline.
 
-    Returns (row_counts_by_season, None) or (None, problem). Only the per-season
-    counts are required: a manifest written before restated_seasons and
-    published_without_baseline existed is a valid baseline.
+    Returns (manifest, None) or (None, problem). Only the per-season counts are
+    required: a manifest written before restated_seasons,
+    published_without_baseline, contract_version or columns existed is a valid
+    baseline.
     """
     location = f"s3://{BUCKET}/{MANIFEST_KEY}"
     try:
@@ -274,17 +290,61 @@ def previous_counts(client) -> tuple[dict[str, dict[str, int]] | None, str | Non
         return None, f"previous manifest {location} could not be read ({error})"
 
     try:
-        by_season = json.loads(body)["row_counts_by_season"]
-        counts = {
+        previous = json.loads(body)
+        previous["row_counts_by_season"] = {
             table: {season: int(n) for season, n in seasons.items()}
-            for table, seasons in by_season.items()
+            for table, seasons in previous["row_counts_by_season"].items()
         }
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         return None, (
             f"previous manifest {location} has no usable row_counts_by_season "
             f"({type(error).__name__}: {error})"
         )
-    return counts, None
+    return previous, None
+
+
+def contract_failures(
+    previous: dict, version: int, columns: dict[str, list[list[str]]]
+) -> list[str]:
+    """Why this publish breaks the served contract without a version bump (#74).
+
+    The version may never go down. At the same version, every table the
+    previous manifest listed must keep its columns as a prefix of its new ones:
+    a column appended last, or a table not listed before, is additive and
+    passes; a column dropped, renamed, retyped or moved is breaking and needs a
+    higher version. A previous manifest without the fields predates #74 and
+    skips the check it cannot make.
+
+    It sees shape only. A change in what an existing column's values mean (the
+    is_ratified case of 2026-09-15) passes here and must be bumped by review.
+    """
+    before = previous.get("contract_version")
+    if before is None:
+        return []
+    if version < before:
+        return [
+            f"contract_version {version} is below the previous publish's "
+            f"{before}; the served contract version never goes down"
+        ]
+    if version > before:
+        return []
+
+    failures = []
+    for table, old in sorted((previous.get("columns") or {}).items()):
+        new = columns.get(table)
+        if new is None:
+            failures.append(
+                f"{table} was served at contract_version {version} and is no "
+                f"longer published; removing a served table is breaking"
+            )
+        elif [list(c) for c in old] != new[: len(old)]:
+            failures.append(
+                f"{table}'s columns changed from {old} to {new} at contract_version "
+                f"{version}; dropping, renaming, retyping or moving a served "
+                f"column is breaking — bump served_contract_version in "
+                f"dbt_project.yml"
+            )
+    return failures
 
 
 def main() -> int:
@@ -314,8 +374,10 @@ def main() -> int:
         return 1
 
     expected = expected_rows(connection, seasons)
+    version = contract_version()
 
     counts: dict[str, int] = {}
+    columns: dict[str, list[list[str]]] = {}
     by_season: dict[str, dict[str, int]] = {}
     paths: dict[str, Path] = {}
 
@@ -342,6 +404,14 @@ def main() -> int:
             "GROUP BY season ORDER BY season",
             [str(path)],
         ).fetchall()
+
+        # The shape actually uploaded, for the manifest and the contract check.
+        columns[table] = [
+            [name, column_type]
+            for name, column_type, *_ in connection.execute(
+                "DESCRIBE SELECT * FROM read_parquet(?)", [str(path)]
+            ).fetchall()
+        ]
 
         counts[table] = count
         by_season[table] = {season: n for season, n in table_seasons}
@@ -395,7 +465,8 @@ def main() -> int:
     # Same construction as fpl-ingest's S3Backend._default_client.
     client = boto3.client("s3")
 
-    previous, baseline_problem = previous_counts(client)
+    previous_publish, baseline_problem = previous_manifest(client)
+    previous = previous_publish and previous_publish["row_counts_by_season"]
     without_baseline = False
     if baseline_problem:
         if args.without_baseline:
@@ -434,6 +505,9 @@ def main() -> int:
                 f"{season} if that is intended"
             )
 
+    if previous_publish:
+        failures.extend(contract_failures(previous_publish, version, columns))
+
     if failures:
         for failure in failures:
             print(
@@ -471,6 +545,9 @@ def main() -> int:
     # and false on a normal run. The next publish reads only
     # `row_counts_by_season` from here, so a manifest without them is still a
     # valid baseline.
+    #
+    # `contract_version` and `columns` (#74) let a consumer check the contract
+    # it reads, and give the next publish the shape to compare against.
     manifest = {
         "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -480,6 +557,8 @@ def main() -> int:
         "row_counts_by_season": by_season,
         "restated_seasons": restated,
         "published_without_baseline": without_baseline,
+        "contract_version": version,
+        "columns": columns,
     }
     client.put_object(
         Bucket=BUCKET,

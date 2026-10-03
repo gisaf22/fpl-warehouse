@@ -54,6 +54,16 @@ vars:
   # the live `season` above is ever listed here.
   closed_seasons: ["2025-26"]
 
+  # Version of the served contract, published as `contract_version` in
+  # served/_manifest.json by scripts/publish_served.py (#74). Bump it by one in
+  # the same pull request as any breaking change to a served model: a column
+  # dropped, renamed, retyped or moved; a served table removed; a grain or key
+  # change; or a change to what an existing column's values mean. Appending a
+  # column last, serving a new table or adding a manifest field is not breaking.
+  # The publish refuses a shape break at the same version, but cannot see a
+  # change in meaning — that bump is caught by review only.
+  served_contract_version: 1
+
 models:
   fpl_warehouse:
     staging:

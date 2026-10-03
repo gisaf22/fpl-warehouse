@@ -128,7 +128,9 @@ def test_a_column_appended_last_at_the_same_version_publishes(publish):
         BUILD,
         previous(version=1),
         version=1,
-        columns={"fct_player_fixture": "season varchar, row_number integer, extra integer"},
+        columns={
+            "fct_player_fixture": "season varchar, row_number integer, extra integer"
+        },
     )
 
     assert_published(result)

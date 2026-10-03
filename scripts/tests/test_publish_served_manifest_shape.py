@@ -61,6 +61,17 @@ FIELDS = {
     ),
     "restated_seasons": is_str_list,
     "published_without_baseline": lambda v: isinstance(v, bool),
+    "contract_version": is_count,
+    "columns": lambda v: isinstance(v, dict)
+    and all(
+        isinstance(t, str)
+        and isinstance(cols, list)
+        and all(
+            isinstance(c, list) and len(c) == 2 and all(isinstance(x, str) for x in c)
+            for c in cols
+        )
+        for t, cols in v.items()
+    ),
 }
 
 
