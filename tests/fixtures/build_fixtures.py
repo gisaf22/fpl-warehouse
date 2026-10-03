@@ -113,6 +113,31 @@ event-status is deliberately absent: FPL serves only the current round, so no
 capture of a finished season exists. That absence is exactly the condition the
 closed-season override exists to handle.
 
+CAPTURE INDEX
+-------------
+Beside the payloads, the tree carries what ingest writes to index them (#95):
+
+    raw/fpl/_manifests/{extraction_date}/{run_id}/manifest.json
+    raw/fpl/_catalog/backfill/{run_id}.json
+
+  - The real manifest of every run above (RUNS and EVENT_STATUS_RUNS, all
+    contract 1.0.0), verbatim.
+  - The backfill catalog file of each of those runs and of the history run,
+    trimmed to the entries whose payload is in this tree. The entries
+    themselves are verbatim, so their content_sha256 describes the S3 object,
+    not the edited fixture payload.
+  - One real 2.2.0 manifest (INDEX_22_RUN), whose two captures are listed in
+    its `captures[]` but whose payloads are deliberately NOT in the tree:
+    adding a newer bootstrap-static would become the latest capture and move
+    every served expectation. It is here for the manifest half of the index
+    and for the `origin` fields.
+  - One SYNTHETIC IN_PROGRESS manifest (IN_PROGRESS_RUN), a copy of the 2.2.0
+    one with its status flipped and `captures` removed, as the 2.2.0 schema
+    requires for that status. No live manifest has ever been left in
+    progress (measured 2026-10-03), so a real one does not exist to copy.
+
+`--index-only` rewrites just these files and leaves the payloads untouched.
+
 WHAT EACH PLAYER COVERS
 -----------------------
 426, 427  Normal case. Both played rounds 1 and 2. Their round-2 key carries a
@@ -308,6 +333,11 @@ RUNS = [
     ("20260914T211204Z-a730c3", "2026-09-14"),
 ]
 
+# The capture index (see CAPTURE INDEX): one real 2.2.0 manifest, and the
+# synthetic in-progress run modelled on it.
+INDEX_22_RUN = ("20261003T052050Z-fa64a9", "2026-10-03")
+IN_PROGRESS_RUN = ("20261003T060000Z-0000a1", "2026-10-03")
+
 # (run_id, extraction_date) for event-status — a separate axis from RUNS above.
 # See EVENT-STATUS CAPTURES for why these dates and not the four runs.
 EVENT_STATUS_RUNS = [
@@ -486,6 +516,69 @@ def build_history_season() -> None:
         )
 
 
+def build_index() -> None:
+    """Write the manifests and trimmed catalog files described under CAPTURE INDEX."""
+    fixture_root = Path(__file__).parent
+    for sub in ("_manifests", "_catalog"):
+        if (OUT_ROOT / sub).exists():
+            shutil.rmtree(OUT_ROOT / sub)
+
+    # Every payload in both trees, as its index key.
+    present = {
+        str(path.relative_to(fixture_root))
+        for path in fixture_root.glob("*/**/payload.json")
+    }
+
+    for run_id, date in sorted(set(RUNS) | set(EVENT_STATUS_RUNS)):
+        print(f"{date} {run_id}  index")
+        write(
+            OUT_ROOT / "_manifests" / date / run_id / "manifest.json",
+            s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json"),
+        )
+
+    for run_id in sorted({r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID}):
+        catalog = s3_get(f"{RAW_PREFIX}/_catalog/backfill/{run_id}.json")
+        total = len(catalog["captures"])
+        catalog["captures"] = [c for c in catalog["captures"] if c["key"] in present]
+        if not catalog["captures"]:
+            sys.exit(f"catalog {run_id} lists none of this tree's payloads")
+        catalog["_fixture_note"] = (
+            f"Backfill catalog for {run_id}, trimmed from {total} entries to the "
+            f"{len(catalog['captures'])} whose payload is in this tree. Entries "
+            "are verbatim. See CAPTURE INDEX in build_fixtures.py."
+        )
+        write(OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json", catalog)
+
+    run_id, date = INDEX_22_RUN
+    manifest = s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json")
+    if manifest["raw_contract_version"] != "2.2.0":
+        sys.exit(f"{run_id} is not a 2.2.0 manifest")
+    manifest["_fixture_note"] = (
+        "Verbatim 2.2.0 manifest. Its captures' payloads are deliberately not in "
+        "this tree. See CAPTURE INDEX in build_fixtures.py."
+    )
+    write(OUT_ROOT / "_manifests" / date / run_id / "manifest.json", manifest)
+
+    synthetic_id, synthetic_date = IN_PROGRESS_RUN
+    synthetic = {k: v for k, v in manifest.items() if k != "captures"}
+    synthetic.update(
+        run_id=synthetic_id,
+        extraction_date=synthetic_date,
+        status="IN_PROGRESS",
+        started_at=f"{synthetic_date}T06:00:00.000000Z",
+        ended_at=None,
+        duration_seconds=None,
+        _fixture_note=(
+            f"SYNTHETIC in-progress manifest, copied from {run_id} with its status "
+            "flipped and `captures` removed. See CAPTURE INDEX in build_fixtures.py."
+        ),
+    )
+    write(
+        OUT_ROOT / "_manifests" / synthetic_date / synthetic_id / "manifest.json",
+        synthetic,
+    )
+
+
 def trim_fixtures(fixtures: list) -> list:
     """Drop `stats` from every fixture; keep every fixture and other field."""
     return [{k: v for k, v in f.items() if k != "stats"} for f in fixtures]
@@ -567,6 +660,9 @@ def main() -> None:
     history_only = "--history-only" in sys.argv
     if history_only:
         build_history_season()
+        return
+    if "--index-only" in sys.argv:
+        build_index()
         return
 
     if OUT_ROOT.exists():
@@ -666,6 +762,9 @@ def main() -> None:
     # trees. `--history-only` rewrites just this one, leaving the live tree
     # untouched.
     build_history_season()
+
+    # Last, because the catalog files are trimmed to the payloads written above.
+    build_index()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4005 @@
+{
+ "config": {
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 441.934,
+ "ended_at": "2026-09-14T21:19:26.826149Z",
+ "extraction_date": "2026-09-14",
+ "failures": [],
+ "finality": {
+  "4": {
+   "bonus_added": false,
+   "points": "p"
+  }
+ },
+ "git_sha": "dfb6881d2b68371d3ce88dea2b45e64013a16055",
+ "ingest_version": "1.0.0",
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1754107,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/1": {
+   "attempted": 1,
+   "bytes": 14703,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/10": {
+   "attempted": 1,
+   "bytes": 15875,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/100": {
+   "attempted": 1,
+   "bytes": 14037,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/101": {
+   "attempted": 1,
+   "bytes": 21659,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/102": {
+   "attempted": 1,
+   "bytes": 14078,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/103": {
+   "attempted": 1,
+   "bytes": 14606,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/104": {
+   "attempted": 1,
+   "bytes": 14641,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/105": {
+   "attempted": 1,
+   "bytes": 14068,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/106": {
+   "attempted": 1,
+   "bytes": 12932,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/107": {
+   "attempted": 1,
+   "bytes": 12293,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/108": {
+   "attempted": 1,
+   "bytes": 18211,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/109": {
+   "attempted": 1,
+   "bytes": 13519,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/11": {
+   "attempted": 1,
+   "bytes": 12320,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/110": {
+   "attempted": 1,
+   "bytes": 12883,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/111": {
+   "attempted": 1,
+   "bytes": 16932,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/112": {
+   "attempted": 1,
+   "bytes": 14145,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/113": {
+   "attempted": 1,
+   "bytes": 12921,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/114": {
+   "attempted": 1,
+   "bytes": 12317,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/115": {
+   "attempted": 1,
+   "bytes": 12346,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/116": {
+   "attempted": 1,
+   "bytes": 17069,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/117": {
+   "attempted": 1,
+   "bytes": 12280,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/118": {
+   "attempted": 1,
+   "bytes": 13465,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/119": {
+   "attempted": 1,
+   "bytes": 11704,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/12": {
+   "attempted": 1,
+   "bytes": 16514,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/120": {
+   "attempted": 1,
+   "bytes": 11696,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/121": {
+   "attempted": 1,
+   "bytes": 14087,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/122": {
+   "attempted": 1,
+   "bytes": 12898,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/123": {
+   "attempted": 1,
+   "bytes": 14087,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/124": {
+   "attempted": 1,
+   "bytes": 17078,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/125": {
+   "attempted": 1,
+   "bytes": 13500,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/126": {
+   "attempted": 1,
+   "bytes": 12884,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/127": {
+   "attempted": 1,
+   "bytes": 12928,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/128": {
+   "attempted": 1,
+   "bytes": 14041,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/129": {
+   "attempted": 1,
+   "bytes": 14072,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/13": {
+   "attempted": 1,
+   "bytes": 17669,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/130": {
+   "attempted": 1,
+   "bytes": 12914,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/131": {
+   "attempted": 1,
+   "bytes": 13525,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/132": {
+   "attempted": 1,
+   "bytes": 12851,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/133": {
+   "attempted": 1,
+   "bytes": 12262,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/134": {
+   "attempted": 1,
+   "bytes": 12288,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/135": {
+   "attempted": 1,
+   "bytes": 11706,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/136": {
+   "attempted": 1,
+   "bytes": 22280,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/137": {
+   "attempted": 1,
+   "bytes": 12278,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/138": {
+   "attempted": 1,
+   "bytes": 12316,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/139": {
+   "attempted": 1,
+   "bytes": 14622,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/14": {
+   "attempted": 1,
+   "bytes": 15296,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/140": {
+   "attempted": 1,
+   "bytes": 15270,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/141": {
+   "attempted": 1,
+   "bytes": 12858,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/142": {
+   "attempted": 1,
+   "bytes": 15892,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/143": {
+   "attempted": 1,
+   "bytes": 15245,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/144": {
+   "attempted": 1,
+   "bytes": 13514,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/145": {
+   "attempted": 1,
+   "bytes": 15246,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/146": {
+   "attempted": 1,
+   "bytes": 14044,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/147": {
+   "attempted": 1,
+   "bytes": 15851,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/148": {
+   "attempted": 1,
+   "bytes": 12325,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/149": {
+   "attempted": 1,
+   "bytes": 14091,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/15": {
+   "attempted": 1,
+   "bytes": 15327,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/150": {
+   "attempted": 1,
+   "bytes": 12281,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/151": {
+   "attempted": 1,
+   "bytes": 13471,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/152": {
+   "attempted": 1,
+   "bytes": 11723,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/153": {
+   "attempted": 1,
+   "bytes": 13492,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/154": {
+   "attempted": 1,
+   "bytes": 15888,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/155": {
+   "attempted": 1,
+   "bytes": 14162,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/156": {
+   "attempted": 1,
+   "bytes": 15889,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/157": {
+   "attempted": 1,
+   "bytes": 12318,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/158": {
+   "attempted": 1,
+   "bytes": 12289,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/159": {
+   "attempted": 1,
+   "bytes": 15276,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/16": {
+   "attempted": 1,
+   "bytes": 14088,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/160": {
+   "attempted": 1,
+   "bytes": 14671,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/161": {
+   "attempted": 1,
+   "bytes": 14640,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/162": {
+   "attempted": 1,
+   "bytes": 14078,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/163": {
+   "attempted": 1,
+   "bytes": 12290,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/164": {
+   "attempted": 1,
+   "bytes": 11704,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/165": {
+   "attempted": 1,
+   "bytes": 14722,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/166": {
+   "attempted": 1,
+   "bytes": 13504,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/167": {
+   "attempted": 1,
+   "bytes": 14676,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/168": {
+   "attempted": 1,
+   "bytes": 12877,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/169": {
+   "attempted": 1,
+   "bytes": 12866,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/17": {
+   "attempted": 1,
+   "bytes": 14074,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/170": {
+   "attempted": 1,
+   "bytes": 11714,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/171": {
+   "attempted": 1,
+   "bytes": 11719,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/172": {
+   "attempted": 1,
+   "bytes": 11711,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/173": {
+   "attempted": 1,
+   "bytes": 14048,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/174": {
+   "attempted": 1,
+   "bytes": 11712,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/175": {
+   "attempted": 1,
+   "bytes": 11746,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/176": {
+   "attempted": 1,
+   "bytes": 11726,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/177": {
+   "attempted": 1,
+   "bytes": 14006,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/178": {
+   "attempted": 1,
+   "bytes": 11701,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/179": {
+   "attempted": 1,
+   "bytes": 11701,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/18": {
+   "attempted": 1,
+   "bytes": 15860,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/180": {
+   "attempted": 1,
+   "bytes": 12299,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/181": {
+   "attempted": 1,
+   "bytes": 11697,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/182": {
+   "attempted": 1,
+   "bytes": 11722,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/183": {
+   "attempted": 1,
+   "bytes": 11720,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/184": {
+   "attempted": 1,
+   "bytes": 12874,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/185": {
+   "attempted": 1,
+   "bytes": 11708,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/186": {
+   "attempted": 1,
+   "bytes": 11713,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/187": {
+   "attempted": 1,
+   "bytes": 11697,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/188": {
+   "attempted": 1,
+   "bytes": 11713,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/189": {
+   "attempted": 1,
+   "bytes": 11714,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/19": {
+   "attempted": 1,
+   "bytes": 12321,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/190": {
+   "attempted": 1,
+   "bytes": 12313,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/191": {
+   "attempted": 1,
+   "bytes": 11710,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/192": {
+   "attempted": 1,
+   "bytes": 11712,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/193": {
+   "attempted": 1,
+   "bytes": 11710,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/194": {
+   "attempted": 1,
+   "bytes": 11722,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/195": {
+   "attempted": 1,
+   "bytes": 14613,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/196": {
+   "attempted": 1,
+   "bytes": 11693,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/197": {
+   "attempted": 1,
+   "bytes": 11695,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/198": {
+   "attempted": 1,
+   "bytes": 15855,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/199": {
+   "attempted": 1,
+   "bytes": 12286,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/2": {
+   "attempted": 1,
+   "bytes": 16375,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/20": {
+   "attempted": 1,
+   "bytes": 12287,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/200": {
+   "attempted": 1,
+   "bytes": 12939,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/201": {
+   "attempted": 1,
+   "bytes": 13558,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/202": {
+   "attempted": 1,
+   "bytes": 14097,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/203": {
+   "attempted": 1,
+   "bytes": 12315,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/204": {
+   "attempted": 1,
+   "bytes": 15890,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/205": {
+   "attempted": 1,
+   "bytes": 12277,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/206": {
+   "attempted": 1,
+   "bytes": 12871,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/207": {
+   "attempted": 1,
+   "bytes": 11706,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/208": {
+   "attempted": 1,
+   "bytes": 14108,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/209": {
+   "attempted": 1,
+   "bytes": 14106,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/21": {
+   "attempted": 1,
+   "bytes": 14657,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/210": {
+   "attempted": 1,
+   "bytes": 13514,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/211": {
+   "attempted": 1,
+   "bytes": 12322,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/212": {
+   "attempted": 1,
+   "bytes": 16463,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/213": {
+   "attempted": 1,
+   "bytes": 15268,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/214": {
+   "attempted": 1,
+   "bytes": 12919,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/215": {
+   "attempted": 1,
+   "bytes": 12876,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/216": {
+   "attempted": 1,
+   "bytes": 12862,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/217": {
+   "attempted": 1,
+   "bytes": 13440,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/218": {
+   "attempted": 1,
+   "bytes": 14045,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/219": {
+   "attempted": 1,
+   "bytes": 15153,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/22": {
+   "attempted": 1,
+   "bytes": 14019,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/220": {
+   "attempted": 1,
+   "bytes": 12264,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/221": {
+   "attempted": 1,
+   "bytes": 12278,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/222": {
+   "attempted": 1,
+   "bytes": 12914,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/223": {
+   "attempted": 1,
+   "bytes": 15292,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/224": {
+   "attempted": 1,
+   "bytes": 17015,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/225": {
+   "attempted": 1,
+   "bytes": 12250,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/226": {
+   "attempted": 1,
+   "bytes": 19392,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/227": {
+   "attempted": 1,
+   "bytes": 15188,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/228": {
+   "attempted": 1,
+   "bytes": 13428,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/229": {
+   "attempted": 1,
+   "bytes": 17675,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/23": {
+   "attempted": 1,
+   "bytes": 14013,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/230": {
+   "attempted": 1,
+   "bytes": 15832,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/231": {
+   "attempted": 1,
+   "bytes": 19376,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/232": {
+   "attempted": 1,
+   "bytes": 13484,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/233": {
+   "attempted": 1,
+   "bytes": 14706,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/234": {
+   "attempted": 1,
+   "bytes": 14627,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/235": {
+   "attempted": 1,
+   "bytes": 12284,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/236": {
+   "attempted": 1,
+   "bytes": 14116,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/237": {
+   "attempted": 1,
+   "bytes": 14137,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/238": {
+   "attempted": 1,
+   "bytes": 18767,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/239": {
+   "attempted": 1,
+   "bytes": 15830,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/24": {
+   "attempted": 1,
+   "bytes": 16937,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/240": {
+   "attempted": 1,
+   "bytes": 15226,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/241": {
+   "attempted": 1,
+   "bytes": 17039,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/242": {
+   "attempted": 1,
+   "bytes": 13478,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/243": {
+   "attempted": 1,
+   "bytes": 13480,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/244": {
+   "attempted": 1,
+   "bytes": 12894,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/245": {
+   "attempted": 1,
+   "bytes": 13457,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/246": {
+   "attempted": 1,
+   "bytes": 12302,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/247": {
+   "attempted": 1,
+   "bytes": 11721,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/248": {
+   "attempted": 1,
+   "bytes": 13505,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/249": {
+   "attempted": 1,
+   "bytes": 12339,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/25": {
+   "attempted": 1,
+   "bytes": 12902,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/250": {
+   "attempted": 1,
+   "bytes": 16483,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/251": {
+   "attempted": 1,
+   "bytes": 12322,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/252": {
+   "attempted": 1,
+   "bytes": 12314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/253": {
+   "attempted": 1,
+   "bytes": 15314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/254": {
+   "attempted": 1,
+   "bytes": 14734,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/255": {
+   "attempted": 1,
+   "bytes": 12912,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/256": {
+   "attempted": 1,
+   "bytes": 14708,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/257": {
+   "attempted": 1,
+   "bytes": 13535,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/258": {
+   "attempted": 1,
+   "bytes": 15327,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/259": {
+   "attempted": 1,
+   "bytes": 16491,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/26": {
+   "attempted": 1,
+   "bytes": 15310,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/260": {
+   "attempted": 1,
+   "bytes": 15891,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/261": {
+   "attempted": 1,
+   "bytes": 18276,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/262": {
+   "attempted": 1,
+   "bytes": 16450,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/263": {
+   "attempted": 1,
+   "bytes": 12332,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/264": {
+   "attempted": 1,
+   "bytes": 13521,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/265": {
+   "attempted": 1,
+   "bytes": 14716,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/266": {
+   "attempted": 1,
+   "bytes": 15837,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/267": {
+   "attempted": 1,
+   "bytes": 14123,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/268": {
+   "attempted": 1,
+   "bytes": 13526,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/269": {
+   "attempted": 1,
+   "bytes": 16442,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/27": {
+   "attempted": 1,
+   "bytes": 17641,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/270": {
+   "attempted": 1,
+   "bytes": 17008,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/271": {
+   "attempted": 1,
+   "bytes": 14104,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/272": {
+   "attempted": 1,
+   "bytes": 12338,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/273": {
+   "attempted": 1,
+   "bytes": 11751,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/274": {
+   "attempted": 1,
+   "bytes": 16404,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/275": {
+   "attempted": 1,
+   "bytes": 11720,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/276": {
+   "attempted": 1,
+   "bytes": 11727,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/277": {
+   "attempted": 1,
+   "bytes": 14117,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/278": {
+   "attempted": 1,
+   "bytes": 11740,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/279": {
+   "attempted": 1,
+   "bytes": 12938,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/28": {
+   "attempted": 1,
+   "bytes": 18747,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/280": {
+   "attempted": 1,
+   "bytes": 11753,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/281": {
+   "attempted": 1,
+   "bytes": 13472,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/282": {
+   "attempted": 1,
+   "bytes": 14078,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/283": {
+   "attempted": 1,
+   "bytes": 11728,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/284": {
+   "attempted": 1,
+   "bytes": 11734,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/285": {
+   "attempted": 1,
+   "bytes": 13484,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/286": {
+   "attempted": 1,
+   "bytes": 11769,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/287": {
+   "attempted": 1,
+   "bytes": 11739,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/288": {
+   "attempted": 1,
+   "bytes": 13485,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/289": {
+   "attempted": 1,
+   "bytes": 11752,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/29": {
+   "attempted": 1,
+   "bytes": 12291,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/290": {
+   "attempted": 1,
+   "bytes": 11771,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/291": {
+   "attempted": 1,
+   "bytes": 11722,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/292": {
+   "attempted": 1,
+   "bytes": 11732,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/293": {
+   "attempted": 1,
+   "bytes": 12294,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/294": {
+   "attempted": 1,
+   "bytes": 11741,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/295": {
+   "attempted": 1,
+   "bytes": 14707,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/296": {
+   "attempted": 1,
+   "bytes": 11734,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/297": {
+   "attempted": 1,
+   "bytes": 12884,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/298": {
+   "attempted": 1,
+   "bytes": 11737,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/299": {
+   "attempted": 1,
+   "bytes": 12304,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/3": {
+   "attempted": 1,
+   "bytes": 14043,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/30": {
+   "attempted": 1,
+   "bytes": 16444,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/300": {
+   "attempted": 1,
+   "bytes": 12905,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/301": {
+   "attempted": 1,
+   "bytes": 14647,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/302": {
+   "attempted": 1,
+   "bytes": 14052,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/303": {
+   "attempted": 1,
+   "bytes": 12318,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/304": {
+   "attempted": 1,
+   "bytes": 13544,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/305": {
+   "attempted": 1,
+   "bytes": 12943,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/306": {
+   "attempted": 1,
+   "bytes": 12356,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/307": {
+   "attempted": 1,
+   "bytes": 16412,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/308": {
+   "attempted": 1,
+   "bytes": 12914,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/309": {
+   "attempted": 1,
+   "bytes": 11750,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/31": {
+   "attempted": 1,
+   "bytes": 15889,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/310": {
+   "attempted": 1,
+   "bytes": 11720,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/311": {
+   "attempted": 1,
+   "bytes": 12309,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/312": {
+   "attempted": 1,
+   "bytes": 12323,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/313": {
+   "attempted": 1,
+   "bytes": 12343,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/314": {
+   "attempted": 1,
+   "bytes": 12903,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/315": {
+   "attempted": 1,
+   "bytes": 12346,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/316": {
+   "attempted": 1,
+   "bytes": 11767,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/317": {
+   "attempted": 1,
+   "bytes": 12902,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/318": {
+   "attempted": 1,
+   "bytes": 14633,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/319": {
+   "attempted": 1,
+   "bytes": 12312,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/32": {
+   "attempted": 1,
+   "bytes": 15295,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/320": {
+   "attempted": 1,
+   "bytes": 14062,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/321": {
+   "attempted": 1,
+   "bytes": 11758,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/322": {
+   "attempted": 1,
+   "bytes": 12317,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/323": {
+   "attempted": 1,
+   "bytes": 13498,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/324": {
+   "attempted": 1,
+   "bytes": 11731,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/325": {
+   "attempted": 1,
+   "bytes": 16959,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/326": {
+   "attempted": 1,
+   "bytes": 12908,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/327": {
+   "attempted": 1,
+   "bytes": 12356,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/328": {
+   "attempted": 1,
+   "bytes": 14087,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/329": {
+   "attempted": 1,
+   "bytes": 15254,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/33": {
+   "attempted": 1,
+   "bytes": 18173,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/330": {
+   "attempted": 1,
+   "bytes": 13542,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/331": {
+   "attempted": 1,
+   "bytes": 12333,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/332": {
+   "attempted": 1,
+   "bytes": 15320,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/333": {
+   "attempted": 1,
+   "bytes": 12304,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/334": {
+   "attempted": 1,
+   "bytes": 11774,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/335": {
+   "attempted": 1,
+   "bytes": 12374,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/336": {
+   "attempted": 1,
+   "bytes": 12356,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/337": {
+   "attempted": 1,
+   "bytes": 12947,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/338": {
+   "attempted": 1,
+   "bytes": 16419,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/339": {
+   "attempted": 1,
+   "bytes": 16473,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/34": {
+   "attempted": 1,
+   "bytes": 13493,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/340": {
+   "attempted": 1,
+   "bytes": 14054,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/341": {
+   "attempted": 1,
+   "bytes": 12912,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/342": {
+   "attempted": 1,
+   "bytes": 15272,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/343": {
+   "attempted": 1,
+   "bytes": 15269,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/344": {
+   "attempted": 1,
+   "bytes": 12316,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/345": {
+   "attempted": 1,
+   "bytes": 12350,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/346": {
+   "attempted": 1,
+   "bytes": 17716,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/347": {
+   "attempted": 1,
+   "bytes": 12924,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/348": {
+   "attempted": 1,
+   "bytes": 12321,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/349": {
+   "attempted": 1,
+   "bytes": 12889,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/35": {
+   "attempted": 1,
+   "bytes": 14030,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/350": {
+   "attempted": 1,
+   "bytes": 16497,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/351": {
+   "attempted": 1,
+   "bytes": 12333,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/352": {
+   "attempted": 1,
+   "bytes": 15789,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/353": {
+   "attempted": 1,
+   "bytes": 12302,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/354": {
+   "attempted": 1,
+   "bytes": 12306,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/355": {
+   "attempted": 1,
+   "bytes": 12888,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/356": {
+   "attempted": 1,
+   "bytes": 18289,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/357": {
+   "attempted": 1,
+   "bytes": 12361,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/358": {
+   "attempted": 1,
+   "bytes": 13556,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/359": {
+   "attempted": 1,
+   "bytes": 18178,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/36": {
+   "attempted": 1,
+   "bytes": 13494,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/360": {
+   "attempted": 1,
+   "bytes": 14078,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/361": {
+   "attempted": 1,
+   "bytes": 12314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/362": {
+   "attempted": 1,
+   "bytes": 11769,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/363": {
+   "attempted": 1,
+   "bytes": 12308,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/364": {
+   "attempted": 1,
+   "bytes": 15241,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/365": {
+   "attempted": 1,
+   "bytes": 12890,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/366": {
+   "attempted": 1,
+   "bytes": 12385,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/367": {
+   "attempted": 1,
+   "bytes": 14174,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/368": {
+   "attempted": 1,
+   "bytes": 13583,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/369": {
+   "attempted": 1,
+   "bytes": 12347,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/37": {
+   "attempted": 1,
+   "bytes": 17023,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/370": {
+   "attempted": 1,
+   "bytes": 12908,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/371": {
+   "attempted": 1,
+   "bytes": 13556,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/372": {
+   "attempted": 1,
+   "bytes": 15924,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/373": {
+   "attempted": 1,
+   "bytes": 17021,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/374": {
+   "attempted": 1,
+   "bytes": 13494,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/375": {
+   "attempted": 1,
+   "bytes": 13464,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/376": {
+   "attempted": 1,
+   "bytes": 14030,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/377": {
+   "attempted": 1,
+   "bytes": 11760,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/378": {
+   "attempted": 1,
+   "bytes": 13471,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/379": {
+   "attempted": 1,
+   "bytes": 14172,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/38": {
+   "attempted": 1,
+   "bytes": 12880,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/380": {
+   "attempted": 1,
+   "bytes": 12344,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/381": {
+   "attempted": 1,
+   "bytes": 12308,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/382": {
+   "attempted": 1,
+   "bytes": 13465,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/383": {
+   "attempted": 1,
+   "bytes": 16408,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/384": {
+   "attempted": 1,
+   "bytes": 12364,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/385": {
+   "attempted": 1,
+   "bytes": 13519,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/386": {
+   "attempted": 1,
+   "bytes": 16352,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/387": {
+   "attempted": 1,
+   "bytes": 13538,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/388": {
+   "attempted": 1,
+   "bytes": 15910,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/389": {
+   "attempted": 1,
+   "bytes": 14136,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/39": {
+   "attempted": 1,
+   "bytes": 12281,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/390": {
+   "attempted": 1,
+   "bytes": 15332,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/391": {
+   "attempted": 1,
+   "bytes": 13571,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/392": {
+   "attempted": 1,
+   "bytes": 15305,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/393": {
+   "attempted": 1,
+   "bytes": 12943,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/394": {
+   "attempted": 1,
+   "bytes": 12880,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/395": {
+   "attempted": 1,
+   "bytes": 14104,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/396": {
+   "attempted": 1,
+   "bytes": 12883,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/397": {
+   "attempted": 1,
+   "bytes": 14169,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/398": {
+   "attempted": 1,
+   "bytes": 17119,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/399": {
+   "attempted": 1,
+   "bytes": 12386,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/4": {
+   "attempted": 1,
+   "bytes": 15315,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/40": {
+   "attempted": 1,
+   "bytes": 13548,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/400": {
+   "attempted": 1,
+   "bytes": 13540,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/401": {
+   "attempted": 1,
+   "bytes": 12945,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/402": {
+   "attempted": 1,
+   "bytes": 15874,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/403": {
+   "attempted": 1,
+   "bytes": 12946,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/404": {
+   "attempted": 1,
+   "bytes": 12329,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/405": {
+   "attempted": 1,
+   "bytes": 12929,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/406": {
+   "attempted": 1,
+   "bytes": 16459,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/407": {
+   "attempted": 1,
+   "bytes": 12881,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/408": {
+   "attempted": 1,
+   "bytes": 15239,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/409": {
+   "attempted": 1,
+   "bytes": 12318,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/41": {
+   "attempted": 1,
+   "bytes": 15267,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/410": {
+   "attempted": 1,
+   "bytes": 12311,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/411": {
+   "attempted": 1,
+   "bytes": 14203,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/412": {
+   "attempted": 1,
+   "bytes": 12370,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/413": {
+   "attempted": 1,
+   "bytes": 13470,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/414": {
+   "attempted": 1,
+   "bytes": 19265,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/415": {
+   "attempted": 1,
+   "bytes": 12954,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/416": {
+   "attempted": 1,
+   "bytes": 12919,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/417": {
+   "attempted": 1,
+   "bytes": 16486,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/418": {
+   "attempted": 1,
+   "bytes": 18267,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/419": {
+   "attempted": 1,
+   "bytes": 14127,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/42": {
+   "attempted": 1,
+   "bytes": 12290,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/420": {
+   "attempted": 1,
+   "bytes": 12935,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/421": {
+   "attempted": 1,
+   "bytes": 12922,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/422": {
+   "attempted": 1,
+   "bytes": 12941,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/423": {
+   "attempted": 1,
+   "bytes": 20021,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/424": {
+   "attempted": 1,
+   "bytes": 13476,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/425": {
+   "attempted": 1,
+   "bytes": 12883,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/426": {
+   "attempted": 1,
+   "bytes": 15994,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/427": {
+   "attempted": 1,
+   "bytes": 14777,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/428": {
+   "attempted": 1,
+   "bytes": 14164,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/429": {
+   "attempted": 1,
+   "bytes": 18275,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/43": {
+   "attempted": 1,
+   "bytes": 16519,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/430": {
+   "attempted": 1,
+   "bytes": 15878,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/431": {
+   "attempted": 1,
+   "bytes": 15267,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/432": {
+   "attempted": 1,
+   "bytes": 14126,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/433": {
+   "attempted": 1,
+   "bytes": 12907,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/434": {
+   "attempted": 1,
+   "bytes": 12887,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/435": {
+   "attempted": 1,
+   "bytes": 12312,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/436": {
+   "attempted": 1,
+   "bytes": 13462,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/437": {
+   "attempted": 1,
+   "bytes": 12320,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/438": {
+   "attempted": 1,
+   "bytes": 12322,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/439": {
+   "attempted": 1,
+   "bytes": 12362,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/44": {
+   "attempted": 1,
+   "bytes": 14667,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/440": {
+   "attempted": 1,
+   "bytes": 12932,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/441": {
+   "attempted": 1,
+   "bytes": 12908,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/442": {
+   "attempted": 1,
+   "bytes": 17628,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/443": {
+   "attempted": 1,
+   "bytes": 14606,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/444": {
+   "attempted": 1,
+   "bytes": 11732,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/445": {
+   "attempted": 1,
+   "bytes": 12368,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/446": {
+   "attempted": 1,
+   "bytes": 16487,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/447": {
+   "attempted": 1,
+   "bytes": 14124,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/448": {
+   "attempted": 1,
+   "bytes": 17053,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/449": {
+   "attempted": 1,
+   "bytes": 14730,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/45": {
+   "attempted": 1,
+   "bytes": 15890,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/450": {
+   "attempted": 1,
+   "bytes": 15264,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/451": {
+   "attempted": 1,
+   "bytes": 13461,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/452": {
+   "attempted": 1,
+   "bytes": 14710,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/453": {
+   "attempted": 1,
+   "bytes": 17094,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/454": {
+   "attempted": 1,
+   "bytes": 15320,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/455": {
+   "attempted": 1,
+   "bytes": 13552,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/456": {
+   "attempted": 1,
+   "bytes": 15306,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/457": {
+   "attempted": 1,
+   "bytes": 17060,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/458": {
+   "attempted": 1,
+   "bytes": 15890,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/459": {
+   "attempted": 1,
+   "bytes": 14099,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/46": {
+   "attempted": 1,
+   "bytes": 21080,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/460": {
+   "attempted": 1,
+   "bytes": 17048,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/461": {
+   "attempted": 1,
+   "bytes": 11745,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/462": {
+   "attempted": 1,
+   "bytes": 11744,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/463": {
+   "attempted": 1,
+   "bytes": 12356,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/464": {
+   "attempted": 1,
+   "bytes": 14748,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/465": {
+   "attempted": 1,
+   "bytes": 14092,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/466": {
+   "attempted": 1,
+   "bytes": 12898,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/467": {
+   "attempted": 1,
+   "bytes": 13538,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/468": {
+   "attempted": 1,
+   "bytes": 12314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/469": {
+   "attempted": 1,
+   "bytes": 15900,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/47": {
+   "attempted": 1,
+   "bytes": 14092,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/470": {
+   "attempted": 1,
+   "bytes": 12920,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/471": {
+   "attempted": 1,
+   "bytes": 12958,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/472": {
+   "attempted": 1,
+   "bytes": 13557,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/473": {
+   "attempted": 1,
+   "bytes": 15296,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/474": {
+   "attempted": 1,
+   "bytes": 12339,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/475": {
+   "attempted": 1,
+   "bytes": 12314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/476": {
+   "attempted": 1,
+   "bytes": 14045,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/477": {
+   "attempted": 1,
+   "bytes": 12898,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/478": {
+   "attempted": 1,
+   "bytes": 12322,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/479": {
+   "attempted": 1,
+   "bytes": 11741,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/48": {
+   "attempted": 1,
+   "bytes": 14071,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/480": {
+   "attempted": 1,
+   "bytes": 16510,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/481": {
+   "attempted": 1,
+   "bytes": 15310,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/482": {
+   "attempted": 1,
+   "bytes": 17041,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/483": {
+   "attempted": 1,
+   "bytes": 12352,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/484": {
+   "attempted": 1,
+   "bytes": 14085,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/485": {
+   "attempted": 1,
+   "bytes": 12316,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/486": {
+   "attempted": 1,
+   "bytes": 14669,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/487": {
+   "attempted": 1,
+   "bytes": 13517,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/488": {
+   "attempted": 1,
+   "bytes": 13530,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/489": {
+   "attempted": 1,
+   "bytes": 14122,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/49": {
+   "attempted": 1,
+   "bytes": 12834,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/490": {
+   "attempted": 1,
+   "bytes": 18828,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/491": {
+   "attempted": 1,
+   "bytes": 12366,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/492": {
+   "attempted": 1,
+   "bytes": 14089,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/493": {
+   "attempted": 1,
+   "bytes": 12313,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/494": {
+   "attempted": 1,
+   "bytes": 13511,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/495": {
+   "attempted": 1,
+   "bytes": 15202,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/496": {
+   "attempted": 1,
+   "bytes": 12950,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/497": {
+   "attempted": 1,
+   "bytes": 17052,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/498": {
+   "attempted": 1,
+   "bytes": 14148,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/499": {
+   "attempted": 1,
+   "bytes": 14157,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/5": {
+   "attempted": 1,
+   "bytes": 13472,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/50": {
+   "attempted": 1,
+   "bytes": 12285,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/500": {
+   "attempted": 1,
+   "bytes": 14707,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/501": {
+   "attempted": 1,
+   "bytes": 13514,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/502": {
+   "attempted": 1,
+   "bytes": 18295,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/503": {
+   "attempted": 1,
+   "bytes": 13548,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/504": {
+   "attempted": 1,
+   "bytes": 12314,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/505": {
+   "attempted": 1,
+   "bytes": 14086,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/506": {
+   "attempted": 1,
+   "bytes": 13532,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/507": {
+   "attempted": 1,
+   "bytes": 13454,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/508": {
+   "attempted": 1,
+   "bytes": 19982,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/509": {
+   "attempted": 1,
+   "bytes": 12304,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/51": {
+   "attempted": 1,
+   "bytes": 12302,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/510": {
+   "attempted": 1,
+   "bytes": 12305,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/511": {
+   "attempted": 1,
+   "bytes": 12323,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/512": {
+   "attempted": 1,
+   "bytes": 13533,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/513": {
+   "attempted": 1,
+   "bytes": 12327,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/514": {
+   "attempted": 1,
+   "bytes": 12950,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/515": {
+   "attempted": 1,
+   "bytes": 16499,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/516": {
+   "attempted": 1,
+   "bytes": 14721,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/517": {
+   "attempted": 1,
+   "bytes": 13495,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/518": {
+   "attempted": 1,
+   "bytes": 14110,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/519": {
+   "attempted": 1,
+   "bytes": 15297,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/52": {
+   "attempted": 1,
+   "bytes": 12279,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/520": {
+   "attempted": 1,
+   "bytes": 12932,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/521": {
+   "attempted": 1,
+   "bytes": 14675,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/522": {
+   "attempted": 1,
+   "bytes": 14090,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/523": {
+   "attempted": 1,
+   "bytes": 13481,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/524": {
+   "attempted": 1,
+   "bytes": 12898,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/525": {
+   "attempted": 1,
+   "bytes": 12960,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/526": {
+   "attempted": 1,
+   "bytes": 17638,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/527": {
+   "attempted": 1,
+   "bytes": 17106,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/528": {
+   "attempted": 1,
+   "bytes": 15215,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/529": {
+   "attempted": 1,
+   "bytes": 12363,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/53": {
+   "attempted": 1,
+   "bytes": 11708,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/530": {
+   "attempted": 1,
+   "bytes": 12311,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/531": {
+   "attempted": 1,
+   "bytes": 12316,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/532": {
+   "attempted": 1,
+   "bytes": 12371,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/533": {
+   "attempted": 1,
+   "bytes": 12370,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/534": {
+   "attempted": 1,
+   "bytes": 12370,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/535": {
+   "attempted": 1,
+   "bytes": 12349,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/536": {
+   "attempted": 1,
+   "bytes": 12354,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/537": {
+   "attempted": 1,
+   "bytes": 12305,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/538": {
+   "attempted": 1,
+   "bytes": 13460,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/539": {
+   "attempted": 1,
+   "bytes": 12346,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/54": {
+   "attempted": 1,
+   "bytes": 14081,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/540": {
+   "attempted": 1,
+   "bytes": 16425,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/541": {
+   "attempted": 1,
+   "bytes": 11752,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/542": {
+   "attempted": 1,
+   "bytes": 12377,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/543": {
+   "attempted": 1,
+   "bytes": 12338,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/544": {
+   "attempted": 1,
+   "bytes": 17091,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/545": {
+   "attempted": 1,
+   "bytes": 12360,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/546": {
+   "attempted": 1,
+   "bytes": 13512,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/547": {
+   "attempted": 1,
+   "bytes": 12889,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/548": {
+   "attempted": 1,
+   "bytes": 12328,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/549": {
+   "attempted": 1,
+   "bytes": 12340,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/55": {
+   "attempted": 1,
+   "bytes": 15320,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/550": {
+   "attempted": 1,
+   "bytes": 12299,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/551": {
+   "attempted": 1,
+   "bytes": 12341,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/552": {
+   "attempted": 1,
+   "bytes": 12370,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/553": {
+   "attempted": 1,
+   "bytes": 12358,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/554": {
+   "attempted": 1,
+   "bytes": 11728,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/555": {
+   "attempted": 1,
+   "bytes": 14596,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/556": {
+   "attempted": 1,
+   "bytes": 19344,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/557": {
+   "attempted": 1,
+   "bytes": 12333,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/558": {
+   "attempted": 1,
+   "bytes": 11751,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/559": {
+   "attempted": 1,
+   "bytes": 11743,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/56": {
+   "attempted": 1,
+   "bytes": 15801,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/560": {
+   "attempted": 1,
+   "bytes": 12279,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/561": {
+   "attempted": 1,
+   "bytes": 12851,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/562": {
+   "attempted": 1,
+   "bytes": 11751,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/563": {
+   "attempted": 1,
+   "bytes": 11735,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/564": {
+   "attempted": 1,
+   "bytes": 14058,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/565": {
+   "attempted": 1,
+   "bytes": 11752,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/566": {
+   "attempted": 1,
+   "bytes": 11727,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/567": {
+   "attempted": 1,
+   "bytes": 11761,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/568": {
+   "attempted": 1,
+   "bytes": 12872,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/569": {
+   "attempted": 1,
+   "bytes": 11773,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/57": {
+   "attempted": 1,
+   "bytes": 13488,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/570": {
+   "attempted": 1,
+   "bytes": 11752,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/571": {
+   "attempted": 1,
+   "bytes": 12338,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/572": {
+   "attempted": 1,
+   "bytes": 11778,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/573": {
+   "attempted": 1,
+   "bytes": 11711,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/574": {
+   "attempted": 1,
+   "bytes": 11735,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/575": {
+   "attempted": 1,
+   "bytes": 11717,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/576": {
+   "attempted": 1,
+   "bytes": 11742,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/577": {
+   "attempted": 1,
+   "bytes": 14061,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/578": {
+   "attempted": 1,
+   "bytes": 14079,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/579": {
+   "attempted": 1,
+   "bytes": 11767,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/58": {
+   "attempted": 1,
+   "bytes": 20433,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/580": {
+   "attempted": 1,
+   "bytes": 13474,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/581": {
+   "attempted": 1,
+   "bytes": 11753,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/582": {
+   "attempted": 1,
+   "bytes": 11712,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/583": {
+   "attempted": 1,
+   "bytes": 11718,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/584": {
+   "attempted": 1,
+   "bytes": 12305,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/585": {
+   "attempted": 1,
+   "bytes": 11750,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/586": {
+   "attempted": 1,
+   "bytes": 11775,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/587": {
+   "attempted": 1,
+   "bytes": 11732,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/588": {
+   "attempted": 1,
+   "bytes": 11722,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/589": {
+   "attempted": 1,
+   "bytes": 11739,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/59": {
+   "attempted": 1,
+   "bytes": 13430,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/590": {
+   "attempted": 1,
+   "bytes": 13455,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/591": {
+   "attempted": 1,
+   "bytes": 14112,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/592": {
+   "attempted": 1,
+   "bytes": 11753,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/593": {
+   "attempted": 1,
+   "bytes": 11768,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/594": {
+   "attempted": 1,
+   "bytes": 11717,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/595": {
+   "attempted": 1,
+   "bytes": 11699,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/596": {
+   "attempted": 1,
+   "bytes": 11707,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/597": {
+   "attempted": 1,
+   "bytes": 11729,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/598": {
+   "attempted": 1,
+   "bytes": 11742,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/599": {
+   "attempted": 1,
+   "bytes": 11709,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/6": {
+   "attempted": 1,
+   "bytes": 15243,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/60": {
+   "attempted": 1,
+   "bytes": 14062,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/600": {
+   "attempted": 1,
+   "bytes": 12275,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/601": {
+   "attempted": 1,
+   "bytes": 12887,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/602": {
+   "attempted": 1,
+   "bytes": 12304,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/603": {
+   "attempted": 1,
+   "bytes": 12311,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/604": {
+   "attempted": 1,
+   "bytes": 12312,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/605": {
+   "attempted": 1,
+   "bytes": 12304,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/606": {
+   "attempted": 1,
+   "bytes": 12280,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/607": {
+   "attempted": 1,
+   "bytes": 11702,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/608": {
+   "attempted": 1,
+   "bytes": 13451,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/609": {
+   "attempted": 1,
+   "bytes": 12315,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/61": {
+   "attempted": 1,
+   "bytes": 12338,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/610": {
+   "attempted": 1,
+   "bytes": 12310,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/611": {
+   "attempted": 1,
+   "bytes": 16878,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/612": {
+   "attempted": 1,
+   "bytes": 10980,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/613": {
+   "attempted": 1,
+   "bytes": 10997,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/614": {
+   "attempted": 1,
+   "bytes": 10958,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/615": {
+   "attempted": 1,
+   "bytes": 10952,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/616": {
+   "attempted": 1,
+   "bytes": 10998,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/617": {
+   "attempted": 1,
+   "bytes": 10981,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/618": {
+   "attempted": 1,
+   "bytes": 10956,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/619": {
+   "attempted": 1,
+   "bytes": 10996,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/62": {
+   "attempted": 1,
+   "bytes": 12302,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/620": {
+   "attempted": 1,
+   "bytes": 11560,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/621": {
+   "attempted": 1,
+   "bytes": 11560,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/622": {
+   "attempted": 1,
+   "bytes": 10986,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/623": {
+   "attempted": 1,
+   "bytes": 13276,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/624": {
+   "attempted": 1,
+   "bytes": 12089,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/625": {
+   "attempted": 1,
+   "bytes": 11558,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/626": {
+   "attempted": 1,
+   "bytes": 10989,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/627": {
+   "attempted": 1,
+   "bytes": 10256,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/628": {
+   "attempted": 1,
+   "bytes": 10233,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/629": {
+   "attempted": 1,
+   "bytes": 10247,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/63": {
+   "attempted": 1,
+   "bytes": 12277,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/630": {
+   "attempted": 1,
+   "bytes": 11950,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/631": {
+   "attempted": 1,
+   "bytes": 10210,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/632": {
+   "attempted": 1,
+   "bytes": 10240,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/633": {
+   "attempted": 1,
+   "bytes": 10204,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/634": {
+   "attempted": 1,
+   "bytes": 10242,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/635": {
+   "attempted": 1,
+   "bytes": 10233,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/636": {
+   "attempted": 1,
+   "bytes": 10230,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/637": {
+   "attempted": 1,
+   "bytes": 10239,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/638": {
+   "attempted": 1,
+   "bytes": 10245,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/639": {
+   "attempted": 1,
+   "bytes": 10203,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/64": {
+   "attempted": 1,
+   "bytes": 18170,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/640": {
+   "attempted": 1,
+   "bytes": 10839,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/641": {
+   "attempted": 1,
+   "bytes": 10233,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/642": {
+   "attempted": 1,
+   "bytes": 10236,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/643": {
+   "attempted": 1,
+   "bytes": 16097,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/644": {
+   "attempted": 1,
+   "bytes": 10208,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/645": {
+   "attempted": 1,
+   "bytes": 10231,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/646": {
+   "attempted": 1,
+   "bytes": 10240,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/647": {
+   "attempted": 1,
+   "bytes": 10200,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/648": {
+   "attempted": 1,
+   "bytes": 10236,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/649": {
+   "attempted": 1,
+   "bytes": 14893,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/65": {
+   "attempted": 1,
+   "bytes": 12853,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/650": {
+   "attempted": 1,
+   "bytes": 10236,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/651": {
+   "attempted": 1,
+   "bytes": 10247,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/652": {
+   "attempted": 1,
+   "bytes": 10199,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/653": {
+   "attempted": 1,
+   "bytes": 10229,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/654": {
+   "attempted": 1,
+   "bytes": 10774,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/655": {
+   "attempted": 1,
+   "bytes": 9445,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/656": {
+   "attempted": 1,
+   "bytes": 10028,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/657": {
+   "attempted": 1,
+   "bytes": 10596,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/658": {
+   "attempted": 1,
+   "bytes": 9444,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/66": {
+   "attempted": 1,
+   "bytes": 12859,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/67": {
+   "attempted": 1,
+   "bytes": 12323,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/68": {
+   "attempted": 1,
+   "bytes": 14128,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/69": {
+   "attempted": 1,
+   "bytes": 13527,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/7": {
+   "attempted": 1,
+   "bytes": 13471,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/70": {
+   "attempted": 1,
+   "bytes": 13520,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/71": {
+   "attempted": 1,
+   "bytes": 16435,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/72": {
+   "attempted": 1,
+   "bytes": 14013,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/73": {
+   "attempted": 1,
+   "bytes": 14077,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/74": {
+   "attempted": 1,
+   "bytes": 15230,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/75": {
+   "attempted": 1,
+   "bytes": 14072,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/76": {
+   "attempted": 1,
+   "bytes": 12278,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/77": {
+   "attempted": 1,
+   "bytes": 12291,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/78": {
+   "attempted": 1,
+   "bytes": 12309,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/79": {
+   "attempted": 1,
+   "bytes": 12934,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/8": {
+   "attempted": 1,
+   "bytes": 12928,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/80": {
+   "attempted": 1,
+   "bytes": 13452,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/81": {
+   "attempted": 1,
+   "bytes": 11706,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/82": {
+   "attempted": 1,
+   "bytes": 15821,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/83": {
+   "attempted": 1,
+   "bytes": 13435,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/84": {
+   "attempted": 1,
+   "bytes": 14700,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/85": {
+   "attempted": 1,
+   "bytes": 14049,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/86": {
+   "attempted": 1,
+   "bytes": 14105,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/87": {
+   "attempted": 1,
+   "bytes": 14695,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/88": {
+   "attempted": 1,
+   "bytes": 12926,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/89": {
+   "attempted": 1,
+   "bytes": 14649,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/9": {
+   "attempted": 1,
+   "bytes": 12313,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/90": {
+   "attempted": 1,
+   "bytes": 14041,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/91": {
+   "attempted": 1,
+   "bytes": 14663,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/92": {
+   "attempted": 1,
+   "bytes": 13424,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/93": {
+   "attempted": 1,
+   "bytes": 11712,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/94": {
+   "attempted": 1,
+   "bytes": 14111,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/95": {
+   "attempted": 1,
+   "bytes": 14109,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/96": {
+   "attempted": 1,
+   "bytes": 14674,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/97": {
+   "attempted": 1,
+   "bytes": 14679,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/98": {
+   "attempted": 1,
+   "bytes": 14704,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/99": {
+   "attempted": 1,
+   "bytes": 12258,
+   "failed": 0,
+   "written": 1
+  },
+  "event-live/04": {
+   "attempted": 1,
+   "bytes": 469155,
+   "failed": 0,
+   "written": 1
+  },
+  "event-status": {
+   "attempted": 1,
+   "bytes": 220,
+   "failed": 0,
+   "written": 1
+  },
+  "fixtures": {
+   "attempted": 1,
+   "bytes": 209394,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "raw_contract_version": "1.0.0",
+ "run_id": "20260914T211204Z-a730c3",
+ "source": "fpl",
+ "started_at": "2026-09-14T21:12:04.891897Z",
+ "status": "SUCCESS",
+ "totals": {
+  "attempted": 662,
+  "bytes": 11324598,
+  "failed": 0,
+  "written": 662
+ }
+}
