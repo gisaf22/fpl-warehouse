@@ -61,14 +61,7 @@ aged as (
     select
         endpoints.endpoint,
         newest.newest_received_at,
-        epoch(
-            {% if var('freshness_as_of', none) %}
-            cast('{{ var("freshness_as_of") }}' as timestamp)
-            {% else %}
-            timezone('UTC', current_timestamp)
-            {% endif %}
-            - newest.newest_received_at
-        ) / 3600.0                             as age_hours_exact
+        epoch({{ as_of_utc() }} - newest.newest_received_at) / 3600.0                             as age_hours_exact
     from endpoints
     left join newest
         on newest.endpoint = endpoints.endpoint

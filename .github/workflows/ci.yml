@@ -125,6 +125,29 @@ jobs:
       # model is private, so none of them can be ref()'d from outside the
       # group; dbt enforces that at parse, and this pins that none was
       # quietly made public. Add a model to SERVED only when it is published.
+      # E8 of #88 (#104 AC2): capture metadata comes from the capture index,
+      # never from an object's path. So no model or singular test may name the
+      # `filename` column DuckDB reports. The one place a path becomes an index
+      # key is macros/capture_key_from_filename.sql, which this step does not
+      # scan, and sources.yml's `filename = true` is not a .sql file.
+      #
+      # -w matches `filename` as a whole word, so the macro's own name
+      # (capture_key_from_filename) is not a hit. One exception:
+      # stg_test_fixture_tree_reads_no_s3_object reads each source's physical
+      # path to prove a fixture build issues no s3:// read. It parses no
+      # metadata from it. YAML is not scanned, because a unit test's given rows
+      # for a source must supply its filename column.
+      - name: Check no model or test parses a filename
+        run: |
+          hits=$(grep -rnw filename models tests --include='*.sql' \
+            | grep -v '^tests/stg_test_fixture_tree_reads_no_s3_object\.sql:' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::filename used outside capture_key_from_filename (#104 AC2, #88 E8):"
+            echo "$hits"
+            exit 1
+          fi
+          echo "no model or test reads filename"
+
       - name: Check exactly the served models are public
         run: |
           uv run dbt ls --resource-type model \
