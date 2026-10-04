@@ -425,3 +425,33 @@ unit_tests:
         - {endpoint: "fixtures", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "ok"}
         - {endpoint: "event-status", newest_received_at: "2026-10-03 12:00:00", age_hours: 24.0, freshness_status: "error"}
         - {endpoint: "element-summary", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "exempt"}
+
+  - name: endpoint_with_no_admitted_live_capture_still_has_a_row_and_errors
+    description: >
+      fixtures has only an unadmitted capture and event-status none at all.
+      Both keep their row, with no received_at or age, and read error.
+    model: int_endpoint_freshness
+    config:
+      tags: [unit]
+      meta:
+        covers: "#103 AC4"
+    overrides:
+      vars:
+        freshness_as_of: "2026-10-04 12:00:00"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "bs", endpoint: "bootstrap-static", scope: null, received_at: "2026-10-04 11:00:00"}
+          - {capture_key: "fx-local", endpoint: "fixtures", scope: null, received_at: "2026-10-04 11:00:00"}
+          - {capture_key: "el", endpoint: "element-summary/4", scope: null, received_at: "2026-10-04 11:00:00"}
+      - input: ref('int_capture_admission')
+        rows:
+          - {capture_key: "bs", admitted: true}
+          - {capture_key: "fx-local", admitted: false}
+          - {capture_key: "el", admitted: true}
+    expect:
+      rows:
+        - {endpoint: "bootstrap-static", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "ok"}
+        - {endpoint: "fixtures", newest_received_at: null, age_hours: null, freshness_status: "error"}
+        - {endpoint: "event-status", newest_received_at: null, age_hours: null, freshness_status: "error"}
+        - {endpoint: "element-summary", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "exempt"}

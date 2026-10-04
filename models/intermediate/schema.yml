@@ -61,6 +61,21 @@ models:
       A view, so the age is taken when it is read. Internal.
     group: warehouse_internal
     access: private
+    columns:
+      - name: endpoint
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#103 AC4"
+          - accepted_values:
+              arguments:
+                values: ['bootstrap-static', 'fixtures', 'event-status', 'element-summary']
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#103 AC4"
 
   - name: int_capture_admission
     description: >
