@@ -198,27 +198,37 @@ jobs:
       - name: Create the local database directory
         run: mkdir -p .local
 
-      # Input guard (#39): refuse to rebuild served/ from stale live captures.
-      # bootstrap-static, fixtures and event-status warn when their newest
-      # capture is over 6h old (one missed ingest run) and error over 18h (two).
-      # element-summary is exempt, and the history tree is never read here:
-      # --vars history_root is not passed, so only the live globs are checked.
-      # See CLAUDE.md, "Source freshness".
+      # Input guard (#103, replacing #39's `dbt source freshness`): refuse to
+      # rebuild served/ from stale inputs. int_endpoint_freshness gives each
+      # live endpoint's newest *admitted* capture and its age, so a local or
+      # unadmitted capture can never make an endpoint look fresh.
+      # bootstrap-static, fixtures and event-status warn over 6h (one missed
+      # ingest run) and error over 18h (two). element-summary is exempt, and
+      # ported history captures are not counted. See CLAUDE.md, "Source
+      # freshness".
       #
-      # An error fails this step, so `dbt build` and the publish are skipped
-      # and the healthchecks.io ping below sends /fail. A warning passes. Each
-      # source's age goes to the job summary either way, and a warning or error
-      # is also raised as an annotation.
-      - name: Check live source freshness
+      # Building only the model's upstream reads the run manifests and the
+      # backfill catalog, not the raw payloads, so this is cheap. Cautious
+      # selection keeps out any test that also reads a model not built here. An error fails this step, so the full
+      # `dbt build` and the publish are skipped and the healthchecks.io ping
+      # below sends /fail. A warning passes. Every endpoint's age goes to the
+      # job summary either way, and a warning or error is also raised as an
+      # annotation. The ages are read with `dbt show` after the build, whatever
+      # its outcome, so a failed guard still reports them.
+      - name: Check input freshness
         run: |
           status=0
-          uv run dbt source freshness || status=$?
-          if [ -f target/sources.json ]; then
+          uv run dbt build --select +int_endpoint_freshness \
+            --indirect-selection cautious --vars "{history_root: '$HISTORY_ROOT'}" || status=$?
+          if uv run dbt show --select int_endpoint_freshness --limit 10 \
+              --output json -q > freshness.json; then
             {
-              echo "### Source freshness"
-              jq -r '.results[] | "- `\(.unique_id | split(".") | last)`: \(.status), newest capture \(.max_loaded_at // "none"), \(((.max_loaded_at_time_ago_in_s // 0) / 360 | round) / 10)h old"' target/sources.json
+              echo "### Input freshness"
+              jq -r '.show[] | "- `\(.endpoint)`: \(.freshness_status), newest admitted capture \(.newest_received_at // "none"), \(.age_hours // "n/a")h old"' freshness.json
             } >> "$GITHUB_STEP_SUMMARY"
-            jq -r '.results[] | select(.status == "warn" or .status == "error" or .status == "runtime error") | "::\(if .status == "warn" then "warning" else "error" end)::source freshness \(.status): \(.unique_id | split(".") | last), newest capture \(.max_loaded_at // "none")"' target/sources.json
+            jq -r '.show[] | select(.freshness_status == "warn" or .freshness_status == "error") | "::\(if .freshness_status == "warn" then "warning" else "error" end)::input freshness \(.freshness_status): \(.endpoint), newest admitted capture \(.newest_received_at // "none"), \(.age_hours // "n/a")h old"' freshness.json
+          else
+            echo "::warning::could not read int_endpoint_freshness for the job summary"
           fi
           exit "$status"
 

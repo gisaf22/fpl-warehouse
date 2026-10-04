@@ -1073,37 +1073,43 @@ fpl-ingest's two checks are documented in that repo.
 
 ### Source freshness
 
-Before `dbt build`, the scheduled build runs `dbt source freshness` over the live raw tree
-(#39). It refuses to rebuild `served/` from stale captures.
+Before `dbt build`, the scheduled build checks how old each live input is (#39, reworked in
+#103). It refuses to rebuild `served/` from stale captures.
 
-| Source | Warn after | Error after |
+| Endpoint | Warn over | Error over |
 |---|---|---|
-| `bootstrap_static`, `fixtures`, `event_status` | 6h | 18h |
-| `element_summary` | exempt | exempt |
+| `bootstrap-static`, `fixtures`, `event-status` | 6h | 18h |
+| `element-summary` | exempt | exempt |
 
-- **Age is the newest capture's `run_id` start instant**, parsed from its object key by
-  `loaded_at_field` in `models/staging/sources.yml`, exactly as staging parses `extracted_at`.
-  The payloads carry no timestamp of their own.
+- **Age is the newest *admitted* capture's `received_at`**, from `int_endpoint_freshness`
+  (#103, #88 E2). It counts only captures `int_capture_admission` admits, so a local or
+  otherwise unadmitted capture can never make an endpoint look fresh. Ported history
+  captures are not counted. An endpoint with no admitted live capture at all reads as an
+  error. The model is a view, so the age is taken when it is read.
+- **How it runs:** the step runs `dbt build --select +int_endpoint_freshness`. That builds
+  the model's upstream from the run manifests and the backfill catalog only, not the raw
+  payloads, and runs the two guard tests. `int_test_endpoint_freshness_warns_over_6h` has
+  warn severity and `int_test_endpoint_freshness_errors_over_18h` has error severity. Both
+  are tagged `e2e`. `dbt show` then writes every endpoint's age to the job summary.
+- **Replaced (#103):** `dbt source freshness` and the three sources' `loaded_at_field`s,
+  which parsed the age out of object keys. Run-level `run_ended_at` was rejected as the age,
+  because runs skip endpoints and the manifest source includes local runs.
 - **The thresholds sit between cadence steps.** fpl-ingest runs every 12h, and over the 39
   scheduled builds from 2026-09-10 to 2026-09-29 a build started with the three sources
   0.54–0.62h old. So one missed ingest run reads about 12.6h (warn), and two about 24.6h
   (error). Re-check if ingest's cadence changes.
 - **An error fails the job.** `dbt build` and the publish are skipped, `served/` is not
   overwritten, and the healthchecks.io ping sends `/fail`. A warning passes. Both are
-  raised as annotations, and every source's age goes to the job summary.
+  raised as annotations naming the endpoint and its age.
 - **element-summary is exempt, because its age is not a staleness signal.** fpl-ingest stops
   capturing it once the latest gameweek is settled and captured, so its newest capture is days
   or weeks old at every settled gameweek. On 2026-09-29 it was 2026-09-21, with round 6's
   deadline on 10-10. Measured by age, it would have failed 17 of those 39 builds. Its failure
   modes are covered elsewhere: #68's gate (a finished fixture with no player rows) and the
   ingest heartbeat (fpl-ingest#57).
-- **The ported history tree is exempt by construction.** The step passes no `history_root`,
-  so it reads only the live globs. A closed season never changes, so its age means nothing.
-- **Never run under `--target fixtures`.** The checked-in tree is old by construction, and no
-  `ci.yml` job runs source freshness.
-- **Cost:** about 70s against live S3, measured locally on 2026-09-30. Most of it is the
-  bootstrap-static read, which is about 190 payloads of about 1.8 MB each. It grows with
-  the capture count.
+- **Never under `--target fixtures`.** The checked-in tree is old by construction, which is
+  why the two guard tests are `e2e`. The model itself, and its unit tests, build there
+  normally.
 
 **It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
 runs `scripts/publish_served.py`, which exports the five served tables to parquet and uploads
