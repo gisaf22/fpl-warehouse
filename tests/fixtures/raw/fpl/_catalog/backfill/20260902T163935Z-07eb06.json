@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Catalog of the LOCAL run 20260902T163935Z-07eb06, trimmed from 651 entries to the 6 fixture players'. Their payloads are deliberately not in this tree. See CAPTURE INDEX in build_fixtures.py.",
+ "_fixture_note": "Catalog of the LOCAL run 20260902T163935Z-07eb06, trimmed from 651 entries to the 6 fixture players'. Only fpl_id 166's payload is in this tree. See CAPTURE INDEX in build_fixtures.py.",
  "captures": [
   {
    "content_length": 12486,

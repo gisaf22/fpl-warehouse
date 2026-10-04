@@ -250,6 +250,27 @@ jobs:
           uv run dbt build
           --vars "{history_root: '$HISTORY_ROOT'}"
 
+      # Admission counts (#104, #88 E4): how many indexed captures were
+      # admitted, flagged or left out, and why, in the job summary. The two
+      # warn-severity tests in the build above name each flagged capture and
+      # each recent exclusion; this is the standing total. continue-on-error,
+      # so a reporting failure can never block the publish below.
+      - name: Report capture admission counts
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 20 --output json -q --inline "
+            select
+              coalesce(unadmitted_reason, case when flagged_revalidation
+                then 'admitted, flagged revalidation' else 'admitted' end) as outcome,
+              count(*) as captures
+            from {{ ref('int_capture_admission') }}
+            group by 1 order by 2 desc" > admission.json
+          {
+            echo "### Capture admission"
+            jq -r '.show[] | "- \(.outcome): \(.captures)"' admission.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Publishes the served fact and dimension tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
       # current objects; there is no published history to pin to.

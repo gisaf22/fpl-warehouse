@@ -35,28 +35,28 @@
 --   at build time is the known as-of bug this rebuild must not reintroduce.
 --
 -- Capture identity:
---   The payload body carries no extraction timestamp, so `extraction_date`,
---   `run_id` and `extracted_at` are parsed from the object's own key —
---   `.../element-summary/{fpl_id}/{extraction_date}/{run_id}/payload.json`.
---   `run_id` is `{YYYYMMDDTHHMMSSZ}-{short hash}`; its prefix is the run's
---   start instant, which is what `extracted_at` casts. These are the only
---   real ordering fields available, and the served layer needs them to
---   resolve competing captures of the same (fpl_id, fixture_id).
+--   Only admitted captures are staged: each payload's key, from
+--   capture_key_from_filename, is inner-joined to int_admitted_capture (#104).
+--   capture_key, season, extraction_date, run_id, extracted_at and
+--   observed_at all come from there, never from the object's path. A payload
+--   that is unadmitted or not yet indexed is not staged.
+--   The served layer resolves competing captures of the same
+--   (fpl_id, fixture_id) by observed_at, then run_id. extracted_at is carried
+--   only because fct_player_fixture serves it (#88 E1).
 --
 -- Season:
 --   `season` is part of capture identity. fpl_id, fixture_id and gameweek are
 --   all reassigned every season, so every downstream dedup, retraction check
 --   and ratification lookup partitions by season as well — it keeps that
 --   within-season logic from ever reaching across a season boundary. It is
---   never used to relate one season's rows to another's. The live raw layout
---   has no season segment, so the value is stamped from the `season` var; the
---   same column appears on every stg_ model.
+--   never used to relate one season's rows to another's. The same column
+--   appears on every stg_ model.
 -- =============================================================================
 
 with raw as (
 
     select
-        filename,
+        {{ capture_key_from_filename() }} as capture_key,
         unnest(history) as h
     from {{ source('fpl_raw', 'element_summary') }}
 
@@ -64,13 +64,12 @@ with raw as (
 
 select
     -- Capture identity
-    {{ season_from_filename() }} as season,
-    cast(str_split(filename, '/')[-3] as date) as extraction_date,
-    str_split(filename, '/')[-2]               as run_id,
-    strptime(
-        split_part(str_split(filename, '/')[-2], '-', 1),
-        '%Y%m%dT%H%M%SZ'
-    )                                          as extracted_at,
+    admitted.capture_key,
+    admitted.season,
+    admitted.extraction_date,
+    admitted.run_id,
+    admitted.extracted_at,
+    admitted.observed_at,
 
     -- Keys
     cast(h.element             as integer)   as fpl_id,
@@ -131,3 +130,5 @@ select
     cast(h.modified            as boolean)   as modified
 
 from raw
+inner join {{ ref('int_admitted_capture') }} as admitted
+    on admitted.capture_key = raw.capture_key

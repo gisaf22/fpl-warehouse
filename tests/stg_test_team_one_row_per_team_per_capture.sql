@@ -14,13 +14,14 @@
 with source_teams as (
 
     select
-        {{ season_from_filename() }}   as season,
-        str_split(filename, '/')[-2]   as run_id,
+        admitted.season,
+        admitted.run_id,
         cast(t.id as integer)          as team_fpl_id
     from (
-        select filename, unnest(teams) as t
+        select {{ capture_key_from_filename() }} as capture_key, unnest(teams) as t
         from {{ source('fpl_raw', 'bootstrap_static') }}
-    )
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 ),
 

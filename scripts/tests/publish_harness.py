@@ -170,7 +170,7 @@ def make_publish(tmp_path, monkeypatch):
             )
             connection.execute(
                 "create table stg_gameweek (season varchar, run_id varchar, "
-                "extracted_at timestamp, gameweek integer, finished boolean)"
+                "observed_at timestamp, gameweek integer, finished boolean)"
             )
             connection.execute(
                 "create table stg_team (season varchar, team_fpl_id integer)"

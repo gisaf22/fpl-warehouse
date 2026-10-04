@@ -19,18 +19,17 @@
 --
 -- fixture_id:
 --   Reassigned every season (1-380 repeat), so it identifies a fixture only
---   together with season, which each row reads from its own key.
+--   together with season, which each row takes from the capture index.
 -- =============================================================================
 
 select
-    -- Capture identity (see stg_player_fixture for the key layout)
-    {{ season_from_filename() }} as season,
-    cast(str_split(filename, '/')[-3] as date) as extraction_date,
-    str_split(filename, '/')[-2]               as run_id,
-    strptime(
-        split_part(str_split(filename, '/')[-2], '-', 1),
-        '%Y%m%dT%H%M%SZ'
-    )                                          as extracted_at,
+    -- Capture identity, from the capture index (see int_admitted_capture)
+    admitted.capture_key,
+    admitted.season,
+    admitted.extraction_date,
+    admitted.run_id,
+    admitted.extracted_at,
+    admitted.observed_at,
 
     -- Keys
     cast(id as integer)                        as fixture_id,
@@ -52,4 +51,9 @@ select
     cast(team_h_difficulty as integer)         as team_h_difficulty,
     cast(team_a_difficulty as integer)         as team_a_difficulty
 
-from {{ source('fpl_raw', 'fixtures') }}
+from (
+    select {{ capture_key_from_filename() }} as capture_key, *
+    from {{ source('fpl_raw', 'fixtures') }}
+) as raw
+inner join {{ ref('int_admitted_capture') }} as admitted
+    on admitted.capture_key = raw.capture_key

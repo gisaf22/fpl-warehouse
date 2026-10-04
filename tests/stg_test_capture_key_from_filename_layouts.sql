@@ -7,7 +7,7 @@
 -- Tier: unit
 {{ config(tags=['unit'], meta={'covers': '#95 AC3'}) }}
 
-with cases (filename, expected) as (
+with cases (object_path, expected) as (
 
     values
         -- dev, live tree
@@ -32,8 +32,8 @@ with cases (filename, expected) as (
 )
 
 select
-    filename,
+    object_path,
     expected,
-    {{ capture_key_from_filename('filename') }} as actual
+    {{ capture_key_from_filename('object_path') }} as actual
 from cases
-where {{ capture_key_from_filename('filename') }} is distinct from expected
+where {{ capture_key_from_filename('object_path') }} is distinct from expected

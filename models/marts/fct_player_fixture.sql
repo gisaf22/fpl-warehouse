@@ -152,9 +152,9 @@ latest_run_per_player as (
             run_id,
             row_number() over (
                 partition by season, fpl_id
-                order by extracted_at desc, run_id desc
+                order by observed_at desc, run_id desc
             ) as run_rank
-        from (select distinct season, fpl_id, run_id, extracted_at from captures)
+        from (select distinct season, fpl_id, run_id, observed_at from captures)
     )
     where run_rank = 1
 
@@ -195,7 +195,7 @@ ranked as (
             order by
                 (captures.team_h_score is not null
                     and captures.team_a_score is not null) desc,
-                captures.extracted_at desc,
+                captures.observed_at desc,
                 captures.run_id desc
         ) as capture_rank
     from captures
@@ -208,7 +208,9 @@ ranked as (
 
 select
     ranked.season,
-    ranked.* exclude (season, capture_rank),
+    -- capture_key and observed_at are internal to staging; extracted_at
+    -- stays as the served label (#104, #88 E1).
+    ranked.* exclude (season, capture_rank, capture_key, observed_at),
     -- The fixture's side the player was on; see header.
     case
         when ranked.was_home then fixture.team_h_fpl_id

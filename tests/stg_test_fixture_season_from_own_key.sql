@@ -8,9 +8,9 @@
 -- Tier: unit
 {{ config(group='warehouse_internal', tags=['unit'], meta={'covers': '#37 AC3'}) }}
 
--- The kickoff date is the independent witness. Season is parsed from the key
--- (season_from_filename), so checking it against the same macro would only
--- compare it with itself; the payload's own kickoff_time says which season a
+-- The kickoff date is the independent witness. Season comes from the capture
+-- index (#104), so checking it against the index would only compare it with
+-- itself; the payload's own kickoff_time says which season a
 -- fixture was played in. A row labelled with the wrong season — the ported
 -- season read as the live `season` var, say — kicks off outside its label's
 -- window and fails here.
@@ -88,6 +88,5 @@ where coalesce(staged_spread.seasons_staged, 0) < source_spread.seasons_by_kicko
 union all
 
 select null, null, null, 'two seasons in the source but no fixture_id shared between them'
-where (select count(distinct {{ season_from_filename() }})
-       from {{ source('fpl_raw', 'fixtures') }}) > 1
+where (select count(distinct season) from {{ ref('stg_fixture') }}) > 1
   and not exists (select 1 from source_spread where seasons_by_kickoff > 1)

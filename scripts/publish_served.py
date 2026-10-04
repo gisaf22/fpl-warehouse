@@ -204,10 +204,10 @@ def expected_rows(
                     run_id,
                     row_number() over (
                         partition by season
-                        order by extracted_at desc, run_id desc
+                        order by observed_at desc, run_id desc
                     ) as capture_rank
                 from (
-                    select distinct season, run_id, extracted_at
+                    select distinct season, run_id, observed_at
                     from main.stg_gameweek
                 )
             )

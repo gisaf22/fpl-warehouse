@@ -52,6 +52,16 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: int_admitted_capture
+    description: >
+      One row per admitted capture: its season and run_id from the capture
+      index, observed_at (the index's received_at), and the served
+      extraction_date and extracted_at from the run manifest, or for the
+      history port from received_at (#104, #88 E1). Every payload staging
+      model joins it, so staging holds admitted captures only. Internal.
+    group: warehouse_internal
+    access: private
+
   - name: int_endpoint_freshness
     description: >
       One row per live endpoint: its newest admitted capture's received_at,

@@ -19,7 +19,7 @@
 -- Position:
 --   Taken from the player's latest appearance: their newest capture within
 --   the season, which for a departed player predates the season's latest
---   capture. Ordered by extracted_at, with run_id breaking a same-second tie,
+--   capture. Ordered by observed_at, with run_id breaking a same-second tie,
 --   as elsewhere. Position is fixed within a season (decision 2 on #32), so
 --   which capture it comes from cannot matter; the constant_per_key test on
 --   stg_player.position_id fails the build if that ever stops holding.
@@ -43,7 +43,7 @@ with latest_appearance as (
     from {{ ref('stg_player') }}
     qualify row_number() over (
         partition by season, fpl_id
-        order by extracted_at desc, run_id desc
+        order by observed_at desc, run_id desc
     ) = 1
 
 )

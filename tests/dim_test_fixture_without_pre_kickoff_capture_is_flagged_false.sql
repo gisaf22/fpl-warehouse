@@ -20,7 +20,7 @@ with latest as (
     from {{ ref('stg_fixture') }}
     qualify row_number() over (
         partition by season, fixture_id
-        order by extracted_at desc, run_id desc
+        order by observed_at desc, run_id desc
     ) = 1
 
 ),
@@ -34,7 +34,7 @@ no_pre_kickoff_capture as (
         from {{ ref('stg_fixture') }} as stg_fixture
         where stg_fixture.season = latest.season
           and stg_fixture.fixture_id = latest.fixture_id
-          and stg_fixture.extracted_at < latest.kickoff_time
+          and stg_fixture.observed_at < latest.kickoff_time
     )
 
 ),
@@ -52,7 +52,7 @@ earliest as (
         and no_pre_kickoff_capture.fixture_id = stg_fixture.fixture_id
     qualify row_number() over (
         partition by stg_fixture.season, stg_fixture.fixture_id
-        order by stg_fixture.extracted_at, stg_fixture.run_id
+        order by stg_fixture.observed_at, stg_fixture.run_id
     ) = 1
 
 ),

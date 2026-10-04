@@ -18,12 +18,19 @@
 {% set stg = ref('stg_player_fixture') %}
 {% set gw = ref('fct_player_gameweek') %}
 
+-- capture_key and observed_at are staging's internal capture columns from
+-- the index (#104). The fact excludes them, so they are not part of the
+-- expected served list, and the rest keep their relative order.
 with staging_columns as (
 
-    select ordinal_position, column_name, data_type
+    select
+        row_number() over (order by ordinal_position) as ordinal_position,
+        column_name,
+        data_type
     from information_schema.columns
     where table_schema = '{{ stg.schema }}'
       and table_name = '{{ stg.identifier }}'
+      and column_name not in ('capture_key', 'observed_at')
 
 ),
 

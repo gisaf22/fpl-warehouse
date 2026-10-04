@@ -65,9 +65,9 @@ with latest_capture as (
             run_id,
             row_number() over (
                 partition by season
-                order by extracted_at desc, run_id desc
+                order by observed_at desc, run_id desc
             ) as capture_rank
-        from (select distinct season, run_id, extracted_at from {{ ref('stg_gameweek') }})
+        from (select distinct season, run_id, observed_at from {{ ref('stg_gameweek') }})
     )
     where capture_rank = 1
 

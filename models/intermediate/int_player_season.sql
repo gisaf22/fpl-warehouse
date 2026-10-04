@@ -72,7 +72,7 @@ from (
         web_name,
         row_number() over (
             partition by season, fpl_id
-            order by extracted_at desc, run_id desc
+            order by observed_at desc, run_id desc
         ) as capture_rank
     from {{ ref('stg_player') }}
 )

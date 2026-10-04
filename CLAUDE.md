@@ -36,12 +36,11 @@ and states it can be deleted on migration.
   this file keep the word "round" as written; there it means gameweek.
 - **`season` is part of the grain project-wide** — `fct_player_fixture` is
   `(season, fpl_id, fixture_id)`, `int_player_gameweek_spine` and `fct_player_gameweek` are
-  `(season, fpl_id, gameweek)`. Each row reads its season from its own raw key via the
-  `season_from_filename` macro: a season-shaped segment before `/fpl/` means a ported
-  history season and states its own season, anything else is the live tree and takes the
-  `season` var (currently `2026-27`). The live key layout still has no season segment, so
-  for live rows the var remains the only available source of the value — **extending it is
-  an open item for fpl-ingest, not fpl-warehouse.**
+  `(season, fpl_id, gameweek)`. Each row reads its season from its capture's entry in the
+  capture index, via `int_admitted_capture` (#104). The `season` var (currently `2026-27`)
+  stays as "the live season" for the publish floor and a few fixture tests, and
+  `stg_test_season_var_is_newest_admitted_live_season` fails the build if it ever differs
+  from the newest season among admitted live captures (#88 E5).
 - **`season` partitions; it never relates.** Every dedup, retraction check, ratification
   rollup and spine cross is keyed by season, because `fpl_id`, `fixture_id` and `gameweek` are
   all reassigned each season and unscoped logic would silently merge two different people
@@ -83,12 +82,13 @@ zeroed ICT fields ride along with it silently.
 Staging itself is correct as-is — a 1:1 model must carry provisional captures through.
 This is a served-layer obligation, not a staging bug.
 
-The ordering field is the raw object key, not the payload: the body carries no extraction
-timestamp, so `sources.yml` reads with `filename = true` and staging parses
-`extraction_date`, `run_id` and `extracted_at` out of
-`.../element-summary/{fpl_id}/{extraction_date}/{run_id}/payload.json`. `run_id` is
-`{YYYYMMDDTHHMMSSZ}-{hash}`, so its prefix is the run's start instant and the hash breaks
-ties. There is no `metadata.json` alongside element-summary payloads to read instead.
+The ordering field is `observed_at`, the capture index's `received_at`, with `run_id`
+breaking a tie (#104). The body carries no timestamp of its own. Until #104 staging parsed
+`extraction_date`, `run_id` and `extracted_at` out of each object's key. Now every
+capture column comes from the index through `int_admitted_capture`, and no model reads a
+path. Measured on 2026-10-03, ordering by `received_at` instead of run start flipped no
+capture's order (#88 step 0). `extracted_at` is kept only as a served column on
+`fct_player_fixture`, with its old values (#88 E1); nothing orders by it.
 
 ---
 
@@ -286,8 +286,25 @@ not silently corrected.
   true` until reviewed. Every unadmitted capture carries one `unadmitted_reason`: the
   first that applies of `run_not_finalized`, `origin_unknown`, `not_production`,
   `unusable` and `null_season`. Measured on 2026-10-03 against live S3: 79,702 admitted,
-  and 651 not admitted, all from 07eb06 (`not_production`). C2 (#88) makes staging read
-  only admitted captures.
+  and 651 not admitted, all from 07eb06 (`not_production`).
+- `int_admitted_capture` (#104) is every admitted capture with its metadata: `season` and
+  `run_id` from the index, `observed_at` (`received_at`), and the served `extraction_date`
+  and `extracted_at` from the run manifest (`stg_run`), or for the history port from
+  `received_at`. **Every payload staging model inner-joins it on the capture key**, which
+  `capture_key_from_filename` computes from the source's `filename`. So staging holds
+  admitted captures only, and nothing else reads a path: CI's `validate` job fails on
+  `filename` in any `.sql` under `models/` or `tests/` (#88 E8). The one exception is
+  `stg_test_fixture_tree_reads_no_s3_object`, which checks the physical path read.
+- **A payload with no index entry is excluded silently** (#88 E7). That is normally one
+  whose run was still in progress when the build started. It has no finalized manifest
+  yet, and the next build picks it up. Counting such payloads would need a second read of
+  every payload source.
+- **Two warn-severity tests report admission problems without failing the build** (#88
+  E4). `int_test_capture_admission_flagged_revalidation_warns` names every admitted
+  capture with a failed revalidation. `int_test_capture_admission_recent_unadmitted_warns`
+  names every unadmitted capture from a run started in the last 7 days. Older exclusions,
+  such as 07eb06's, are settled and would only warn forever. The scheduled build's job
+  summary also lists capture counts by outcome.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
 - Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
@@ -1031,8 +1048,10 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test in the project is `error` severity — there is no `severity: warn` anywhere — so no
-real failure can land as a passing warning. `dbt build` is used rather than `dbt run` then
+test is `error` severity except three deliberate warnings: the input-freshness warn over 6h
+(#103) and the two admission warnings (#104, see "Layering"). Each of those reports a condition that must not block a
+publish. Every other assertion fails the build, so no real failure can land as a passing
+warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
 
 ### Monitoring

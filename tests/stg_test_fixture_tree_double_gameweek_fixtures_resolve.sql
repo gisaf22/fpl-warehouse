@@ -33,10 +33,14 @@ with double_gameweek as (
 fixtures as (
 
     select distinct
-        {{ season_from_filename() }} as season,
+        admitted.season,
         cast(id as integer)          as fixture_id,
         cast(event as integer)       as gameweek
-    from {{ source('fpl_raw', 'fixtures') }}
+    from (
+        select {{ capture_key_from_filename() }} as capture_key, *
+        from {{ source('fpl_raw', 'fixtures') }}
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 )
 

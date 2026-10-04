@@ -34,6 +34,9 @@ unit_tests:
               3::bigint as team_h, 14::bigint as team_a,
               null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
               3::bigint as team_h_difficulty, 4::bigint as team_a_difficulty
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
     expect:
       rows:
         - {season: "2026-27", run_id: "20260914T211204Z-a730c3", fixture_id: 57, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14}
@@ -65,6 +68,11 @@ unit_tests:
               6::bigint as team_h, 9::bigint as team_a,
               null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
               2::bigint as team_h_difficulty, 3::bigint as team_a_difficulty)
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/fixtures/2026-09-06/20260906T191056Z-6d5820/payload.json", season: "2026-27", run_id: "20260906T191056Z-6d5820"}
+          - {capture_key: "raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
+          - {capture_key: "raw/fpl/fixtures/2026-09-20/20260920T191100Z-0f0f0f/payload.json", season: "2026-27", run_id: "20260920T191100Z-0f0f0f"}
     expect:
       rows:
         - {run_id: "20260906T191056Z-6d5820", fixture_id: 41, gameweek: 5,    kickoff_time: "2026-09-27 14:00:00"}
@@ -75,9 +83,9 @@ unit_tests:
     description: >
       fixture_id is reassigned every season, so id 1 in the ported season and
       id 1 in the live season are different matches. Each row takes its season
-      from its own key — the ported tree's season segment, or the `season` var
-      for the live tree — and the two never merge. The ported row has no
-      kickoff, so the season is shown to come from the key and not the date.
+      from its capture's index entry (#104) and the two never merge. The ported
+      row has no kickoff, so the season is shown to come from the index and not
+      the date.
     model: stg_fixture
     config:
       tags: [unit]
@@ -99,6 +107,10 @@ unit_tests:
           lateral (select
               null::bigint as team_h_score, null::bigint as team_a_score, false as finished,
               null::bigint as team_h_difficulty, null::bigint as team_a_difficulty)
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "history/2025-26/fpl/fixtures/2026-05-26/20260526T034626Z-2a6b73/payload.json", season: "2025-26", run_id: "20260526T034626Z-2a6b73"}
+          - {capture_key: "raw/fpl/fixtures/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
     expect:
       rows:
         - {season: "2025-26", fixture_id: 1, team_h_fpl_id: 12, team_a_fpl_id: 4}

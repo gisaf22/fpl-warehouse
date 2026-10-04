@@ -16,7 +16,7 @@
 --
 -- Latest capture:
 --   Teams, gameweek, kickoff, score and finished come from each fixture's latest
---   capture, ordered by extracted_at with run_id breaking a same-second tie,
+--   capture, ordered by observed_at with run_id breaking a same-second tie,
 --   as in dim_team. So the score is the final one once there is one, and a
 --   postponed fixture reads null gameweek and kickoff — kept, not dropped and
 --   not given an earlier capture's schedule.
@@ -42,7 +42,7 @@ with ranked as (
         *,
         row_number() over (
             partition by season, fixture_id
-            order by extracted_at desc, run_id desc
+            order by observed_at desc, run_id desc
         ) as capture_rank_desc
     from {{ ref('stg_fixture') }}
 
@@ -61,12 +61,12 @@ captures as (
     select
         ranked.season,
         ranked.fixture_id,
-        ranked.extracted_at,
+        ranked.observed_at,
         ranked.run_id,
         ranked.team_h_difficulty,
         ranked.team_a_difficulty,
         latest.kickoff_time is null
-            or ranked.extracted_at < latest.kickoff_time as is_pre_kickoff
+            or ranked.observed_at < latest.kickoff_time as is_pre_kickoff
     from ranked
     inner join latest
         on  latest.season = ranked.season
@@ -88,9 +88,9 @@ difficulty as (
         partition by season, fixture_id
         order by
             is_pre_kickoff desc,
-            case when is_pre_kickoff then extracted_at end desc,
+            case when is_pre_kickoff then observed_at end desc,
             case when is_pre_kickoff then run_id end desc,
-            extracted_at,
+            observed_at,
             run_id
     ) = 1
 

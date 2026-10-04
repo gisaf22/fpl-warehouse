@@ -15,7 +15,7 @@
 -- Latest capture:
 --   Each season's rows come from that season's latest bootstrap-static
 --   capture only — every team in it, and nothing from earlier captures.
---   Ordered by extracted_at, with run_id breaking a same-second tie, as the
+--   Ordered by observed_at, with run_id breaking a same-second tie, as the
 --   element-summary dedup does. Sound because a team id names the same club
 --   all season: tests/stg_test_team_id_keeps_its_code_within_a_season.sql.
 --
@@ -29,10 +29,10 @@ with latest_capture as (
         season,
         run_id
     from {{ ref('stg_team') }}
-    group by season, run_id, extracted_at
+    group by season, run_id, observed_at
     qualify row_number() over (
         partition by season
-        order by extracted_at desc, run_id desc
+        order by observed_at desc, run_id desc
     ) = 1
 
 )
