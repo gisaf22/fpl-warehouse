@@ -40,21 +40,20 @@
 with raw as (
 
     select
-        filename,
+        {{ capture_key_from_filename() }} as capture_key,
         unnest(elements) as e
     from {{ source('fpl_raw', 'bootstrap_static') }}
 
 )
 
 select
-    -- Capture identity (see stg_player_fixture for the key layout)
-    {{ season_from_filename() }} as season,
-    cast(str_split(filename, '/')[-3] as date) as extraction_date,
-    str_split(filename, '/')[-2]               as run_id,
-    strptime(
-        split_part(str_split(filename, '/')[-2], '-', 1),
-        '%Y%m%dT%H%M%SZ'
-    )                                          as extracted_at,
+    -- Capture identity, from the capture index (see int_admitted_capture)
+    admitted.capture_key,
+    admitted.season,
+    admitted.extraction_date,
+    admitted.run_id,
+    admitted.extracted_at,
+    admitted.observed_at,
 
     -- Keys
     cast(e.id as integer)                      as fpl_id,
@@ -70,3 +69,5 @@ select
     cast(e.total_points as integer)            as total_points
 
 from raw
+inner join {{ ref('int_admitted_capture') }} as admitted
+    on admitted.capture_key = raw.capture_key

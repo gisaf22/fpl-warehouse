@@ -10,10 +10,15 @@
 
     Whatever precedes that — `s3://fpl-data-safari/`, a local `raw_root`, or
     the fixture trees under tests/fixtures — is dropped. The segment before
-    `/fpl/` decides which tree, by the same rule as season_from_filename: a
-    season-shaped segment is a history season, anything else the live tree.
+    `/fpl/` decides which tree: a season-shaped segment is a history season,
+    anything else the live tree.
+
+    Staging calls it with no argument, on the source's own `filename` column,
+    and joins the result to int_admitted_capture (#104). It is the only place
+    a model reads an object's path: CI's validate job fails on `filename`
+    anywhere else in models/ or tests/ (#88 E8).
 #}
-{% macro capture_key_from_filename(column) %}
+{% macro capture_key_from_filename(column='filename') %}
     case
         when regexp_matches(
                 regexp_extract({{ column }}, '([^/]+)/fpl/', 1), '^\d{4}-\d{2}$'

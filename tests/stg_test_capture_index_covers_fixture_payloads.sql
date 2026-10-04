@@ -12,13 +12,13 @@
 
 {% if target.name != 'fixtures' %}
 
-select null as filename where false
+select null as object_path where false
 
 {% else %}
 
 with payloads as (
 
-    select file as filename
+    select file as object_path
     from glob('tests/fixtures/raw/fpl/**/payload.json')
     union all
     select file
@@ -26,9 +26,9 @@ with payloads as (
 
 )
 
-select filename
+select object_path
 from payloads
-where {{ capture_key_from_filename('filename') }} not in (
+where {{ capture_key_from_filename('object_path') }} not in (
     select capture_key from {{ ref('base_capture_index') }}
 )
 

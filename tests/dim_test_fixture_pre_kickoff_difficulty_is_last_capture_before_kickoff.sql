@@ -22,7 +22,7 @@ with latest as (
     from {{ ref('stg_fixture') }}
     qualify row_number() over (
         partition by season, fixture_id
-        order by extracted_at desc, run_id desc
+        order by observed_at desc, run_id desc
     ) = 1
 
 ),
@@ -38,10 +38,10 @@ last_before_kickoff as (
     inner join latest
         on  latest.season = stg_fixture.season
         and latest.fixture_id = stg_fixture.fixture_id
-    where stg_fixture.extracted_at < latest.kickoff_time
+    where stg_fixture.observed_at < latest.kickoff_time
     qualify row_number() over (
         partition by stg_fixture.season, stg_fixture.fixture_id
-        order by stg_fixture.extracted_at desc, stg_fixture.run_id desc
+        order by stg_fixture.observed_at desc, stg_fixture.run_id desc
     ) = 1
 
 ),

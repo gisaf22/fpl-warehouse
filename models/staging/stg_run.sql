@@ -17,10 +17,16 @@
 --   The manifest's `origin` object, recorded from contract 2.2.0
 --   (gisaf22/fpl-ingest#75). Null for every older run, whose origin comes from
 --   the run-origin seed instead (#96).
+--
+-- extraction_date:
+--   The manifest's own date, which equalled the date directory in the run's
+--   object keys for 198 of 198 manifests (#88 step 0). Served on
+--   fct_player_fixture via int_admitted_capture (#104, #88 E1).
 -- =============================================================================
 
 select
     run_id,
+    cast(extraction_date as date)  as extraction_date,
     cast(started_at as timestamp)  as run_started_at,
     cast(ended_at as timestamp)    as run_ended_at,
     status,

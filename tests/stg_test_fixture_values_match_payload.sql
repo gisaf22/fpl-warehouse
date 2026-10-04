@@ -20,8 +20,8 @@
 with source_fixtures as (
 
     select
-        {{ season_from_filename() }}   as season,
-        str_split(filename, '/')[-2]   as run_id,
+        admitted.season,
+        admitted.run_id,
         cast(id as integer)            as fixture_id,
         team_h,
         team_a,
@@ -32,7 +32,11 @@ with source_fixtures as (
         finished,
         team_h_difficulty,
         team_a_difficulty
-    from {{ source('fpl_raw', 'fixtures') }}
+    from (
+        select {{ capture_key_from_filename() }} as capture_key, *
+        from {{ source('fpl_raw', 'fixtures') }}
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 ),
 

@@ -13,13 +13,14 @@
 with source_positions as (
 
     select
-        {{ season_from_filename() }}   as season,
-        str_split(filename, '/')[-2]   as run_id,
+        admitted.season,
+        admitted.run_id,
         cast(p.id as integer)          as position_id
     from (
-        select filename, unnest(element_types) as p
+        select {{ capture_key_from_filename() }} as capture_key, unnest(element_types) as p
         from {{ source('fpl_raw', 'bootstrap_static') }}
-    )
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 ),
 

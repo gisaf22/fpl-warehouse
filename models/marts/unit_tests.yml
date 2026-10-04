@@ -23,11 +23,11 @@ unit_tests:
     given:
       - input: ref('stg_team')
         rows:
-          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
-          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", team_fpl_id: 1, team_code: 3, team_name: "Old name", team_short_name: "OLD"}
-          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", team_fpl_id: 99, team_code: 999, team_name: "Earlier only", team_short_name: "EAR"}
-          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
-          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 2, team_code: 7, team_name: "Aston Villa", team_short_name: "AVL"}
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", observed_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", observed_at: "2026-08-29 19:11:08", team_fpl_id: 1, team_code: 3, team_name: "Old name", team_short_name: "OLD"}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", observed_at: "2026-08-29 19:11:08", team_fpl_id: 99, team_code: 999, team_name: "Earlier only", team_short_name: "EAR"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", team_fpl_id: 2, team_code: 7, team_name: "Aston Villa", team_short_name: "AVL"}
     expect:
       rows:
         - {season: "2025-26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
@@ -71,10 +71,10 @@ unit_tests:
     given:
       - input: ref('stg_team')
         rows:
-          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
-          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", team_fpl_id: 13, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
-          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
-          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", team_fpl_id: 12, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", observed_at: "2026-05-26 03:46:26", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", observed_at: "2026-05-26 03:46:26", team_fpl_id: 13, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", team_fpl_id: 1, team_code: 3, team_name: "Arsenal", team_short_name: "ARS"}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", team_fpl_id: 12, team_code: 43, team_name: "Man City", team_short_name: "MCI"}
     expect:
       rows:
         - {season: "2025-26", team_fpl_id: 1, team_code: 3}
@@ -102,9 +102,9 @@ unit_tests:
     given:
       - input: ref('stg_fixture')
         rows:
-          - {season: "2026-27", run_id: "20260910T190000Z-aaaa", extracted_at: "2026-09-10 19:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 2, team_a_difficulty: 4}
-          - {season: "2026-27", run_id: "20260913T130000Z-bbbb", extracted_at: "2026-09-13 13:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
-          - {season: "2026-27", run_id: "20260913T150000Z-cccc", extracted_at: "2026-09-13 15:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 5, team_a_difficulty: 1}
+          - {season: "2026-27", run_id: "20260910T190000Z-aaaa", extracted_at: "2026-09-10 19:00:00", observed_at: "2026-09-10 19:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 2, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260913T130000Z-bbbb", extracted_at: "2026-09-13 13:00:00", observed_at: "2026-09-13 13:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 16:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260913T150000Z-cccc", extracted_at: "2026-09-13 15:00:00", observed_at: "2026-09-13 15:00:00", fixture_id: 30, gameweek: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 5, team_a_difficulty: 1}
     expect:
       rows:
         - {season: "2026-27", fixture_id: 30, kickoff_time: "2026-09-13 14:00:00", team_h_difficulty: 3, team_a_difficulty: 4, difficulty_is_pre_kickoff: true}
@@ -124,9 +124,9 @@ unit_tests:
     given:
       - input: ref('stg_fixture')
         rows:
-          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", fixture_id: 1, gameweek: 1, kickoff_time: "2025-08-15 19:00:00", team_h_fpl_id: 12, team_a_fpl_id: 4, team_h_score: 4, team_a_score: 2, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
-          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", fixture_id: 1, gameweek: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 2, team_a_difficulty: 4}
-          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", fixture_id: 1, gameweek: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
+          - {season: "2025-26", run_id: "20260526T034626Z-aaaa", extracted_at: "2026-05-26 03:46:26", observed_at: "2026-05-26 03:46:26", fixture_id: 1, gameweek: 1, kickoff_time: "2025-08-15 19:00:00", team_h_fpl_id: 12, team_a_fpl_id: 4, team_h_score: 4, team_a_score: 2, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
+          - {season: "2026-27", run_id: "20260829T191108Z-bbbb", extracted_at: "2026-08-29 19:11:08", observed_at: "2026-08-29 19:11:08", fixture_id: 1, gameweek: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 2, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260914T211204Z-cccc", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 1, gameweek: 1, kickoff_time: "2026-08-21 19:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_score: 2, team_a_score: 0, finished: true, team_h_difficulty: 3, team_a_difficulty: 5}
     expect:
       rows:
         - {season: "2025-26", fixture_id: 1, team_h_difficulty: 3, team_a_difficulty: 5, difficulty_is_pre_kickoff: false}
@@ -145,9 +145,9 @@ unit_tests:
     given:
       - input: ref('stg_fixture')
         rows:
-          - {season: "2026-27", run_id: "20260906T120000Z-aaaa", extracted_at: "2026-09-06 12:00:00", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260906T150000Z-bbbb", extracted_at: "2026-09-06 15:00:00", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 1, team_a_score: 0, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260906T191056Z-cccc", extracted_at: "2026-09-06 19:10:56", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 2, team_a_score: 1, finished: true, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260906T120000Z-aaaa", extracted_at: "2026-09-06 12:00:00", observed_at: "2026-09-06 12:00:00", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260906T150000Z-bbbb", extracted_at: "2026-09-06 15:00:00", observed_at: "2026-09-06 15:00:00", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 1, team_a_score: 0, finished: false, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260906T191056Z-cccc", extracted_at: "2026-09-06 19:10:56", observed_at: "2026-09-06 19:10:56", fixture_id: 40, gameweek: 4, kickoff_time: "2026-09-06 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_score: 2, team_a_score: 1, finished: true, team_h_difficulty: 3, team_a_difficulty: 3}
     expect:
       rows:
         - {season: "2026-27", fixture_id: 40, team_h_score: 2, team_a_score: 1, finished: true}
@@ -166,18 +166,18 @@ unit_tests:
     given:
       - input: ref('stg_fixture')
         rows:
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 11, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 1,  team_a_fpl_id: 2,  team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 12, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 4,  team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 13, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 5,  team_a_fpl_id: 6,  team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 14, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 7,  team_a_fpl_id: 8,  team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 15, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 9,  team_a_fpl_id: 10, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 16, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 11, team_a_fpl_id: 12, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 17, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 13, team_a_fpl_id: 14, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 18, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 15, team_a_fpl_id: 16, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 19, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 17, team_a_fpl_id: 18, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 20, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 19, team_a_fpl_id: 20, team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 21, gameweek: 2, kickoff_time: "2026-09-01 19:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 1,  team_h_difficulty: 3, team_a_difficulty: 3}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fixture_id: 22, gameweek: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 2,  team_a_fpl_id: 5,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 11, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 1,  team_a_fpl_id: 2,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 12, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 4,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 13, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 5,  team_a_fpl_id: 6,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 14, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 7,  team_a_fpl_id: 8,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 15, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 9,  team_a_fpl_id: 10, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 16, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 11, team_a_fpl_id: 12, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 17, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 13, team_a_fpl_id: 14, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 18, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 15, team_a_fpl_id: 16, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 19, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 17, team_a_fpl_id: 18, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 20, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 19, team_a_fpl_id: 20, team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 21, gameweek: 2, kickoff_time: "2026-09-01 19:00:00", team_h_fpl_id: 3,  team_a_fpl_id: 1,  team_h_difficulty: 3, team_a_difficulty: 3}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 22, gameweek: 3, kickoff_time: "2026-09-13 14:00:00", team_h_fpl_id: 2,  team_a_fpl_id: 5,  team_h_difficulty: 3, team_a_difficulty: 3}
     expect:
       rows:
         - {fixture_id: 11, gameweek: 2, team_h_fpl_id: 1,  team_a_fpl_id: 2}
@@ -208,8 +208,8 @@ unit_tests:
     given:
       - input: ref('stg_fixture')
         rows:
-          - {season: "2026-27", run_id: "20260906T191056Z-aaaa", extracted_at: "2026-09-06 19:10:56", fixture_id: 41, gameweek: 5, kickoff_time: "2026-09-27 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
-          - {season: "2026-27", run_id: "20260914T211204Z-bbbb", extracted_at: "2026-09-14 21:12:04", fixture_id: 41, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260906T191056Z-aaaa", extracted_at: "2026-09-06 19:10:56", observed_at: "2026-09-06 19:10:56", fixture_id: 41, gameweek: 5, kickoff_time: "2026-09-27 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", run_id: "20260914T211204Z-bbbb", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fixture_id: 41, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, team_h_score: null, team_a_score: null, finished: false, team_h_difficulty: 3, team_a_difficulty: 4}
     expect:
       rows:
         - {season: "2026-27", fixture_id: 41, gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 14, difficulty_is_pre_kickoff: true}
@@ -231,8 +231,8 @@ unit_tests:
     given:
       - input: ref('stg_player_fixture')
         rows:
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 21, gameweek: 2, was_home: true,  opponent_team_fpl_id: 2, kickoff_time: "2026-08-29 14:00:00", team_h_score: 1, team_a_score: 0}
-          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 22, gameweek: 2, was_home: false, opponent_team_fpl_id: 3, kickoff_time: "2026-09-01 19:00:00", team_h_score: 2, team_a_score: 2}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 21, gameweek: 2, was_home: true,  opponent_team_fpl_id: 2, kickoff_time: "2026-08-29 14:00:00", team_h_score: 1, team_a_score: 0}
+          - {season: "2026-27", run_id: "20260914T211204Z-aaaa", extracted_at: "2026-09-14 21:12:04", observed_at: "2026-09-14 21:12:04", fpl_id: 500, fixture_id: 22, gameweek: 2, was_home: false, opponent_team_fpl_id: 3, kickoff_time: "2026-09-01 19:00:00", team_h_score: 2, team_a_score: 2}
       - input: ref('int_gameweek_status')
         rows: []
       - input: ref('dim_fixture')

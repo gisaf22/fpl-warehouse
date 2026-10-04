@@ -24,8 +24,10 @@ sources:
       `history_root` (tests/fixtures/history under the `fixtures` target), in a
       single read_json over a list of globs rather than a UNION in staging — see
       the reason noted on those `external_location`s. Each row carries its own
-      season, parsed from its key by the `season_from_filename` macro; no model
-      ever relates one season's rows to another's.
+      season, from the capture index via int_admitted_capture (#104); no model
+      ever relates one season's rows to another's. Staging keeps only admitted
+      captures, and takes each capture's metadata from the index: no model
+      parses an object's path.
 
       event-status is live-only on purpose: the endpoint serves only the
       current round, so no capture of it exists for any closed season. A closed
@@ -46,16 +48,16 @@ sources:
           (per-fixture rows for the season so far — the canonical
           player-gameweek source), and `history_past` (prior seasons).
 
-          `filename = true` surfaces the object's own key, which is the only
-          carrier of capture identity — the payload body has no extraction
-          timestamp. `{extraction_date}/{run_id}` is parsed out of it in
-          staging so the served layer can order competing captures.
+          `filename = true` surfaces the object's own key. Staging turns it into
+          the capture index's key (capture_key_from_filename) and joins
+          int_admitted_capture, which supplies every capture column (#104):
+          the payload body has no timestamp of its own.
         meta:
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
-          # the payload struct types differ. Season comes from each row's own key
-          # (season_from_filename). An empty history_root yields the live glob
+          # the payload struct types differ. Season comes from the capture
+          # index (int_admitted_capture). An empty history_root yields the live glob
           # alone, so a build works before any season has been ported. Project
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
@@ -90,8 +92,8 @@ sources:
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
-          # the payload struct types differ. Season comes from each row's own key
-          # (season_from_filename). An empty history_root yields the live glob
+          # the payload struct types differ. Season comes from the capture
+          # index (int_admitted_capture). An empty history_root yields the live glob
           # alone, so a build works before any season has been ported. Project
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
@@ -121,8 +123,8 @@ sources:
           bootstrap's current-state view.
 
           Captured on the same `{extraction_date}/{run_id}` layout as
-          bootstrap-static, so every capture is read and staging parses capture
-          identity from the key the same way. The ported 2025-26 season carries
+          bootstrap-static, so every capture is read and staging takes its
+          capture identity from the index the same way. The ported 2025-26 season carries
           one end-of-season snapshot (see
           scripts/rekey_history_season.py, which maps the archive's
           `fixtures.json` to this endpoint).
@@ -196,6 +198,7 @@ sources:
               columns = struct_pack(
                 raw_contract_version := 'VARCHAR',
                 run_id := 'VARCHAR',
+                extraction_date := 'VARCHAR',
                 status := 'VARCHAR',
                 started_at := 'VARCHAR',
                 ended_at := 'VARCHAR',

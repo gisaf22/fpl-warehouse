@@ -36,9 +36,9 @@ with latest_run_per_player as (
             run_id,
             row_number() over (
                 partition by season, fpl_id
-                order by extracted_at desc, run_id desc
+                order by observed_at desc, run_id desc
             ) as run_rank
-        from (select distinct season, fpl_id, run_id, extracted_at from {{ ref('stg_player_fixture') }})
+        from (select distinct season, fpl_id, run_id, observed_at from {{ ref('stg_player_fixture') }})
     )
     where run_rank = 1
 

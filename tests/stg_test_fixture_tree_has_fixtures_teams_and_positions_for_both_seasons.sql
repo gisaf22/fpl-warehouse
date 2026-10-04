@@ -7,10 +7,10 @@
 -- Origin: new in #36 — the staging and dimension models for fixtures, teams
 --         and positions (#37, #38 onward) build against this tree on every PR.
 -- Tier: integration
-{{ config(tags=['integration'], meta={'covers': '#36 AC1'}) }}
+{{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#36 AC1'}) }}
 
--- Reads the sources, not staging: the staging models for these three are
--- separate items and do not exist yet. What is asserted is the tree itself.
+-- Reads the sources, not staging: what is asserted is the tree itself. Each
+-- payload's season comes from the capture index (#104).
 --
 -- Fixtures target only. On `dev` the seasons present depend on whether
 -- history_root is set for that run, which is not what this test is about.
@@ -29,8 +29,12 @@ with expected as (
 
 fixtures as (
 
-    select {{ season_from_filename() }} as season, count(*) as n
-    from {{ source('fpl_raw', 'fixtures') }}
+    select admitted.season, count(*) as n
+    from (
+        select {{ capture_key_from_filename() }} as capture_key
+        from {{ source('fpl_raw', 'fixtures') }}
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
     group by 1
 
 ),
@@ -39,8 +43,12 @@ teams as (
 
     select season, count(*) as n
     from (
-        select {{ season_from_filename() }} as season, unnest(teams) as t
-        from {{ source('fpl_raw', 'bootstrap_static') }}
+        select admitted.season, raw.t
+        from (
+            select {{ capture_key_from_filename() }} as capture_key, unnest(teams) as t
+            from {{ source('fpl_raw', 'bootstrap_static') }}
+        ) as raw
+        inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
     )
     group by 1
 
@@ -50,8 +58,12 @@ positions as (
 
     select season, count(*) as n
     from (
-        select {{ season_from_filename() }} as season, unnest(element_types) as p
-        from {{ source('fpl_raw', 'bootstrap_static') }}
+        select admitted.season, raw.p
+        from (
+            select {{ capture_key_from_filename() }} as capture_key, unnest(element_types) as p
+            from {{ source('fpl_raw', 'bootstrap_static') }}
+        ) as raw
+        inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
     )
     group by 1
 

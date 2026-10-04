@@ -19,21 +19,20 @@
 with raw as (
 
     select
-        filename,
+        {{ capture_key_from_filename() }} as capture_key,
         unnest(element_types) as p
     from {{ source('fpl_raw', 'bootstrap_static') }}
 
 )
 
 select
-    -- Capture identity (see stg_player_fixture for the key layout)
-    {{ season_from_filename() }} as season,
-    cast(str_split(filename, '/')[-3] as date) as extraction_date,
-    str_split(filename, '/')[-2]               as run_id,
-    strptime(
-        split_part(str_split(filename, '/')[-2], '-', 1),
-        '%Y%m%dT%H%M%SZ'
-    )                                          as extracted_at,
+    -- Capture identity, from the capture index (see int_admitted_capture)
+    admitted.capture_key,
+    admitted.season,
+    admitted.extraction_date,
+    admitted.run_id,
+    admitted.extracted_at,
+    admitted.observed_at,
 
     -- Keys
     cast(p.id as integer)                      as position_id,
@@ -43,3 +42,5 @@ select
     cast(p.singular_name_short as varchar)     as position_short_name
 
 from raw
+inner join {{ ref('int_admitted_capture') }} as admitted
+    on admitted.capture_key = raw.capture_key

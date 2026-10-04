@@ -138,8 +138,9 @@ Beside the payloads, the tree carries what ingest writes to index them (#95):
 
   - The real manifest of LOCAL_RUN, 20260902T163935Z-07eb06: a laptop run that wrote
     into production raw/ (#87). Its catalog file is trimmed to the six fixture
-    players' element-summary entries, every one with `season: null`, and their
-    payloads are deliberately NOT in the tree. It exists so admission (#97) has a
+    players' element-summary entries, every one with `season: null`. One of their
+    payloads, fpl_id LOCAL_RUN_PAYLOAD_FPL_ID's, is in the tree so staging's
+    admission filter has real bytes to exclude (#104 AC1); the rest are not. It exists so admission (#97) has a
     real `local` run to exclude; its bytes duplicate production captures (#87
     evidence), so leaving them out loses nothing.
   - Two SYNTHETIC catalog entries appended to the last run's catalog file, with
@@ -350,6 +351,9 @@ RUNS = [
 INDEX_22_RUN = ("20261003T052050Z-fa64a9", "2026-10-03")
 IN_PROGRESS_RUN = ("20261003T060000Z-0000a1", "2026-10-03")
 LOCAL_RUN = ("20260902T163935Z-07eb06", "2026-09-02")
+# The one LOCAL_RUN payload kept in the tree, so staging's admission filter
+# (#104 AC1) has an unadmitted capture with real bytes to exclude.
+LOCAL_RUN_PAYLOAD_FPL_ID = 166
 # fpl_ids of the two synthetic admission entries; no fixture player has either.
 SYNTHETIC_UNUSABLE_FPL_ID = 9998
 SYNTHETIC_REVALIDATED_FPL_ID = 9999
@@ -581,10 +585,12 @@ def build_index() -> None:
         sys.exit(f"{run_id} no longer gives fixture players with a null season")
     catalog["_fixture_note"] = (
         f"Catalog of the LOCAL run {run_id}, trimmed from {total} entries to the "
-        f"{len(catalog['captures'])} fixture players'. Their payloads are "
-        "deliberately not in this tree. See CAPTURE INDEX in build_fixtures.py."
+        f"{len(catalog['captures'])} fixture players'. Only fpl_id "
+        f"{LOCAL_RUN_PAYLOAD_FPL_ID}'s payload is in this tree. See CAPTURE "
+        "INDEX in build_fixtures.py."
     )
     write(OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json", catalog)
+    write_local_run_payload()
 
     # Two synthetic admission cases, appended to the last run's catalog.
     run_id, date = RUNS[-1]
@@ -645,6 +651,25 @@ def build_index() -> None:
         OUT_ROOT / "_manifests" / synthetic_date / synthetic_id / "manifest.json",
         synthetic,
     )
+
+
+def write_local_run_payload() -> None:
+    """The LOCAL_RUN element-summary payload of one fixture player, verbatim.
+
+    An unadmitted capture whose payload is in the tree: staging must exclude it
+    (#104 AC1). Its bytes duplicate a production capture (#87 evidence), so on
+    a build that ignored admission it would change no served row either.
+    """
+    run_id, date = LOCAL_RUN
+    fpl_id = LOCAL_RUN_PAYLOAD_FPL_ID
+    payload = s3_get(f"{RAW_PREFIX}/element-summary/{fpl_id}/{date}/{run_id}/payload.json")
+    payload["_fixture_note"] = (
+        f"Verbatim element-summary capture from the LOCAL run {run_id}, which "
+        "admission excludes as not_production. Kept so staging's admission "
+        "filter has a payload to exclude (#104 AC1). See CAPTURE INDEX in "
+        "build_fixtures.py."
+    )
+    write(OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id / "payload.json", payload)
 
 
 def trim_fixtures(fixtures: list) -> list:

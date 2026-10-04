@@ -39,22 +39,27 @@ with history as (
 fixtures as (
 
     select distinct
-        {{ season_from_filename() }} as season,
+        admitted.season,
         cast(id as integer)          as fixture_id,
         cast(event as integer)       as gameweek,
         cast(team_h as integer)      as team_h,
         cast(team_a as integer)      as team_a
-    from {{ source('fpl_raw', 'fixtures') }}
+    from (
+        select {{ capture_key_from_filename() }} as capture_key, *
+        from {{ source('fpl_raw', 'fixtures') }}
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 ),
 
 teams as (
 
-    select distinct season, cast(t.id as integer) as team_fpl_id
+    select distinct admitted.season, cast(t.id as integer) as team_fpl_id
     from (
-        select {{ season_from_filename() }} as season, unnest(teams) as t
+        select {{ capture_key_from_filename() }} as capture_key, unnest(teams) as t
         from {{ source('fpl_raw', 'bootstrap_static') }}
-    )
+    ) as raw
+    inner join {{ ref('int_admitted_capture') }} as admitted using (capture_key)
 
 ),
 

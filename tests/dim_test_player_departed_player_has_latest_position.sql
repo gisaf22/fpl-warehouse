@@ -14,10 +14,10 @@
 with latest_capture as (
 
     select season, run_id
-    from (select distinct season, run_id, extracted_at from {{ ref('stg_player') }})
+    from (select distinct season, run_id, observed_at from {{ ref('stg_player') }})
     qualify row_number() over (
         partition by season
-        order by extracted_at desc, run_id desc
+        order by observed_at desc, run_id desc
     ) = 1
 
 ),
@@ -44,7 +44,7 @@ last_appearance as (
     inner join departed using (season, fpl_id)
     qualify row_number() over (
         partition by player.season, player.fpl_id
-        order by player.extracted_at desc, player.run_id desc
+        order by player.observed_at desc, player.run_id desc
     ) = 1
 
 )
