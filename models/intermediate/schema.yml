@@ -52,6 +52,31 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: int_endpoint_freshness
+    description: >
+      One row per live endpoint: its newest admitted capture's received_at,
+      that capture's age in hours, and freshness_status (ok, warn over 6h,
+      error over 18h, exempt for element-summary) (#103, #88 E2). The
+      scheduled build's input guard, which replaces `dbt source freshness`.
+      A view, so the age is taken when it is read. Internal.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: endpoint
+        data_tests:
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#103 AC4"
+          - accepted_values:
+              arguments:
+                values: ['bootstrap-static', 'fixtures', 'event-status', 'element-summary']
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#103 AC4"
+
   - name: int_capture_admission
     description: >
       One row per indexed capture: whether it is admitted, and if not, why
