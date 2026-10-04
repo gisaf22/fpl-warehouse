@@ -148,6 +148,41 @@ jobs:
           fi
           echo "no model or test reads filename"
 
+      # Every payload staging model must declare a relationships test from
+      # capture_key to int_admitted_capture, so a new stg_ model cannot skip
+      # the admission join unnoticed. stg_run is exempt: it is built from run
+      # manifests, not payloads, and has no capture_key.
+      - name: Check every staging model tests capture_key against admission
+        run: |
+          uv run python - <<'PY'
+          import json, sys
+
+          EXEMPT = {"stg_run"}
+          with open("target/manifest.json") as fh:
+              nodes = json.load(fh)["nodes"].values()
+          staging = {n["name"] for n in nodes
+                     if n["resource_type"] == "model" and n["name"].startswith("stg_")}
+          covered = set()
+          for n in nodes:
+              meta = n.get("test_metadata") or {}
+              kwargs = meta.get("kwargs", {})
+              if (meta.get("name") == "relationships"
+                      and n.get("column_name") == "capture_key"
+                      and "int_admitted_capture" in str(kwargs.get("to"))
+                      and kwargs.get("field") == "capture_key"):
+                  covered.add(n["attached_node"].rsplit(".", 1)[-1])
+          problems = []
+          if not staging - EXEMPT:
+              problems.append("no stg_ models found; nothing was checked")
+          problems += [f"{m} has no relationships test from capture_key to int_admitted_capture"
+                       for m in sorted(staging - EXEMPT - covered)]
+          for problem in problems:
+              print(f"::error::{problem}")
+          if not problems:
+              print(f"checked {len(staging - EXEMPT)} staging models")
+          sys.exit(1 if problems else 0)
+          PY
+
       - name: Check exactly the served models are public
         run: |
           uv run dbt ls --resource-type model \

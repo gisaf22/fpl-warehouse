@@ -9,6 +9,18 @@ models:
       served contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
 
   - name: stg_player
     description: >
@@ -17,6 +29,17 @@ models:
     group: warehouse_internal
     access: private
     columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
       - name: player_code
         description: >
           FPL's cross-season player identifier (`elements[].code`). Carried
@@ -59,6 +82,17 @@ models:
     group: warehouse_internal
     access: private
     columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
       - name: strength
         # Nullable by design, so no not_null test: FPL reports no strength for
         # any team in 2026-27 (decision 4 on #32). Where present it must sit on
@@ -80,6 +114,18 @@ models:
       contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
 
   - name: stg_fixture
     description: >
@@ -91,6 +137,18 @@ models:
       of the served contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
 
   - name: stg_gameweek
     description: >
@@ -98,6 +156,18 @@ models:
       not part of the served contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
 
   - name: stg_gameweek_status
     description: >
@@ -106,6 +176,18 @@ models:
       rollup lives in int_gameweek_status. Internal: not part of the served contract.
     group: warehouse_internal
     access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
 
   - name: stg_run
     description: >
