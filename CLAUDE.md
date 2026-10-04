@@ -293,7 +293,9 @@ not silently corrected.
   `received_at`. **Every payload staging model inner-joins it on the capture key**, which
   `capture_key_from_filename` computes from the source's `filename`. So staging holds
   admitted captures only, and nothing else reads a path: CI's `validate` job fails on
-  `filename` in any `.sql` under `models/` or `tests/` (#88 E8). The one exception is
+  `filename` in any `.sql` under `models/` or `tests/` (#88 E8). Each payload staging model also declares a `relationships` test from
+  `capture_key` to `int_admitted_capture`, and `validate` fails if any `stg_` model but
+  `stg_run` (built from manifests, not payloads) lacks one. The one exception is
   `stg_test_fixture_tree_reads_no_s3_object`, which checks the physical path read.
 - **A payload with no index entry is excluded silently** (#88 E7). That is normally one
   whose run was still in progress when the build started. It has no finalized manifest
