@@ -160,6 +160,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
       # A scheduled run's OIDC subject is the ref form —
       # repo:gisaf22/fpl-warehouse:ref:refs/heads/main — because a schedule
       # always runs on the default branch. There is no distinct `schedule`

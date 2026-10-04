@@ -1,0 +1,6 @@
+# audit_helper drives the served diff (#102): macros/served_diff.sql compares two
+# builds' served tables with its compare_queries and compare_all_columns. Nothing
+# in the model DAG uses it. It pulls in dbt_utils as its own dependency.
+packages:
+  - package: dbt-labs/audit_helper
+    version: 0.14.0

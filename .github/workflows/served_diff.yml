@@ -4,8 +4,11 @@
 # Dispatched from main with a head_ref. Two parallel jobs each run a full
 # `dbt build` against live S3 and export the five served tables to parquet:
 # `before` from main, `after` from head_ref. Neither publishes. A `diff` job
-# then compares each table per season, both ways, with EXCEPT ALL, and writes
-# counts, build times and differing rows to the job summary and an artifact.
+# then loads both sides into one DuckDB (the served_diff target) as schemas
+# served_before and served_after and compares each table per season with dbt's
+# audit_helper, via the served_diff run-operation in macros/served_diff.sql. It
+# writes counts, build times and differing rows to the job summary and an
+# artifact.
 # It fails on any difference, and fails as inconclusive if the two builds read
 # different newest run_ids — an ingest run landed between them, so a
 # difference would not be attributable to the code.
@@ -17,6 +20,9 @@
 # risk, as with ci.yml's live-tests: the head code runs holding the role,
 # including its served write grant. This workflow is dispatch-only and
 # maintainer-run; it never calls the publish script.
+#
+# Both refs need macros/served_diff.sql, so a head_ref older than #102 cannot
+# be compared.
 
 name: Served Diff
 
@@ -60,14 +66,6 @@ jobs:
         with:
           ref: ${{ matrix.ref }}
 
-      # The head ref's tree may predate this workflow's script, so the diff
-      # tooling always comes from main.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: main
-          path: .served-diff-tools
-          sparse-checkout: scripts
-
       - name: Require an AWS role to be configured
         run: |
           if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
@@ -82,6 +80,11 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
@@ -99,10 +102,13 @@ jobs:
           uv run dbt build --vars "{history_root: '$HISTORY_ROOT'}"
           echo "BUILD_SECONDS=$((SECONDS - start))" >> "$GITHUB_ENV"
 
+      # The head ref's own macros/served_diff.sql, so a head_ref must contain
+      # it: one older than #102 cannot be compared.
       - name: Export served tables
-        run: >-
-          uv run python .served-diff-tools/scripts/served_diff.py
-          export ".local/served-diff/${{ matrix.side }}" --seconds "$BUILD_SECONDS"
+        run: |
+          mkdir -p ".local/served-diff/${{ matrix.side }}"
+          uv run dbt run-operation served_diff_export --args \
+            "{out_dir: .local/served-diff/${{ matrix.side }}, seconds: $BUILD_SECONDS}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -127,6 +133,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: served-*
@@ -137,7 +148,9 @@ jobs:
           HEAD_REF: ${{ inputs.head_ref }}
         run: |
           echo "main vs \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
-          uv run python scripts/served_diff.py diff served/served-before served/served-after \
+          mkdir -p .local
+          uv run dbt -q --no-use-colors run-operation served_diff --target served_diff \
+            --args "{before: served/served-before, after: served/served-after}" \
             | tee report.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
