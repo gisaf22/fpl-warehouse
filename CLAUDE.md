@@ -907,9 +907,29 @@ The `AWS_ROLE_ARN` guard step in both jobs stays regardless. It is no longer des
 normal state, but it still gives a fork or a fresh clone with no variable set an explanatory
 failure instead of an opaque credentials error.
 
+### Served diff
+
+`.github/workflows/served_diff.yml` (#102) shows how a change affects served data, against live S3.
+Dispatch it from `main` with `head_ref`:
+`gh workflow run served_diff.yml --ref main -f head_ref=<branch>`. Two parallel jobs build
+`main` and `head_ref` with a full `dbt build` and export the five served tables. Neither
+publishes. A `diff` job then compares each table per season, both ways, with `EXCEPT ALL`,
+via `scripts/served_diff.py`. Counts, both build times and the differing rows go to the job
+summary and an artifact.
+
+- **It fails on any difference.** It also fails as **inconclusive** when the two builds read
+  different newest run_ids: an ingest run landed between them. Re-dispatch.
+- **It is dispatched from `main` on purpose.** The OIDC subject stays the `main` ref form the
+  role already trusts. The head code still runs holding the role, including its served write
+  grant. That risk is accepted, as for `live-tests`.
+- **It is not a PR check**, for the same reason `live-tests` is not.
+
 ### Actions are SHA-pinned, not tag-pinned
 
-Every `uses:` in both workflows names a full 40-character commit SHA with the version tag
+`actions/upload-artifact` v7 → `043fb46d…` and `actions/download-artifact` v8 → `3e5f45b2…`
+(both lightweight tags) were pinned on 2026-10-04 for the served diff.
+
+Every `uses:` in every workflow names a full 40-character commit SHA with the version tag
 kept as a trailing comment, e.g.
 `uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5`. Pinned 2026-09-13:
 `actions/checkout` v5 → `fbc6f399…`, `astral-sh/setup-uv` v7 → `37802adc…`,
