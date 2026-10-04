@@ -1,0 +1,161 @@
+# Served diff (#102, #88 E3) — proves a change's effect on served data in
+# Actions, against live S3, rather than on a laptop.
+#
+# Dispatched from main with a head_ref. Two parallel jobs each run a full
+# `dbt build` against live S3 and export the five served tables to parquet:
+# `before` from main, `after` from head_ref. Neither publishes. A `diff` job
+# then loads both sides into one DuckDB (the served_diff target) as schemas
+# served_before and served_after and compares each table per season with dbt's
+# audit_helper, via the served_diff run-operation in macros/served_diff.sql. It
+# writes counts, build times and differing rows to the job summary and an
+# artifact.
+# It fails on any difference, and fails as inconclusive if the two builds read
+# different newest run_ids — an ingest run landed between them, so a
+# difference would not be attributable to the code.
+#
+#   gh workflow run served_diff.yml --ref main -f head_ref=<branch>
+#
+# Dispatching from main keeps the OIDC subject at the ref form the deploy
+# role's trust policy already admits, so no IAM change is needed. Accepted
+# risk, as with ci.yml's live-tests: the head code runs holding the role,
+# including its served write grant. This workflow is dispatch-only and
+# maintainer-run; it never calls the publish script.
+#
+# Both refs need macros/served_diff.sql, so a head_ref older than #102 cannot
+# be compared.
+
+name: Served Diff
+
+on:
+  workflow_dispatch:
+    inputs:
+      head_ref:
+        description: Branch, tag or SHA whose served output is compared with main's.
+        type: string
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    # Explicit so pipefail is on: the diff step pipes into the job summary.
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      # Both sides always run to the end; one failing says nothing about the other.
+      fail-fast: false
+      matrix:
+        include:
+          - side: before
+            ref: main
+          - side: after
+            ref: ${{ inputs.head_ref }}
+    name: build (${{ matrix.side }})
+    runs-on: ubuntu-latest
+    # Same budget and reasoning as scheduled_build.yml: sized against the worst
+    # observed live build, below the one-hour OIDC session.
+    timeout-minutes: 45
+    env:
+      HISTORY_ROOT: s3://fpl-data-safari/history
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Require an AWS role to be configured
+        run: |
+          if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
+            echo "::error::Set the AWS_ROLE_ARN repository variable. See CLAUDE.md, 'Scheduled build'."
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Create the local database directory
+        run: mkdir -p .local
+
+      # Wall-clock seconds of the build alone, carried into build.json.
+      - name: Build and test against live S3
+        run: |
+          start=$SECONDS
+          uv run dbt build --vars "{history_root: '$HISTORY_ROOT'}"
+          echo "BUILD_SECONDS=$((SECONDS - start))" >> "$GITHUB_ENV"
+
+      # The head ref's own macros/served_diff.sql, so a head_ref must contain
+      # it: one older than #102 cannot be compared.
+      - name: Export served tables
+        run: |
+          mkdir -p ".local/served-diff/${{ matrix.side }}"
+          uv run dbt run-operation served_diff_export --args \
+            "{out_dir: .local/served-diff/${{ matrix.side }}, seconds: $BUILD_SECONDS}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: served-${{ matrix.side }}
+          path: .local/served-diff/${{ matrix.side }}
+          if-no-files-found: error
+
+  diff:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: served-*
+          path: served
+
+      - name: Diff served output
+        env:
+          HEAD_REF: ${{ inputs.head_ref }}
+        run: |
+          echo "main vs \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p .local
+          uv run dbt -q --no-use-colors run-operation served_diff --target served_diff \
+            --args "{before: served/served-before, after: served/served-after}" \
+            | tee report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: served-diff-report
+          path: report.md
+          if-no-files-found: ignore

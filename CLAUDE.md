@@ -615,6 +615,8 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
 ## Tests
 
 ```bash
+dbt deps                                              # once per clone: packages.yml
+
 # Fast tiers — no AWS session, no S3. Build once, then run either tier.
 dbt seed --target fixtures                            # load seeds (dbt run does not)
 dbt run  --target fixtures                            # build from tests/fixtures/raw
@@ -907,9 +909,49 @@ The `AWS_ROLE_ARN` guard step in both jobs stays regardless. It is no longer des
 normal state, but it still gives a fork or a fresh clone with no variable set an explanatory
 failure instead of an opaque credentials error.
 
+### Served diff
+
+`.github/workflows/served_diff.yml` (#102) shows how a change affects served data, against live S3.
+Dispatch it from `main` with `head_ref`:
+`gh workflow run served_diff.yml --ref main -f head_ref=<branch>`.
+
+- **Two builds, neither publishes.** Two parallel jobs build `main` and `head_ref` with a full
+  `dbt build`. Each exports the five served tables and a `build.json` (build seconds, and the
+  newest run_id its staging read) through the `served_diff_export` run-operation.
+- **One connection for both sides.** The `diff` job loads both exports into one DuckDB, the
+  credential-free `served_diff` target, as schemas `served_before` and `served_after`.
+  Attaching the two build databases instead was rejected: each holds all of staging, which
+  is far too big to pass between jobs.
+- **audit_helper compares them.** The `served_diff` run-operation in
+  `macros/served_diff.sql` uses `audit_helper.compare_queries` per table and per season: a
+  summary for the counts, and the rows themselves, capped at 20 per season. For a table that
+  differs, `compare_all_columns` on the table's key names the columns whose values changed.
+  `compare_relations` has no filter, so the per-season split goes through `compare_queries`,
+  which `compare_relations` wraps.
+- **Row counts are compared too.** audit_helper uses set `EXCEPT`, which cannot see a change
+  in how often an identical row repeats. Every served table has a unique key, so a repeated
+  row is itself a defect.
+- **The report** (counts, both build times and the differing rows) goes to the job summary
+  and a `served-diff-report` artifact.
+- **It fails on any difference, a missing table, or a changed column list.** It also fails as
+  **inconclusive** when the two builds read different newest run_ids: an ingest run landed
+  between them. Re-dispatch.
+- **Both refs need the macro**, so a `head_ref` older than #102 cannot be compared.
+- **It is dispatched from `main` on purpose.** The OIDC subject stays the `main` ref form the
+  role already trusts. The head code still runs holding the role, including its served write
+  grant. That risk is accepted, as for `live-tests`.
+- **It is not a PR check**, for the same reason `live-tests` is not.
+
+audit_helper (with dbt_utils, its dependency) is the project's only dbt package, pinned in
+`packages.yml` and `package-lock.yml`. Nothing in the model DAG uses it, but dbt will not
+parse without it, so every workflow runs `dbt deps` and so must a fresh clone.
+
 ### Actions are SHA-pinned, not tag-pinned
 
-Every `uses:` in both workflows names a full 40-character commit SHA with the version tag
+`actions/upload-artifact` v7 → `043fb46d…` and `actions/download-artifact` v8 → `3e5f45b2…`
+(both lightweight tags) were pinned on 2026-10-04 for the served diff.
+
+Every `uses:` in every workflow names a full 40-character commit SHA with the version tag
 kept as a trailing comment, e.g.
 `uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5`. Pinned 2026-09-13:
 `actions/checkout` v5 → `fbc6f399…`, `astral-sh/setup-uv` v7 → `37802adc…`,

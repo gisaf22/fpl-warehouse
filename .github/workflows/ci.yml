@@ -52,6 +52,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
       # Resolves every ref() and the group/access boundary. No warehouse
       # connection, so no AWS session needed.
       - name: Parse project
@@ -199,6 +204,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
+
       # Turns "this job needs no credentials" from a claim into something the
       # run verifies. If a well-meaning change ever adds an AWS step here, the
       # job fails loudly rather than quietly putting a production read back on
@@ -259,6 +269,11 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
 
       - name: Assert no AWS session is present
         run: |
@@ -336,6 +351,11 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+
+      # packages.yml (audit_helper, for the served diff) must be installed
+      # before dbt will parse the project.
+      - name: Install dbt packages
+        run: uv run dbt deps
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4

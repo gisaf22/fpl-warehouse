@@ -123,3 +123,15 @@ fpl_warehouse:
         preserve_insertion_order: false
       extensions:
         - json
+
+    # The served diff's comparison database (#102). The diff job loads both
+    # builds' exported served parquet into it as schemas served_before and
+    # served_after, so audit_helper sees both sides in one connection. It reads
+    # only local files, so like `fixtures` it declares no secrets. The path is
+    # overridable so scripts/tests can give each test its own database.
+    served_diff:
+      type: duckdb
+      path: "{{ env_var('DBT_SERVED_DIFF_PATH', '.local/served_diff.duckdb') }}"
+      threads: 1
+      extensions:
+        - json
