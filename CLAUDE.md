@@ -30,8 +30,9 @@ and states it can be deleted on migration.
 - **Never model at gameweek grain directly from raw data.**
 - **Gameweek, not round.** FPL calls the same number `round` (element-summary history)
   and `event` (fixtures, event-status, bootstrap-static). This project calls it `gameweek`
-  from the intermediate layer onward (#89); staging still says `round` until #88 renames it,
-  and each model that reads staging maps it at that boundary. Dated measurement records in
+  from staging onward: #89 renamed it from the intermediate layer up, and #101 finished it in
+  staging (`stg_event_status` became `stg_gameweek_status`). Source names keep the ingest
+  endpoint's name (`event_status`). Dated measurement records in
   this file keep the word "round" as written; there it means gameweek.
 - **`season` is part of the grain project-wide** — `fct_player_fixture` is
   `(season, fpl_id, fixture_id)`, `int_player_gameweek_spine` and `fct_player_gameweek` are
@@ -94,7 +95,7 @@ ties. There is no `metadata.json` alongside element-summary payloads to read ins
 ## Gameweek ratification — `is_ratified` is sourced, not inferred
 
 `is_ratified` on both served models comes from FPL's `event-status` endpoint, via
-`stg_event_status` -> `int_gameweek_status`. **Do not re-derive it from the scoreline.**
+`stg_gameweek_status` -> `int_gameweek_status`. **Do not re-derive it from the scoreline.**
 
 Until 2026-09-14 it was inferred in `fct_player_fixture` as `team_h_score is not null and
 team_a_score is not null`, i.e. scoreline publication used as a proxy for points

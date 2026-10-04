@@ -4,10 +4,9 @@
 -- =============================================================================
 --
 -- Purpose:
---   Collapses stg_event_status's (round, match_date) x capture grain down to
---   one authoritative row per gameweek: has FPL ratified this gameweek's
---   points? Staging still calls the column `round` until #88; it is renamed to
---   `gameweek` where this model reads it.
+--   Collapses stg_gameweek_status's (gameweek, match_date) x capture grain
+--   down to one authoritative row per gameweek: has FPL ratified this
+--   gameweek's points?
 --
 --   This is the reshape that replaces the served layer's former inference,
 --   which read "FPL has published a final score for this fixture" as a proxy
@@ -57,12 +56,11 @@ with per_capture as (
 
     select
         season,
-        -- Boundary mapping: staging names this column round until #88.
-        round as gameweek,
+        gameweek,
         run_id,
         bool_and(points = 'r' and bonus_added) as is_ratified
-    from {{ ref('stg_event_status') }}
-    group by season, round, run_id
+    from {{ ref('stg_gameweek_status') }}
+    group by season, gameweek, run_id
 
 )
 

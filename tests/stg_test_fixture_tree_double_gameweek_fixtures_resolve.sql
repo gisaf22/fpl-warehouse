@@ -22,11 +22,11 @@ select null as failure where false
 
 with double_gameweek as (
 
-    select distinct season, fixture_id, round
+    select distinct season, fixture_id, gameweek
     from {{ ref('stg_player_fixture') }}
     where season = '{{ var("season") }}'
       and fpl_id = 233
-      and round = 2
+      and gameweek = 2
 
 ),
 
@@ -35,7 +35,7 @@ fixtures as (
     select distinct
         {{ season_from_filename() }} as season,
         cast(id as integer)          as fixture_id,
-        cast(event as integer)       as round
+        cast(event as integer)       as gameweek
     from {{ source('fpl_raw', 'fixtures') }}
 
 )
@@ -55,7 +55,7 @@ select
     'history fixture has no round-2 fixture row' as failure,
     double_gameweek.fixture_id
 from double_gameweek
-left join fixtures using (season, fixture_id, round)
+left join fixtures using (season, fixture_id, gameweek)
 where fixtures.fixture_id is null
 
 {% endif %}

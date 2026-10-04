@@ -99,8 +99,7 @@ difficulty as (
 select
     latest.season,
     latest.fixture_id,
-    -- Boundary mapping: staging names this column round until #88.
-    latest.round as gameweek,
+    latest.gameweek,
     latest.kickoff_time,
     latest.team_h_fpl_id,
     latest.team_a_fpl_id,
