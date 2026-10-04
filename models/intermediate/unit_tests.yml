@@ -322,3 +322,106 @@ unit_tests:
         - {capture_key: "k-failed", admitted: true, flagged_revalidation: true, unadmitted_reason: null}
         - {capture_key: "k-passed", admitted: true, flagged_revalidation: false, unadmitted_reason: null}
         - {capture_key: "k-sidecar", admitted: true, flagged_revalidation: false, unadmitted_reason: null}
+
+  # --- int_endpoint_freshness: per-endpoint age of admitted captures (#103) --
+  # as_of is pinned through the freshness_as_of var so ages are exact.
+
+  - name: endpoint_freshness_warns_over_6h_errors_over_18h_and_exempts_element_summary
+    description: >
+      Each live endpoint's newest admitted capture sets its age. Over 6h warns,
+      over 18h errors, and element-summary is exempt however old it is.
+    model: int_endpoint_freshness
+    config:
+      tags: [unit]
+      meta:
+        covers: "#103 AC1"
+    overrides:
+      vars:
+        freshness_as_of: "2026-10-04 12:00:00"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "bs-old", endpoint: "bootstrap-static", scope: null, received_at: "2026-10-03 12:00:00"}
+          - {capture_key: "bs-new", endpoint: "bootstrap-static", scope: null, received_at: "2026-10-04 07:00:00"}
+          - {capture_key: "fx", endpoint: "fixtures", scope: null, received_at: "2026-10-04 05:00:00"}
+          - {capture_key: "es", endpoint: "event-status", scope: null, received_at: "2026-10-03 17:00:00"}
+          - {capture_key: "el", endpoint: "element-summary/166", scope: null, received_at: "2026-09-14 12:00:00"}
+      - input: ref('int_capture_admission')
+        rows:
+          - {capture_key: "bs-old", admitted: true}
+          - {capture_key: "bs-new", admitted: true}
+          - {capture_key: "fx", admitted: true}
+          - {capture_key: "es", admitted: true}
+          - {capture_key: "el", admitted: true}
+    expect:
+      rows:
+        - {endpoint: "bootstrap-static", newest_received_at: "2026-10-04 07:00:00", age_hours: 5.0, freshness_status: "ok"}
+        - {endpoint: "fixtures", newest_received_at: "2026-10-04 05:00:00", age_hours: 7.0, freshness_status: "warn"}
+        - {endpoint: "event-status", newest_received_at: "2026-10-03 17:00:00", age_hours: 19.0, freshness_status: "error"}
+        - {endpoint: "element-summary", newest_received_at: "2026-09-14 12:00:00", age_hours: 480.0, freshness_status: "exempt"}
+
+  - name: endpoint_freshness_thresholds_are_strictly_over
+    description: >
+      Exactly 6h is still ok and exactly 18h still only warns; one second past
+      18h errors.
+    model: int_endpoint_freshness
+    config:
+      tags: [unit]
+      meta:
+        covers: "#103 AC1"
+    overrides:
+      vars:
+        freshness_as_of: "2026-10-04 12:00:00"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "bs", endpoint: "bootstrap-static", scope: null, received_at: "2026-10-04 06:00:00"}
+          - {capture_key: "fx", endpoint: "fixtures", scope: null, received_at: "2026-10-03 18:00:00"}
+          - {capture_key: "es", endpoint: "event-status", scope: null, received_at: "2026-10-03 17:59:59"}
+          - {capture_key: "el", endpoint: "element-summary/4", scope: null, received_at: "2026-10-04 11:00:00"}
+      - input: ref('int_capture_admission')
+        rows:
+          - {capture_key: "bs", admitted: true}
+          - {capture_key: "fx", admitted: true}
+          - {capture_key: "es", admitted: true}
+          - {capture_key: "el", admitted: true}
+    expect:
+      rows:
+        - {endpoint: "bootstrap-static", newest_received_at: "2026-10-04 06:00:00", age_hours: 6.0, freshness_status: "ok"}
+        - {endpoint: "fixtures", newest_received_at: "2026-10-03 18:00:00", age_hours: 18.0, freshness_status: "warn"}
+        - {endpoint: "event-status", newest_received_at: "2026-10-03 17:59:59", age_hours: 18.0, freshness_status: "error"}
+        - {endpoint: "element-summary", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "exempt"}
+
+  - name: endpoint_freshness_ignores_an_unadmitted_newer_capture
+    description: >
+      A local (not_production) capture newer than every admitted one does not
+      make its endpoint fresh: only admitted captures count.
+    model: int_endpoint_freshness
+    config:
+      tags: [unit]
+      meta:
+        covers: "#103 AC2"
+    overrides:
+      vars:
+        freshness_as_of: "2026-10-04 12:00:00"
+    given:
+      - input: ref('base_capture_index')
+        rows:
+          - {capture_key: "es-ci", endpoint: "event-status", scope: null, received_at: "2026-10-03 12:00:00"}
+          - {capture_key: "es-local", endpoint: "event-status", scope: null, received_at: "2026-10-04 11:00:00"}
+          - {capture_key: "bs", endpoint: "bootstrap-static", scope: null, received_at: "2026-10-04 11:00:00"}
+          - {capture_key: "fx", endpoint: "fixtures", scope: null, received_at: "2026-10-04 11:00:00"}
+          - {capture_key: "el", endpoint: "element-summary/4", scope: null, received_at: "2026-10-04 11:00:00"}
+      - input: ref('int_capture_admission')
+        rows:
+          - {capture_key: "es-ci", admitted: true}
+          - {capture_key: "es-local", admitted: false}
+          - {capture_key: "bs", admitted: true}
+          - {capture_key: "fx", admitted: true}
+          - {capture_key: "el", admitted: true}
+    expect:
+      rows:
+        - {endpoint: "bootstrap-static", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "ok"}
+        - {endpoint: "fixtures", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "ok"}
+        - {endpoint: "event-status", newest_received_at: "2026-10-03 12:00:00", age_hours: 24.0, freshness_status: "error"}
+        - {endpoint: "element-summary", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "exempt"}
