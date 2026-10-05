@@ -32,6 +32,21 @@ vars:
   # itself does not change.
   season: "2026-27"
 
+  # Pre-deadline capture window, for the missed-deadline warning (#111). A
+  # deadline counts as covered when an admitted capture's observed_at falls in
+  # [deadline - (gate + buffer) minutes, deadline).
+  #
+  # pre_deadline_gate_minutes mirrors fpl-ingest's PRE_DEADLINE_WINDOW in
+  # orchestration/pre_deadline.py, widened from 75 to 120 in
+  # gisaf22/fpl-ingest@7daf43e (2026-10-04). If the gate changes again, change
+  # this with it. The buffer covers received_at landing just before the gate
+  # reads its clock (#80's 5 minutes, kept).
+  pre_deadline_gate_minutes: 120
+  pre_deadline_buffer_minutes: 5
+  # stg_run.trigger and the pre-deadline workflow both start on 2026-09-24, so
+  # no earlier deadline had a capture to miss (#80). Delete, do not re-date.
+  pre_deadline_coverage_start: "2026-09-24"
+
   # Root of the re-keyed history tree — closed seasons ported from the pre-S3
   # archive by scripts/rekey_history_season.py, laid out as
   # {history_root}/{season}/fpl/{endpoint}/{extraction_date}/{run_id}/payload.json.
