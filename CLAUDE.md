@@ -1050,8 +1050,11 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except three deliberate warnings: the input-freshness warn over 6h
-(#103) and the two admission warnings (#104, see "Layering"). Each of those reports a condition that must not block a
+test is `error` severity except four deliberate warnings: the input-freshness warn over 6h
+(#103), the two admission warnings (#104, see "Layering"), and the missed pre-deadline
+capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
+`[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
+mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a
 publish. Every other assertion fails the build, so no real failure can land as a passing
 warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
