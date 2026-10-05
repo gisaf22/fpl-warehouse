@@ -243,12 +243,34 @@ jobs:
       # any test fails, Actions' default `bash -e` propagates that, and the run
       # is marked failed — which is the notification. Verified 2026-09-10: a
       # deliberately failing test returned exit 1 from `dbt build`. Every test
-      # in the project is error severity (no `severity: warn` anywhere), so
-      # there is no path where a real failure lands as a passing warning.
+      # is error severity except the deliberate warnings listed in CLAUDE.md
+      # ("Scheduled build"), each a condition that must not block the publish.
       - name: Build and test against live S3
         run: >-
           uv run dbt build
           --vars "{history_root: '$HISTORY_ROOT'}"
+
+      # Missed pre-deadline captures (#111): the warn test in the build above
+      # names each miss only in the dbt log. This puts them in the job summary
+      # and raises an annotation. Same macro as the test, so they cannot drift;
+      # the coverage start is read from its var. continue-on-error, so a
+      # reporting failure can never block the publish below.
+      - name: Report missed pre-deadline captures
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 50 --output json -q --inline "
+            select scope.coverage_start, missed.*
+            from (select '{{ var('pre_deadline_coverage_start') }}' as coverage_start) as scope
+            left join ({{ missed_pre_deadline_windows(ref('stg_gameweek'), ref('int_admitted_capture')) }}) as missed
+              on true" > missed.json
+          {
+            echo "### Pre-deadline capture coverage"
+            jq -r '.show as $r | if $r[0].gameweek == null
+              then "- every passed deadline since \($r[0].coverage_start) has a capture in its window"
+              else $r[] | "- missed: \(.season) gameweek \(.gameweek), deadline \(.deadline_time)" end' missed.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.show[] | select(.gameweek != null) | "::warning::missed pre-deadline capture: \(.season) gameweek \(.gameweek), deadline \(.deadline_time)"' missed.json
 
       # Admission counts (#104, #88 E4): how many indexed captures were
       # admitted, flagged or left out, and why, in the job summary. The two
