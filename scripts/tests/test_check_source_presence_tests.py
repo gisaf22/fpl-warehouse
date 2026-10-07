@@ -18,16 +18,25 @@ def source_id(table: str) -> str:
     return f"source.fpl_warehouse.fpl_raw.{table}"
 
 
-def presence_test(table: str, mode: str) -> tuple[str, dict]:
+SEVERITY = {"removed": "ERROR", "partial": "WARN"}
+
+
+def presence_test(table: str, mode: str, severity: str | None = None) -> tuple[str, dict]:
     uid = f"test.fpl_warehouse.consumed_keys_present_{table}_{mode}"
     return uid, {
         "resource_type": "test",
+        "config": {"severity": severity or SEVERITY[mode]},
         "test_metadata": {"name": "consumed_keys_present", "kwargs": {"mode": mode}},
         "depends_on": {"nodes": [source_id(table)]},
     }
 
 
-def manifest(*, without: tuple[str, str] | None = None, exempt: object = "absent") -> dict:
+def manifest(
+    *,
+    without: tuple[str, str] | None = None,
+    exempt: object = "absent",
+    severity: dict[tuple[str, str], str] | None = None,
+) -> dict:
     """Every payload source declared with both tests; run_manifests has none.
 
     `without` drops one (table, mode) test. `exempt` sets
@@ -47,7 +56,7 @@ def manifest(*, without: tuple[str, str] | None = None, exempt: object = "absent
             "meta": {"record_path": "$[*].stats[*]", "presence_exempt": exempt},
         }
     nodes = dict(
-        presence_test(table, mode)
+        presence_test(table, mode, (severity or {}).get((table, mode)))
         for table in PAYLOAD
         for mode in ("removed", "partial")
         if (table, mode) != without
@@ -83,3 +92,18 @@ def test_an_exemption_with_an_empty_reason_fails_naming_the_column(reason):
 @pytest.mark.covers("#114 AC4")
 def test_an_exemption_with_a_reason_passes():
     assert problems(manifest(exempt="FPL omits stats before kickoff")) == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#114 AC4")
+@pytest.mark.parametrize(("mode", "wrong"), [("removed", "warn"), ("partial", "error")])
+def test_a_presence_test_with_the_wrong_severity_fails_naming_it(mode, wrong):
+    found = problems(manifest(severity={("bootstrap_static", mode): wrong}))
+    assert len(found) == 1
+    assert "bootstrap_static" in found[0] and mode in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#114 AC4")
+def test_no_payload_sources_found_fails():
+    assert problems({"sources": {}, "nodes": {}}) != []
