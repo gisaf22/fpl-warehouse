@@ -297,21 +297,23 @@ not silently corrected.
   `capture_key` to `int_admitted_capture`, and `validate` fails if any `stg_` model but
   `stg_run` (built from manifests, not payloads) lacks one. There are two exceptions,
   both excluded from that check by name. `stg_test_fixture_tree_reads_no_s3_object`
-  checks the physical path read. The `consumed_keys_present` generic test
-  (`tests/generic/`, #114 D2) builds the path of each capture in an endpoint's latest
-  admitted live run from its `capture_key` and reads those objects alone with
-  `read_json_objects`.
+  checks the physical path read. `int_source_key_presence` (#114 D2) builds the path
+  of each capture in an endpoint's latest admitted live run from its `capture_key` and
+  reads those objects alone with `read_json_objects`.
 - **Every source field staging reads is declared on its source and tested for presence**
   (#114). Each `fpl_raw` payload source in `models/staging/sources.yml` lists its
   consumed fields as `columns:`. A nested field is named by its path (`elements.id`),
   and `meta.record_path` locates its records (`$.elements[*]`). The source's
-  `meta.endpoint` names its capture-index endpoint. `consumed_keys_present` checks every
-  declared column as a key in the raw JSON of the endpoint's latest admitted live run
-  that has bytes: the run of the newest capture, with all of that run's captures, never
-  each entity's own latest. A key that holds a null is present. It runs twice per
-  source. `mode: removed` (error) fails when the key is absent from every record.
-  `mode: partial` (warn) reports a key absent from some records, or a source with no
-  admitted live capture. A column opts out only with a reason in
+  `meta.endpoint` names its capture-index endpoint. `int_source_key_presence` reads the
+  raw JSON once per build and records, per declared column, how many records of the
+  endpoint's latest admitted live run with payload files lack the key: the run of the
+  newest capture with a file, with all of that run's captures that have one, never each
+  entity's own latest. A key that holds a null is present. `consumed_keys_present` reads
+  that table and runs twice per source. `mode: removed` (error) fails when the key is
+  absent from every record. `mode: partial` (warn) reports a key absent from some
+  records, a source with no admitted live capture, or a latest admitted run with
+  captures that have no payload file (naming the run and the count; the check falls
+  back to the newest captures with one). A column opts out only with a reason in
   `meta.presence_exempt`. CI's `validate` job runs `scripts/check_source_presence_tests.py`
   over `manifest.json`, which fails on a payload source without both tests at those
   severities, or an exemption with no reason. **A field staging reads but nobody declared

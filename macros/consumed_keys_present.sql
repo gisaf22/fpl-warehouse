@@ -64,15 +64,24 @@
 {%- endmacro %}
 
 {#
-    Findings for a source's consumed keys over one run's captures (#114).
-    One row per (source, column) that fails the mode:
+    The latest admitted live run of an endpoint, ignoring whether its objects
+    exist, and how many of its captures have no payload file. One row, only
+    when that count is above zero: the run the test then falls back from
+    (#114 D3, amended). Arguments as for latest_live_run_captures.
+#}
+{% macro latest_live_run_missing_bytes(admitted, endpoint, present) -%}
+    select run_id, count(*) as captures_without_bytes
+    from ({{ latest_live_run_captures(admitted, endpoint) }})
+    where capture_key not in (select capture_key from {{ present }})
+    group by run_id
+{%- endmacro %}
 
-        removed  the key is absent from every record (error severity)
-        partial  the key is absent from some records but not all (warn)
-
-    With no capture at all, `partial` returns one row naming the source and
-    `removed` returns nothing: emptiness belongs to the freshness guard (AC7).
-    A column with no records (an empty array) is reported by neither.
+{#
+    Key presence for a source's consumed keys over one run's captures (#114).
+    One row per spec: source_name, column_name, run_id, captures (the run's
+    captures read), records (records holding the key's record path) and
+    missing (records without the key). With no capture, every row has
+    captures = 0 and a null run_id.
 
     A key present with a null value counts as present: json_exists sees the
     key, not its value (#114 D2).
@@ -80,10 +89,7 @@
     captures: a relation with capture_key and run_id.
     objects:  a relation with capture_key and json, one row per payload.
 #}
-{% macro consumed_key_findings(source_name, specs, captures, objects, mode) -%}
-    {%- if mode not in ('removed', 'partial') -%}
-        {{ exceptions.raise_compiler_error("consumed_keys_present: mode must be 'removed' or 'partial', got " ~ mode) }}
-    {%- endif -%}
+{% macro consumed_key_presence(source_name, specs, captures, objects) -%}
     with run as (
         select min(run_id) as run_id, count(*) as captures
         from {{ captures }}
@@ -119,35 +125,76 @@
     )
 
     select
-        '{{ source_name }}'          as source_name,
+        '{{ source_name }}' as source_name,
         checked.column_name,
         run.run_id,
         run.captures,
         checked.records,
-        checked.missing,
+        checked.missing
+    from checked
+    cross join run
+{%- endmacro %}
+
+{#
+    Findings from key presence rows (#114), one row per finding:
+
+        removed  a key absent from every record (error severity)
+        partial  a key absent from some records but not all (warn); one row
+                 per source with no admitted live capture (AC7); and one row
+                 per source whose latest admitted run has captures without a
+                 payload file, naming that run and the count (D3, amended)
+
+    A column with no records (an empty array) is reported by neither.
+
+    presence: a relation shaped like int_source_key_presence: the columns of
+              consumed_key_presence plus latest_run_id and
+              latest_run_missing_bytes.
+#}
+{% macro presence_findings(presence, mode) -%}
+    {%- if mode not in ('removed', 'partial') -%}
+        {{ exceptions.raise_compiler_error("consumed_keys_present: mode must be 'removed' or 'partial', got " ~ mode) }}
+    {%- endif -%}
+    select
+        source_name, column_name, run_id, captures, records, missing,
         {%- if mode == 'removed' %}
         'key absent from every record' as finding
         {%- else %}
         'key absent from some records' as finding
         {%- endif %}
-    from checked
-    cross join run
-    where run.captures > 0
+    from {{ presence }}
+    where captures > 0
       {%- if mode == 'removed' %}
-      and checked.records > 0
-      and checked.missing = checked.records
+      and records > 0
+      and missing = records
       {%- else %}
-      and checked.missing > 0
-      and checked.missing < checked.records
-      {%- endif %}
-    {%- if mode == 'partial' %}
+      and missing > 0
+      and missing < records
 
     union all
 
-    select
-        '{{ source_name }}', null, null, 0, 0, 0,
+    select distinct
+        source_name, null, null, 0, 0, 0,
         'no admitted live capture'
-    from run
-    where run.captures = 0
-    {%- endif %}
+    from {{ presence }}
+    where captures = 0
+
+    union all
+
+    select distinct
+        source_name, null, latest_run_id, 0, 0, latest_run_missing_bytes,
+        'latest admitted run has captures without a payload file; checked the newest captures with one'
+    from {{ presence }}
+    where latest_run_missing_bytes > 0
+      {%- endif %}
+{%- endmacro %}
+
+{#
+    consumed_key_presence and presence_findings in one call, for a run with
+    no captures missing their files.
+#}
+{% macro consumed_key_findings(source_name, specs, captures, objects, mode) -%}
+    select * from ({{ presence_findings(
+        "(select *, null::varchar as latest_run_id, 0 as latest_run_missing_bytes from ("
+        ~ consumed_key_presence(source_name, specs, captures, objects) ~ "))",
+        mode) }})
 {%- endmacro %}

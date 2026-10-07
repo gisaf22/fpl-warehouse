@@ -141,7 +141,7 @@ jobs:
         run: |
           hits=$(grep -rnw filename models tests --include='*.sql' \
             | grep -v '^tests/stg_test_fixture_tree_reads_no_s3_object\.sql:' \
-            | grep -v '^tests/generic/consumed_keys_present\.sql:' || true)
+            | grep -v '^models/intermediate/int_source_key_presence\.sql:' || true)
           if [ -n "$hits" ]; then
             echo "::error::filename used outside capture_key_from_filename (#104 AC2, #88 E8):"
             echo "$hits"
