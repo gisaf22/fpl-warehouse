@@ -13,6 +13,16 @@
 -- 20260914T211204Z-a730c3 (one capture, 2026-09-14): 20261003T052050Z-fa64a9 is
 -- newer but index-only, with no payload in the tree, so it cannot be read..
 
+-- Fixture-only: the expected run is a fact about tests/fixtures/raw. Against
+-- live data the newest run is a different one every build, and the declared
+-- columns are covered there by the applied source tests instead.
+
+{% if target.name != 'fixtures' %}
+
+select null as source_name where false
+
+{% else %}
+
 with expected (source_name, column_name, run_id, captures, missing_equals_records) as (
     values ('bootstrap_static', 'elements.no_such_key', '20260914T211204Z-a730c3', 1, true)
 ),
@@ -37,3 +47,5 @@ actual as (
 union all
 (select 'reported, not expected', * from actual
  except select 'reported, not expected', * from expected)
+
+{% endif %}
