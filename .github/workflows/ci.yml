@@ -140,7 +140,8 @@ jobs:
       - name: Check no model or test parses a filename
         run: |
           hits=$(grep -rnw filename models tests --include='*.sql' \
-            | grep -v '^tests/stg_test_fixture_tree_reads_no_s3_object\.sql:' || true)
+            | grep -v '^tests/stg_test_fixture_tree_reads_no_s3_object\.sql:' \
+            | grep -v '^models/intermediate/int_source_key_presence\.sql:' || true)
           if [ -n "$hits" ]; then
             echo "::error::filename used outside capture_key_from_filename (#104 AC2, #88 E8):"
             echo "$hits"
@@ -182,6 +183,12 @@ jobs:
               print(f"checked {len(staging - EXEMPT)} staging models")
           sys.exit(1 if problems else 0)
           PY
+
+      # Every fpl_raw payload source must carry consumed_keys_present twice,
+      # removed at error and partial at warn, and a column may opt out only
+      # with a reason in meta.presence_exempt (#114 AC4).
+      - name: Check every payload source carries the presence tests
+        run: uv run python scripts/check_source_presence_tests.py
 
       - name: Check exactly the served models are public
         run: |

@@ -295,8 +295,29 @@ not silently corrected.
   admitted captures only, and nothing else reads a path: CI's `validate` job fails on
   `filename` in any `.sql` under `models/` or `tests/` (#88 E8). Each payload staging model also declares a `relationships` test from
   `capture_key` to `int_admitted_capture`, and `validate` fails if any `stg_` model but
-  `stg_run` (built from manifests, not payloads) lacks one. The one exception is
-  `stg_test_fixture_tree_reads_no_s3_object`, which checks the physical path read.
+  `stg_run` (built from manifests, not payloads) lacks one. There are two exceptions,
+  both excluded from that check by name. `stg_test_fixture_tree_reads_no_s3_object`
+  checks the physical path read. `int_source_key_presence` (#114 D2) builds the path
+  of each capture in an endpoint's latest admitted live run from its `capture_key` and
+  reads those objects alone with `read_json_objects`.
+- **Every source field staging reads is declared on its source and tested for presence**
+  (#114). Each `fpl_raw` payload source in `models/staging/sources.yml` lists its
+  consumed fields as `columns:`. A nested field is named by its path (`elements.id`),
+  and `meta.record_path` locates its records (`$.elements[*]`). The source's
+  `meta.endpoint` names its capture-index endpoint. `int_source_key_presence` reads the
+  raw JSON once per build and records, per declared column, how many records of the
+  endpoint's latest admitted live run with payload files lack the key: the run of the
+  newest capture with a file, with all of that run's captures that have one, never each
+  entity's own latest. A key that holds a null is present. `consumed_keys_present` reads
+  that table and runs twice per source. `mode: removed` (error) fails when the key is
+  absent from every record. `mode: partial` (warn) reports a key absent from some
+  records, a source with no admitted live capture, or a latest admitted run with
+  captures that have no payload file (naming the run and the count; the check falls
+  back to the newest captures with one). A column opts out only with a reason in
+  `meta.presence_exempt`. CI's `validate` job runs `scripts/check_source_presence_tests.py`
+  over `manifest.json`, which fails on a payload source without both tests at those
+  severities, or an exemption with no reason. **A field staging reads but nobody declared
+  is not protected** (#114 D4); #115 closes that.
 - **A payload with no index entry is excluded silently** (#88 E7). That is normally one
   whose run was still in progress when the build started. It has no finalized manifest
   yet, and the next build picks it up. Counting such payloads would need a second read of
@@ -1050,8 +1071,9 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except four deliberate warnings: the input-freshness warn over 6h
-(#103), the two admission warnings (#104, see "Layering"), and the missed pre-deadline
+test is `error` severity except five deliberate warnings: the input-freshness warn over 6h
+(#103), the two admission warnings (#104, see "Layering"), the partial-presence warning on
+each payload source (#114, see "Layering"), and the missed pre-deadline
 capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
 `[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
 mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a

@@ -62,6 +62,16 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: int_source_key_presence
+    description: >
+      One row per consumed source column: whether its key is still in the raw
+      JSON of its endpoint's latest admitted live run with payload files, as
+      record and missing counts (#114). Read once per build so both
+      consumed_keys_present tests on each payload source read this table, not
+      the raw objects. Internal.
+    group: warehouse_internal
+    access: private
+
   - name: int_endpoint_freshness
     description: >
       One row per live endpoint: its newest admitted capture's received_at,

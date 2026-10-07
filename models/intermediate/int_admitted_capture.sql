@@ -23,6 +23,10 @@
 --                      records its run instant there (fpl-ingest#66 AC6).
 --                      Kept only because fct_player_fixture serves it (E1);
 --                      nothing orders by it.
+--   endpoint           the capture index's, as ingest names it
+--                      (`element-summary/{id}` per player). Read by the
+--                      consumed_keys_present test to find an endpoint's
+--                      latest run (#114 D3).
 --   Both served columns equal what parsing the object key used to give: the
 --   run_id instant matched the run start for 199 of 199 runs, and the key's
 --   date the manifest's for 198 of 198 (#88 step 0).
@@ -43,7 +47,8 @@ select
         date_trunc('second', runs.run_started_at),
         date_trunc('second', captures.received_at)
     )                                              as extracted_at,
-    captures.received_at                           as observed_at
+    captures.received_at                           as observed_at,
+    captures.endpoint
 from {{ ref('base_capture_index') }} as captures
 inner join {{ ref('int_capture_admission') }} as admission
     on admission.capture_key = captures.capture_key
