@@ -77,3 +77,16 @@ def test_no_payload_staging_model_found_fails_rather_than_passing_vacuously():
     found = problems(manifest())
     assert len(found) == 1
     assert "nothing was checked" in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+def test_a_new_staging_model_calling_source_itself_fails_though_older_ones_await_conversion():
+    found = problems(
+        manifest(
+            model("stg_gameweek_status", "event_status", VIA_MACRO),
+            model("stg_new_payload", "fixtures", DIRECT),
+        )
+    )
+    assert len(found) == 1
+    assert "stg_new_payload" in found[0] and "fixtures" in found[0]

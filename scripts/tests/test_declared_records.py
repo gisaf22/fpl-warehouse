@@ -51,3 +51,15 @@ def test_every_declared_field_is_read_under_its_key():
     assert result.returncode == 0, result.stdout + result.stderr
     for key in ("capture_key", "event", "date", "points", "bonus_added"):
         assert f'"{key}"' in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#115 AC1")
+def test_an_unsupported_record_path_fails_compilation_naming_the_path():
+    result = show(
+        "with r as ({{ declared_records('event_status', '$.status[*].nested[*]') }}) "
+        "select * from r"
+    )
+
+    assert result.returncode != 0
+    assert "$.status[*].nested[*]" in result.stdout + result.stderr
