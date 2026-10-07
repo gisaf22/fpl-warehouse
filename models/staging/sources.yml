@@ -53,6 +53,7 @@ sources:
           int_admitted_capture, which supplies every capture column (#104):
           the payload body has no timestamp of its own.
         meta:
+          endpoint: element-summary
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
@@ -77,6 +78,148 @@ sources:
               union_by_name = true,
               filename = true
             )
+        columns:
+          - name: history
+          - name: history.assists
+            meta:
+              record_path: '$.history[*]'
+          - name: history.bonus
+            meta:
+              record_path: '$.history[*]'
+          - name: history.bps
+            meta:
+              record_path: '$.history[*]'
+          - name: history.clean_sheets
+            meta:
+              record_path: '$.history[*]'
+          - name: history.clearances_blocks_interceptions
+            meta:
+              record_path: '$.history[*]'
+          - name: history.creativity
+            meta:
+              record_path: '$.history[*]'
+          - name: history.defensive_contribution
+            meta:
+              record_path: '$.history[*]'
+          - name: history.element
+            meta:
+              record_path: '$.history[*]'
+          - name: history.expected_assists
+            meta:
+              record_path: '$.history[*]'
+          - name: history.expected_goal_involvements
+            meta:
+              record_path: '$.history[*]'
+          - name: history.expected_goals
+            meta:
+              record_path: '$.history[*]'
+          - name: history.expected_goals_conceded
+            meta:
+              record_path: '$.history[*]'
+          - name: history.fixture
+            meta:
+              record_path: '$.history[*]'
+          - name: history.goals_conceded
+            meta:
+              record_path: '$.history[*]'
+          - name: history.goals_scored
+            meta:
+              record_path: '$.history[*]'
+          - name: history.ict_index
+            meta:
+              record_path: '$.history[*]'
+          - name: history.influence
+            meta:
+              record_path: '$.history[*]'
+          - name: history.kickoff_time
+            meta:
+              record_path: '$.history[*]'
+          - name: history.minutes
+            meta:
+              record_path: '$.history[*]'
+          - name: history.modified
+            meta:
+              record_path: '$.history[*]'
+          - name: history.opponent_team
+            meta:
+              record_path: '$.history[*]'
+          - name: history.own_goals
+            meta:
+              record_path: '$.history[*]'
+          - name: history.penalties_missed
+            meta:
+              record_path: '$.history[*]'
+          - name: history.penalties_saved
+            meta:
+              record_path: '$.history[*]'
+          - name: history.recoveries
+            meta:
+              record_path: '$.history[*]'
+          - name: history.red_cards
+            meta:
+              record_path: '$.history[*]'
+          - name: history.round
+            meta:
+              record_path: '$.history[*]'
+          - name: history.saves
+            meta:
+              record_path: '$.history[*]'
+          - name: history.selected
+            meta:
+              record_path: '$.history[*]'
+          - name: history.starts
+            meta:
+              record_path: '$.history[*]'
+          - name: history.tackles
+            meta:
+              record_path: '$.history[*]'
+          - name: history.team_a_score
+            meta:
+              record_path: '$.history[*]'
+          - name: history.team_h_score
+            meta:
+              record_path: '$.history[*]'
+          - name: history.threat
+            meta:
+              record_path: '$.history[*]'
+          - name: history.total_points
+            meta:
+              record_path: '$.history[*]'
+          - name: history.transfers_balance
+            meta:
+              record_path: '$.history[*]'
+          - name: history.transfers_in
+            meta:
+              record_path: '$.history[*]'
+          - name: history.transfers_out
+            meta:
+              record_path: '$.history[*]'
+          - name: history.value
+            meta:
+              record_path: '$.history[*]'
+          - name: history.was_home
+            meta:
+              record_path: '$.history[*]'
+          - name: history.yellow_cards
+            meta:
+              record_path: '$.history[*]'
+        data_tests:
+          # Every declared column must still be a key in the latest admitted
+          # live run (#114). Declaring a column above is enough to cover it.
+          - consumed_keys_present:
+              arguments:
+                mode: removed
+              config:
+                severity: error
+                tags: ['integration']
+                meta: {covers: '#114 AC1'}
+          - consumed_keys_present:
+              arguments:
+                mode: partial
+              config:
+                severity: warn
+                tags: ['integration']
+                meta: {covers: '#114 AC8'}
 
       - name: bootstrap_static
         description: >
@@ -89,6 +232,7 @@ sources:
           selected downstream by the same `{extraction_date}/{run_id}` key
           fields used for element-summary.
         meta:
+          endpoint: bootstrap-static
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
@@ -113,6 +257,82 @@ sources:
               union_by_name = true,
               filename = true
             )
+        columns:
+          - name: elements
+          - name: events
+          - name: teams
+          - name: element_types
+          - name: elements.id
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.code
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.element_type
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.web_name
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.total_points
+            meta:
+              record_path: '$.elements[*]'
+          - name: events.id
+            meta:
+              record_path: '$.events[*]'
+          - name: events.deadline_time
+            meta:
+              record_path: '$.events[*]'
+          - name: events.finished
+            meta:
+              record_path: '$.events[*]'
+          - name: events.is_current
+            meta:
+              record_path: '$.events[*]'
+          - name: events.data_checked
+            meta:
+              record_path: '$.events[*]'
+          - name: teams.id
+            meta:
+              record_path: '$.teams[*]'
+          - name: teams.code
+            meta:
+              record_path: '$.teams[*]'
+          - name: teams.name
+            meta:
+              record_path: '$.teams[*]'
+          - name: teams.short_name
+            meta:
+              record_path: '$.teams[*]'
+          - name: teams.strength
+            meta:
+              record_path: '$.teams[*]'
+          - name: element_types.id
+            meta:
+              record_path: '$.element_types[*]'
+          - name: element_types.singular_name
+            meta:
+              record_path: '$.element_types[*]'
+          - name: element_types.singular_name_short
+            meta:
+              record_path: '$.element_types[*]'
+        data_tests:
+          # Every declared column must still be a key in the latest admitted
+          # live run (#114). Declaring a column above is enough to cover it.
+          - consumed_keys_present:
+              arguments:
+                mode: removed
+              config:
+                severity: error
+                tags: ['integration']
+                meta: {covers: '#114 AC1'}
+          - consumed_keys_present:
+              arguments:
+                mode: partial
+              config:
+                severity: warn
+                tags: ['integration']
+                meta: {covers: '#114 AC8'}
 
       - name: fixtures
         description: >
@@ -129,6 +349,7 @@ sources:
           scripts/rekey_history_season.py, which maps the archive's
           `fixtures.json` to this endpoint).
         meta:
+          endpoint: fixtures
           # Same list-of-globs shape as bootstrap-static above, for the same
           # reasons.
           external_location: >-
@@ -147,6 +368,54 @@ sources:
               union_by_name = true,
               filename = true
             )
+        columns:
+          - name: id
+            meta:
+              record_path: '$[*]'
+          - name: event
+            meta:
+              record_path: '$[*]'
+          - name: kickoff_time
+            meta:
+              record_path: '$[*]'
+          - name: team_h
+            meta:
+              record_path: '$[*]'
+          - name: team_a
+            meta:
+              record_path: '$[*]'
+          - name: team_h_score
+            meta:
+              record_path: '$[*]'
+          - name: team_a_score
+            meta:
+              record_path: '$[*]'
+          - name: finished
+            meta:
+              record_path: '$[*]'
+          - name: team_h_difficulty
+            meta:
+              record_path: '$[*]'
+          - name: team_a_difficulty
+            meta:
+              record_path: '$[*]'
+        data_tests:
+          # Every declared column must still be a key in the latest admitted
+          # live run (#114). Declaring a column above is enough to cover it.
+          - consumed_keys_present:
+              arguments:
+                mode: removed
+              config:
+                severity: error
+                tags: ['integration']
+                meta: {covers: '#114 AC1'}
+          - consumed_keys_present:
+              arguments:
+                mode: partial
+              config:
+                severity: warn
+                tags: ['integration']
+                meta: {covers: '#114 AC8'}
 
       - name: event_status
         description: >
@@ -175,12 +444,44 @@ sources:
           One object per run, same `{extraction_date}/{run_id}` key layout as
           bootstrap-static, parsed the same way in staging.
         meta:
+          endpoint: event-status
           external_location: >-
             read_json(
               '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/event-status/*/*/payload.json',
               union_by_name = true,
               filename = true
             )
+        columns:
+          - name: status
+          - name: status.event
+            meta:
+              record_path: '$.status[*]'
+          - name: status.date
+            meta:
+              record_path: '$.status[*]'
+          - name: status.points
+            meta:
+              record_path: '$.status[*]'
+          - name: status.bonus_added
+            meta:
+              record_path: '$.status[*]'
+        data_tests:
+          # Every declared column must still be a key in the latest admitted
+          # live run (#114). Declaring a column above is enough to cover it.
+          - consumed_keys_present:
+              arguments:
+                mode: removed
+              config:
+                severity: error
+                tags: ['integration']
+                meta: {covers: '#114 AC1'}
+          - consumed_keys_present:
+              arguments:
+                mode: partial
+              config:
+                severity: warn
+                tags: ['integration']
+                meta: {covers: '#114 AC8'}
 
       - name: run_manifests
         description: >
