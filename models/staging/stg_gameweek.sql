@@ -20,12 +20,12 @@
 --   (#89, #101).
 -- =============================================================================
 
+-- Fields come through declared_records, which selects only the columns
+-- declared at `$.events[*]` in sources.yml (#115): an undeclared field fails
+-- the build rather than escaping the presence test.
 with raw as (
 
-    select
-        {{ capture_key_from_filename() }} as capture_key,
-        unnest(events) as ev
-    from {{ source('fpl_raw', 'bootstrap_static') }}
+    {{ declared_records('bootstrap_static', '$.events[*]') }}
 
 )
 
@@ -39,15 +39,15 @@ select
     admitted.observed_at,
 
     -- Keys
-    cast(ev.id as integer)                     as gameweek,
+    cast(raw."id" as integer)                  as gameweek,
 
     -- Calendar
-    cast(ev.deadline_time as timestamp)        as deadline_time,
+    cast(raw."deadline_time" as timestamp)     as deadline_time,
 
     -- Lifecycle
-    cast(ev.finished as boolean)               as finished,
-    cast(ev.data_checked as boolean)           as data_checked,
-    cast(ev.is_current as boolean)             as is_current
+    cast(raw."finished" as boolean)            as finished,
+    cast(raw."data_checked" as boolean)        as data_checked,
+    cast(raw."is_current" as boolean)          as is_current
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted

@@ -37,12 +37,12 @@
 --   same run's element-summary history; not a served column.
 -- =============================================================================
 
+-- Fields come through declared_records, which selects only the columns
+-- declared at `$.elements[*]` in sources.yml (#115): an undeclared field fails
+-- the build rather than escaping the presence test.
 with raw as (
 
-    select
-        {{ capture_key_from_filename() }} as capture_key,
-        unnest(elements) as e
-    from {{ source('fpl_raw', 'bootstrap_static') }}
+    {{ declared_records('bootstrap_static', '$.elements[*]') }}
 
 )
 
@@ -56,17 +56,17 @@ select
     admitted.observed_at,
 
     -- Keys
-    cast(e.id as integer)                      as fpl_id,
+    cast(raw."id" as integer)                  as fpl_id,
 
     -- Identity
-    cast(e.web_name as varchar)                as web_name,
-    cast(e.code as integer)                    as player_code,
+    cast(raw."web_name" as varchar)            as web_name,
+    cast(raw."code" as integer)                as player_code,
 
     -- Position as of this capture; refers to stg_position.position_id
-    cast(e.element_type as integer)            as position_id,
+    cast(raw."element_type" as integer)        as position_id,
 
     -- Season total as of this capture
-    cast(e.total_points as integer)            as total_points
+    cast(raw."total_points" as integer)        as total_points
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted

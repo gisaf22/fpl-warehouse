@@ -16,12 +16,12 @@
 --   this warehouse. stg_player.position_id refers to position_id here.
 -- =============================================================================
 
+-- Fields come through declared_records, which selects only the columns
+-- declared at `$.element_types[*]` in sources.yml (#115): an undeclared field fails
+-- the build rather than escaping the presence test.
 with raw as (
 
-    select
-        {{ capture_key_from_filename() }} as capture_key,
-        unnest(element_types) as p
-    from {{ source('fpl_raw', 'bootstrap_static') }}
+    {{ declared_records('bootstrap_static', '$.element_types[*]') }}
 
 )
 
@@ -35,11 +35,11 @@ select
     admitted.observed_at,
 
     -- Keys
-    cast(p.id as integer)                      as position_id,
+    cast(raw."id" as integer)                  as position_id,
 
     -- Labels
-    cast(p.singular_name as varchar)           as position_name,
-    cast(p.singular_name_short as varchar)     as position_short_name
+    cast(raw."singular_name" as varchar)       as position_name,
+    cast(raw."singular_name_short" as varchar) as position_short_name
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted
