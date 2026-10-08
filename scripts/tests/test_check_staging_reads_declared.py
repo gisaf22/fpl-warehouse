@@ -109,3 +109,12 @@ def test_stg_fixture_calling_source_itself_fails():
     found = problems(manifest(model("stg_fixture", "fixtures", code)))
     assert len(found) == 1
     assert "stg_fixture" in found[0] and "fixtures" in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+def test_stg_player_fixture_calling_source_itself_fails():
+    code = "select unnest(history) as h from {{ source('fpl_raw', 'element_summary') }}"
+    found = problems(manifest(model("stg_player_fixture", "element_summary", code)))
+    assert len(found) == 1
+    assert "stg_player_fixture" in found[0] and "element_summary" in found[0]
