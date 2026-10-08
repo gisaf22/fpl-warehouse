@@ -17,11 +17,12 @@
     Renames and casts stay in the staging model, in its own select over this
     output.
 
-    Under a dbt unit test the graph is empty, so the declarations cannot be
-    read; the macro then passes through every column the mocked source gives.
-    A mock holds only the columns the test lists, and every real build and
-    test has the full graph, so the restriction holds wherever raw data is
-    read.
+    dbt compiles a unit test with an empty graph, so the declarations cannot
+    be read there; only then does the macro pass through every column the
+    mocked source gives. A mock holds only the columns its test lists. The
+    unit test is identified by the node's resource_type, never by the empty
+    graph alone: an empty graph anywhere else is a compile error naming this
+    macro, so the restriction cannot silently lapse where raw data is read.
 #}
 {% macro declared_records(table, record_path) %}
     {%- set relation = source('fpl_raw', table) -%}
@@ -33,7 +34,7 @@
     {%- endif -%}
 
     {%- set keys = [] -%}
-    {%- set unit_test = execute and not graph -%}
+    {%- set unit_test = execute and declared_records_passes_through(model.resource_type, graph) -%}
     {%- if execute and not unit_test -%}
         {%- for node in graph.sources.values()
               if node.source_name == 'fpl_raw' and node.name == table -%}
@@ -65,4 +66,28 @@
     )
     {%- else %} {{ relation }} as payload
     {%- endif %}
+{% endmacro %}
+
+{#
+    declared_records_passes_through(resource_type, graph)
+
+    True only for a unit test (resource_type 'unit_test'), whose graph dbt
+    leaves empty. False when the graph is populated. Any other node with an
+    empty graph is a compile error. Called as a run-operation, it logs which
+    route it took, which is how scripts/tests exercise both routes.
+#}
+{% macro declared_records_passes_through(resource_type, graph) %}
+    {%- if resource_type == 'unit_test' -%}
+        {%- set through = true -%}
+    {%- elif not graph -%}
+        {{ exceptions.raise_compiler_error(
+            "declared_records: the dbt graph is empty outside a unit test (resource_type "
+            ~ resource_type ~ "), so the declared columns cannot be read") }}
+    {%- else -%}
+        {%- set through = false -%}
+    {%- endif -%}
+    {%- if flags.WHICH == 'run-operation' -%}
+        {%- do log('declared_records ' ~ ('passes through' if through else 'reads declarations'), info=True) -%}
+    {%- endif -%}
+    {{ return(through) }}
 {% endmacro %}

@@ -22,12 +22,11 @@ from pathlib import Path
 SOURCE_PREFIX = "source.fpl_warehouse.fpl_raw."
 NOT_PAYLOAD = {"run_manifests", "backfill_catalog"}
 
-# Models still reading their source directly, converted slice by slice (#115).
-# Closed: a model not named here is checked, so a new one cannot join it
-# silently. Slice 5 empties it.
-NOT_YET_CONVERTED: set[str] = set()
-
 DIRECT_SOURCE_CALL = re.compile(r"\bsource\s*\(")
+# SQL line and block comments and Jinja comments, so prose naming source( in a
+# model's header does not trip the check. Not string-aware: a quoted "--" would
+# hide the rest of its line, which no staging model has.
+COMMENT = re.compile(r"--[^\n]*|/\*.*?\*/|\{#.*?#\}", re.DOTALL)
 
 
 def problems(manifest: dict) -> list[str]:
@@ -41,17 +40,17 @@ def problems(manifest: dict) -> list[str]:
             for uid in (node.get("depends_on") or {}).get("nodes", [])
             if uid.startswith(SOURCE_PREFIX) and uid.removeprefix(SOURCE_PREFIX) not in NOT_PAYLOAD
         )
-        if not payload or node["name"] in NOT_YET_CONVERTED:
+        if not payload:
             continue
         checked += 1
-        if DIRECT_SOURCE_CALL.search(node.get("raw_code", "")):
+        if DIRECT_SOURCE_CALL.search(COMMENT.sub(" ", node.get("raw_code", ""))):
             out.append(
                 f"{node['name']} calls source() on fpl_raw.{', fpl_raw.'.join(payload)} "
                 "itself; read payload fields through declared_records so only "
                 "columns declared in sources.yml can be read (#115)"
             )
     if not checked:
-        out.append("no converted payload staging models found; nothing was checked")
+        out.append("no payload staging models found; nothing was checked")
     return out
 
 
@@ -61,7 +60,7 @@ def main() -> int:
     for problem in found:
         print(f"::error::{problem}")
     if not found:
-        print("every converted payload staging model reads through declared_records")
+        print("every payload staging model reads through declared_records")
     return 1 if found else 0
 
 

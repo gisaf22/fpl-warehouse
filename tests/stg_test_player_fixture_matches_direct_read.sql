@@ -5,7 +5,10 @@
 --          through the declared columns changed nothing.
 -- Origin: new in #115
 -- Tier: integration
-{{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#115 AC2'}) }}
+-- Fixture tree only (#115 D4): on a live target it re-reads every raw
+-- payload, 689s for element-summary in served_diff run 37723026491.
+{{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#115 AC2'},
+          enabled=(target.name == 'fixtures')) }}
 
 -- `direct` is stg_player_fixture as it stood before #115: it unnests
 -- `history` from the source itself rather than through declared_records. Kept
