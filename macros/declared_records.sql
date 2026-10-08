@@ -16,6 +16,12 @@
 
     Renames and casts stay in the staging model, in its own select over this
     output.
+
+    Under a dbt unit test the graph is empty, so the declarations cannot be
+    read; the macro then passes through every column the mocked source gives.
+    A mock holds only the columns the test lists, and every real build and
+    test has the full graph, so the restriction holds wherever raw data is
+    read.
 #}
 {% macro declared_records(table, record_path) %}
     {%- set relation = source('fpl_raw', table) -%}
@@ -27,7 +33,8 @@
     {%- endif -%}
 
     {%- set keys = [] -%}
-    {%- if execute -%}
+    {%- set unit_test = execute and not graph -%}
+    {%- if execute and not unit_test -%}
         {%- for node in graph.sources.values()
               if node.source_name == 'fpl_raw' and node.name == table -%}
             {%- for column in node.columns.values()
@@ -45,6 +52,9 @@
     {%- set record = 'rec' if nested else 'payload' %}
     select
         {{ capture_key_from_filename() }} as capture_key
+        {%- if unit_test %},
+        {{ record }}.*
+        {%- endif %}
         {%- for key in keys %},
         {{ record }}."{{ key }}" as "{{ key }}"
         {%- endfor %}

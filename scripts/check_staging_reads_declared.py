@@ -26,7 +26,6 @@ NOT_PAYLOAD = {"run_manifests", "backfill_catalog"}
 # Closed: a model not named here is checked, so a new one cannot join it
 # silently. Slice 5 empties it.
 NOT_YET_CONVERTED = {
-    "stg_fixture",
     "stg_player_fixture",
 }
 
