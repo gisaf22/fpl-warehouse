@@ -25,9 +25,7 @@ NOT_PAYLOAD = {"run_manifests", "backfill_catalog"}
 # Models still reading their source directly, converted slice by slice (#115).
 # Closed: a model not named here is checked, so a new one cannot join it
 # silently. Slice 5 empties it.
-NOT_YET_CONVERTED = {
-    "stg_player_fixture",
-}
+NOT_YET_CONVERTED: set[str] = set()
 
 DIRECT_SOURCE_CALL = re.compile(r"\bsource\s*\(")
 
