@@ -22,12 +22,12 @@
 --   (decision 4 on #32).
 -- =============================================================================
 
+-- Fields come through declared_records, which selects only the columns
+-- declared at `$.teams[*]` in sources.yml (#115): an undeclared field fails
+-- the build rather than escaping the presence test.
 with raw as (
 
-    select
-        {{ capture_key_from_filename() }} as capture_key,
-        unnest(teams) as t
-    from {{ source('fpl_raw', 'bootstrap_static') }}
+    {{ declared_records('bootstrap_static', '$.teams[*]') }}
 
 )
 
@@ -41,15 +41,15 @@ select
     admitted.observed_at,
 
     -- Keys
-    cast(t.id as integer)                      as team_fpl_id,
+    cast(raw."id" as integer)                  as team_fpl_id,
 
     -- Identity
-    cast(t.code as integer)                    as team_code,
-    cast(t.name as varchar)                    as team_name,
-    cast(t.short_name as varchar)              as team_short_name,
+    cast(raw."code" as integer)                as team_code,
+    cast(raw."name" as varchar)                as team_name,
+    cast(raw."short_name" as varchar)          as team_short_name,
 
     -- Rating, null where the source reports none
-    cast(t.strength as integer)                as strength
+    cast(raw."strength" as integer)            as strength
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted

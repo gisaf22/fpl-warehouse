@@ -90,3 +90,13 @@ def test_a_new_staging_model_calling_source_itself_fails_though_older_ones_await
     )
     assert len(found) == 1
     assert "stg_new_payload" in found[0] and "fixtures" in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+@pytest.mark.parametrize("name", ["stg_player", "stg_team", "stg_position", "stg_gameweek"])
+def test_a_bootstrap_static_model_calling_source_itself_fails(name):
+    code = "select unnest(elements) as e from {{ source('fpl_raw', 'bootstrap_static') }}"
+    found = problems(manifest(model(name, "bootstrap_static", code)))
+    assert len(found) == 1
+    assert name in found[0] and "bootstrap_static" in found[0]
