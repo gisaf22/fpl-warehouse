@@ -15,9 +15,10 @@
 --   the served fct_ layer's job, not staging's.
 --
 -- Source:
---   source('fpl_raw', 'element_summary') — the `history` array of each
---   per-player payload. `fixtures` (upcoming) and `history_past` (prior
---   seasons) are deliberately not read here.
+--   fpl_raw.element_summary — the `history` array of each
+--   per-player payload, read through declared_records (#115).
+--   `fixtures` (upcoming) and `history_past` (prior seasons) are deliberately
+--   not declared, so they cannot be read here.
 --
 -- Naming:
 --   Follows the retired src/models/ convention — `fpl_id` for the player key,
@@ -53,12 +54,12 @@
 --   appears on every stg_ model.
 -- =============================================================================
 
+-- Fields come through declared_records, which selects only the columns
+-- declared at `$.history[*]` in sources.yml (#115): an undeclared field fails
+-- the build rather than escaping the presence test.
 with raw as (
 
-    select
-        {{ capture_key_from_filename() }} as capture_key,
-        unnest(history) as h
-    from {{ source('fpl_raw', 'element_summary') }}
+    {{ declared_records('element_summary', '$.history[*]') }}
 
 )
 
@@ -72,62 +73,62 @@ select
     admitted.observed_at,
 
     -- Keys
-    cast(h.element             as integer)   as fpl_id,
-    cast(h.fixture             as integer)   as fixture_id,
-    cast(h.round               as integer)   as gameweek,
+    cast(raw."element"         as integer)   as fpl_id,
+    cast(raw."fixture"         as integer)   as fixture_id,
+    cast(raw."round"           as integer)   as gameweek,
 
     -- Fixture context
-    cast(h.opponent_team       as integer)   as opponent_team_fpl_id,
-    cast(h.was_home            as boolean)   as was_home,
-    cast(h.kickoff_time        as timestamp) as kickoff_time,
-    cast(h.team_h_score        as integer)   as team_h_score,
-    cast(h.team_a_score        as integer)   as team_a_score,
+    cast(raw."opponent_team"   as integer)   as opponent_team_fpl_id,
+    cast(raw."was_home"        as boolean)   as was_home,
+    cast(raw."kickoff_time"    as timestamp) as kickoff_time,
+    cast(raw."team_h_score"    as integer)   as team_h_score,
+    cast(raw."team_a_score"    as integer)   as team_a_score,
 
     -- Appearance
-    cast(h.minutes             as integer)   as minutes,
-    cast(h.starts              as integer)   as starts,
+    cast(raw."minutes"         as integer)   as minutes,
+    cast(raw."starts"          as integer)   as starts,
 
     -- Scoring
-    cast(h.total_points        as integer)   as total_points,
-    cast(h.bonus               as integer)   as bonus,
-    cast(h.bps                 as integer)   as bps,
-    cast(h.goals_scored        as integer)   as goals_scored,
-    cast(h.assists             as integer)   as assists,
-    cast(h.clean_sheets        as integer)   as clean_sheets,
-    cast(h.goals_conceded      as integer)   as goals_conceded,
-    cast(h.own_goals           as integer)   as own_goals,
-    cast(h.penalties_saved     as integer)   as penalties_saved,
-    cast(h.penalties_missed    as integer)   as penalties_missed,
-    cast(h.yellow_cards        as integer)   as yellow_cards,
-    cast(h.red_cards           as integer)   as red_cards,
-    cast(h.saves               as integer)   as saves,
+    cast(raw."total_points"    as integer)   as total_points,
+    cast(raw."bonus"           as integer)   as bonus,
+    cast(raw."bps"             as integer)   as bps,
+    cast(raw."goals_scored"    as integer)   as goals_scored,
+    cast(raw."assists"         as integer)   as assists,
+    cast(raw."clean_sheets"    as integer)   as clean_sheets,
+    cast(raw."goals_conceded"  as integer)   as goals_conceded,
+    cast(raw."own_goals"       as integer)   as own_goals,
+    cast(raw."penalties_saved" as integer)   as penalties_saved,
+    cast(raw."penalties_missed" as integer)   as penalties_missed,
+    cast(raw."yellow_cards"    as integer)   as yellow_cards,
+    cast(raw."red_cards"       as integer)   as red_cards,
+    cast(raw."saves"           as integer)   as saves,
 
     -- Defensive contribution family
-    cast(h.clearances_blocks_interceptions as integer) as clearances_blocks_interceptions,
-    cast(h.recoveries          as integer)   as recoveries,
-    cast(h.tackles             as integer)   as tackles,
-    cast(h.defensive_contribution as integer) as defensive_contribution,
+    cast(raw."clearances_blocks_interceptions" as integer) as clearances_blocks_interceptions,
+    cast(raw."recoveries"      as integer)   as recoveries,
+    cast(raw."tackles"         as integer)   as tackles,
+    cast(raw."defensive_contribution" as integer) as defensive_contribution,
 
     -- Expected values (served as strings)
-    cast(h.expected_goals              as double) as expected_goals,
-    cast(h.expected_assists            as double) as expected_assists,
-    cast(h.expected_goal_involvements  as double) as expected_goal_involvements,
-    cast(h.expected_goals_conceded     as double) as expected_goals_conceded,
+    cast(raw."expected_goals"          as double) as expected_goals,
+    cast(raw."expected_assists"        as double) as expected_assists,
+    cast(raw."expected_goal_involvements" as double) as expected_goal_involvements,
+    cast(raw."expected_goals_conceded" as double) as expected_goals_conceded,
 
     -- ICT family (served as strings; populated only at ratification)
-    cast(h.influence           as double)    as influence,
-    cast(h.creativity          as double)    as creativity,
-    cast(h.threat              as double)    as threat,
-    cast(h.ict_index           as double)    as ict_index,
+    cast(raw."influence"       as double)    as influence,
+    cast(raw."creativity"      as double)    as creativity,
+    cast(raw."threat"          as double)    as threat,
+    cast(raw."ict_index"       as double)    as ict_index,
 
     -- Market
-    cast(h.value               as integer)   as value,
-    cast(h.selected            as integer)   as selected,
-    cast(h.transfers_in        as integer)   as transfers_in,
-    cast(h.transfers_out       as integer)   as transfers_out,
-    cast(h.transfers_balance   as integer)   as transfers_balance,
+    cast(raw."value"           as integer)   as value,
+    cast(raw."selected"        as integer)   as selected,
+    cast(raw."transfers_in"    as integer)   as transfers_in,
+    cast(raw."transfers_out"   as integer)   as transfers_out,
+    cast(raw."transfers_balance" as integer)   as transfers_balance,
 
-    cast(h.modified            as boolean)   as modified
+    cast(raw."modified"        as boolean)   as modified
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted
