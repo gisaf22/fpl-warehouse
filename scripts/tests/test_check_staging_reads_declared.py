@@ -118,3 +118,35 @@ def test_stg_player_fixture_calling_source_itself_fails():
     found = problems(manifest(model("stg_player_fixture", "element_summary", code)))
     assert len(found) == 1
     assert "stg_player_fixture" in found[0] and "element_summary" in found[0]
+
+
+SOURCE_IN_COMMENT = {
+    "line comment": "-- was {{ source('fpl_raw', 'event_status') }}\n",
+    "block comment": "/* was\n   {{ source('fpl_raw', 'event_status') }} */\n",
+    "jinja comment": "{# was\n   source('fpl_raw', 'event_status') #}\n",
+}
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+@pytest.mark.parametrize("comment", SOURCE_IN_COMMENT.values(), ids=SOURCE_IN_COMMENT.keys())
+def test_source_named_only_in_a_comment_passes(comment):
+    found = problems(manifest(model("stg_gameweek_status", "event_status", comment + VIA_MACRO)))
+    assert found == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+@pytest.mark.parametrize("comment", SOURCE_IN_COMMENT.values(), ids=SOURCE_IN_COMMENT.keys())
+def test_a_real_source_call_beside_a_comment_still_fails(comment):
+    found = problems(manifest(model("stg_gameweek_status", "event_status", comment + DIRECT)))
+    assert len(found) == 1
+    assert "stg_gameweek_status" in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+def test_a_real_source_call_after_a_line_comment_on_an_earlier_line_still_fails():
+    code = "select 1 -- note\nfrom {{ source('fpl_raw', 'event_status') }}"
+    found = problems(manifest(model("stg_gameweek_status", "event_status", code)))
+    assert len(found) == 1

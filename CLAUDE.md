@@ -316,8 +316,19 @@ not silently corrected.
   back to the newest captures with one). A column opts out only with a reason in
   `meta.presence_exempt`. CI's `validate` job runs `scripts/check_source_presence_tests.py`
   over `manifest.json`, which fails on a payload source without both tests at those
-  severities, or an exemption with no reason. **A field staging reads but nobody declared
-  is not protected** (#114 D4); #115 closes that.
+  severities, or an exemption with no reason.
+- **Staging can read only declared source fields** (#115, closing #114 D4). Every payload
+  `stg_` model reads its source through the `declared_records(table, record_path)` macro,
+  which selects exactly the columns declared at that `meta.record_path` (`$.<array>[*]` or
+  `$[*]`), named by key, plus `capture_key`. Renames and casts stay in the model. Reading
+  an undeclared field fails the build with DuckDB's binder error naming it. CI's
+  `validate` job runs `scripts/check_staging_reads_declared.py`, which fails on any payload
+  `stg_` model that calls `source()` itself, ignoring SQL and Jinja comments.
+  `run_manifests` and `backfill_catalog` are exempt by name: their `struct_pack` read
+  already fixes the schema. dbt compiles unit tests with an empty graph, so only there,
+  identified by `resource_type`, does the macro pass the mock's columns through; an empty
+  graph anywhere else fails compilation naming the macro. The `*_matches_direct_read`
+  tests that proved each conversion unchanged run on the fixtures target only.
 - **A payload with no index entry is excluded silently** (#88 E7). That is normally one
   whose run was still in progress when the build started. It has no finalized manifest
   yet, and the next build picks it up. Counting such payloads would need a second read of
