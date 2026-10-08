@@ -100,3 +100,12 @@ def test_a_bootstrap_static_model_calling_source_itself_fails(name):
     found = problems(manifest(model(name, "bootstrap_static", code)))
     assert len(found) == 1
     assert name in found[0] and "bootstrap_static" in found[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#115 AC1")
+def test_stg_fixture_calling_source_itself_fails():
+    code = "select * from {{ source('fpl_raw', 'fixtures') }}"
+    found = problems(manifest(model("stg_fixture", "fixtures", code)))
+    assert len(found) == 1
+    assert "stg_fixture" in found[0] and "fixtures" in found[0]
