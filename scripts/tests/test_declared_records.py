@@ -63,3 +63,29 @@ def test_an_unsupported_record_path_fails_compilation_naming_the_path():
 
     assert result.returncode != 0
     assert "$.status[*].nested[*]" in result.stdout + result.stderr
+
+
+TOP_LEVEL = "with r as ({{ declared_records('fixtures', '$[*]') }}) "
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#115 AC1")
+def test_reading_an_undeclared_field_at_the_top_level_path_fails_naming_the_field():
+    # `code` is in every fixtures payload but is not declared in sources.yml.
+    result = show(TOP_LEVEL + "select r.code from r")
+
+    assert result.returncode != 0
+    assert "code" in result.stdout + result.stderr
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#115 AC1")
+def test_every_declared_field_at_the_top_level_path_is_read_under_its_key():
+    keys = ("capture_key", "id", "event", "kickoff_time", "team_h", "team_a",
+            "team_h_score", "team_a_score", "finished", "team_h_difficulty",
+            "team_a_difficulty")
+    result = show(TOP_LEVEL + "select " + ", ".join(f'r."{k}"' for k in keys) + " from r")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    for key in keys:
+        assert f'"{key}"' in result.stdout
