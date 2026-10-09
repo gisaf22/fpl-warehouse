@@ -277,6 +277,33 @@ sources:
           - name: elements.total_points
             meta:
               record_path: '$.elements[*]'
+          # Player status history (#123): availability, news and listed club
+          # as of each capture. code and element_type above are its other
+          # fields.
+          - name: elements.status
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.chance_of_playing_this_round
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.chance_of_playing_next_round
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.news
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.news_added
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.can_select
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.removed
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.team
+            meta:
+              record_path: '$.elements[*]'
           - name: events.id
             meta:
               record_path: '$.events[*]'

@@ -130,3 +130,31 @@ def test_a_full_graph_outside_a_unit_test_reads_the_declarations():
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "reads declarations" in result.stdout
+
+
+ELEMENTS = "with r as ({{ declared_records('bootstrap_static', '$.elements[*]') }}) "
+
+PLAYER_STATUS_FIELDS = (
+    "status", "chance_of_playing_this_round", "chance_of_playing_next_round",
+    "news", "news_added", "can_select", "removed", "team", "element_type", "code",
+)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#124 AC3")
+@pytest.mark.parametrize("field", PLAYER_STATUS_FIELDS)
+def test_staging_can_read_each_player_status_field(field):
+    result = show(ELEMENTS + f'select r."{field}" from r')
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f'"{field}"' in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#124 AC3")
+def test_reading_an_undeclared_player_field_still_fails_naming_the_field():
+    # `team_code` is in every bootstrap-static element but is not declared.
+    result = show(ELEMENTS + "select r.team_code from r")
+
+    assert result.returncode != 0
+    assert "team_code" in result.stdout + result.stderr
