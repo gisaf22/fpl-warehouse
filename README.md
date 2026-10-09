@@ -1,72 +1,47 @@
 # fpl-warehouse
 
-Merges FPL and Understat ingestion databases into a unified warehouse database.
+A dbt-duckdb project that turns fpl-ingest's raw FPL captures in S3 into served
+tables for fpl-intelligence. Every build rebuilds from the raw captures; nothing
+is updated in place.
 
-## Start Here
+## Served tables
 
-If you are new to this repo, read documents in this order:
+Published as parquet after every successful scheduled build (07:45 and 19:45
+UTC), overwritten in place. Every table carries every season, with `season` as a
+column: filter on it, because ids are reassigned each season.
 
-1. [docs/README.md](docs/README.md) for the documentation map.
-2. [docs/contracts/snapshot_contract.md](docs/contracts/snapshot_contract.md) for the warehouse snapshot contract.
-3. [docs/governance/warehouse_governance_spec.md](docs/governance/warehouse_governance_spec.md) for warehouse rules and validation policy.
-4. [docs/system/data_lineage_map.md](docs/system/data_lineage_map.md) for physical warehouse inventory and upstream lineage.
-5. [docs/governance/data_freshness_policy.md](docs/governance/data_freshness_policy.md) for refresh cadence, mutability, and rebuild policy.
-6. [docs/system/architecture.md](docs/system/architecture.md) for build flow and system boundaries.
+| Table | One row per |
+|---|---|
+| `s3://fpl-data-safari/served/fct_player_fixture.parquet` | `(season, fpl_id, fixture_id)` |
+| `s3://fpl-data-safari/served/fct_player_gameweek.parquet` | `(season, fpl_id, gameweek)` |
+| `s3://fpl-data-safari/served/dim_team.parquet` | `(season, team_fpl_id)` |
+| `s3://fpl-data-safari/served/dim_player.parquet` | `(season, fpl_id)` |
+| `s3://fpl-data-safari/served/dim_fixture.parquet` | `(season, fixture_id)` |
+| `s3://fpl-data-safari/served/dim_player_status_history.parquet` | `(season, fpl_id, valid_from)` |
 
-## What it does
+`s3://fpl-data-safari/served/_manifest.json` describes the current publish: row
+counts per table and season, `contract_version`, and each table's columns.
+Check `contract_version` before reading. Column definitions are in
+`models/marts/schema.yml`.
 
-1. **Team matching** — Maps FPL team names ↔ Understat team names
-2. **Player matching** — Fuzzy-matches FPL players to Understat players using name + team
-3. **Warehouse build** — Merges data from both sources into `master.db`:
-   - `dim_teams` — unified team dimension
-   - `dim_players` — unified player dimension with cross-source IDs
-   - `fact_player_gw` — per-player per-gameweek stats from both FPL and Understat
-   - `fact_fixtures` — fixture-level stats including xG, PPDA, deep completions
-   - `fact_shots` — shot-level data linked to FPL player IDs
-
-## Usage
+## Running it
 
 ```bash
-fpl-warehouse              # Build/refresh the warehouse
-fpl-warehouse --force      # Rebuild from scratch
-fpl-warehouse --verbose    # Debug logging
+uv sync
+uv run dbt deps
+
+# Fast tiers: the checked-in fixture tree, no AWS session
+uv run dbt seed --target fixtures
+uv run dbt build --target fixtures --exclude tag:e2e
+uv run pytest
+
+# Live build against S3 (needs an AWS session)
+eval "$(aws configure export-credentials --format env)"
+uv run dbt build
 ```
 
-## Data flow
+## More
 
-```
-fpl.db ──────┐
-             ├──→ master.db
-understat.db ┘
-```
-
-See [docs/system/architecture.md](docs/system/architecture.md) for workflow diagrams.
-
-## Documentation
-
-Use these files as the source of truth for different questions:
-
-1. [docs/README.md](docs/README.md) for where to start and which document owns what.
-2. [docs/contracts/snapshot_contract.md](docs/contracts/snapshot_contract.md) for modeling snapshot responsibilities, join rules, and naming.
-3. [docs/governance/warehouse_governance_spec.md](docs/governance/warehouse_governance_spec.md) for naming rules, feature-tier policy, PIT checks, and join safety.
-4. [docs/history/snapshot_audit.md](docs/history/snapshot_audit.md) for archived audit findings and migration rationale.
-5. [docs/system/data_lineage_map.md](docs/system/data_lineage_map.md) for persisted warehouse tables and source-to-warehouse mapping.
-6. [docs/governance/data_freshness_policy.md](docs/governance/data_freshness_policy.md) for refresh cadence, mutability, and rebuild expectations.
-7. [docs/system/architecture.md](docs/system/architecture.md) for execution flow, package boundaries, and runtime orchestration.
-
-## Prerequisites
-
-Run both ingest pipelines first:
-```bash
-fpl-ingest
-understat-ingest
-```
-
-## Notes
-
-1. The warehouse contract, governance rules, and physical warehouse inventory are separate documents on purpose.
-2. Contract changes should be made before implementation changes.
-3. Governance should be checked before implementation changes.
-4. Warehouse outputs should remain PIT-safe and semantically orthogonal.
-5. The warehouse is currently operated as a twice-daily latest-reconstructed-truth rebuild, not a source-versioned historical archive.
-6. The scheduled build is monitored by a healthchecks.io check, `fpl-warehouse scheduled build`, whose ping URL is the `HEALTHCHECKS_PING_URL_SCHEDULED_BUILD` repository secret. See `CLAUDE.md`, "Scheduled build" → "Monitoring".
+`CLAUDE.md` holds the project's rules and decisions: grain, capture dedup,
+ratification, the served contract, the publish guards, CI and the scheduled
+build. Design decisions are recorded in `docs/adr/`.

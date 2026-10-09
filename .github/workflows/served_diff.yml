@@ -2,7 +2,7 @@
 # Actions, against live S3, rather than on a laptop.
 #
 # Dispatched from main with a head_ref. Two parallel jobs each run a full
-# `dbt build` against live S3 and export the five served tables to parquet:
+# `dbt build` against live S3 and export the six served tables to parquet:
 # `before` from main, `after` from head_ref. Neither publishes. A `diff` job
 # then loads both sides into one DuckDB (the served_diff target) as schemas
 # served_before and served_after and compares each table per season with dbt's

@@ -341,14 +341,15 @@ not silently corrected.
   summary also lists capture counts by outcome.
 - Intermediate models only when a join or reshape is genuinely complex or reused. Skip the
   layer otherwise.
-- Only the served models — the two `fct_` facts and the three `dim_` dimensions — are for
-  external consumption. There is no `agg_` layer: `fct_player_gameweek` is a fact table at
-  gameweek grain, not a separate category.
+- Only the served models — the two `fct_` facts, the three `dim_` dimensions and
+  `dim_player_status_history` — are for external consumption. There is no `agg_` layer:
+  `fct_player_gameweek` is a fact table at gameweek grain, not a separate category.
 
 ## Served contract
 
 fpl-intelligence must never query staging directly — only the served models:
-`fct_player_fixture`, `fct_player_gameweek`, `dim_team`, `dim_player` and `dim_fixture`.
+`fct_player_fixture`, `fct_player_gameweek`, `dim_team`, `dim_player`, `dim_fixture` and
+`dim_player_status_history`.
 
 Three concepts recur across served columns and are each defined once, as a doc block in
 `models/marts/docs.md`: `ratified`, `season_scoped_key` and `pre_kickoff`. Every served
@@ -357,7 +358,7 @@ column's description.
 
 ### Where the served tables live
 
-All five served models are published as parquet to fixed keys, overwritten in place after
+All six served models are published as parquet to fixed keys, overwritten in place after
 every successful scheduled build (see "Scheduled build"):
 
 ```
@@ -366,6 +367,7 @@ s3://fpl-data-safari/served/fct_player_gameweek.parquet
 s3://fpl-data-safari/served/dim_team.parquet
 s3://fpl-data-safari/served/dim_player.parquet
 s3://fpl-data-safari/served/dim_fixture.parquet
+s3://fpl-data-safari/served/dim_player_status_history.parquet
 s3://fpl-data-safari/served/_manifest.json
 ```
 
@@ -457,6 +459,15 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it. From #74 on, each entry states the `contract_version` it ships in.
 
+- **2026-10-09 — `dim_player_status_history` served (#127). Additive, `contract_version` 1.**
+  A new object under `served/`, with an enforced contract, and a new table key in the
+  manifest's `row_counts`, `row_counts_by_season` and `columns`. One row per change in a
+  player's tracked status fields, keyed `(season, fpl_id, valid_from)`; its `schema.yml`
+  description gives the as-of join (strictly before a deadline, #128). Every existing table
+  and manifest field is unchanged, so no bump: the publish guard checks only tables the
+  previous manifest lists (#74 AC4). `capture_key` is served as an audit reference, so
+  dropping it later is breaking (#127 E1).
+
 - **2026-10-03 — manifest gains `contract_version` and `columns` (#74). Additive,
   `contract_version` 1.** Two new manifest fields; every served table and every existing
   field is unchanged. A consumer that reads `served/` should assert `contract_version == 1`
@@ -540,8 +551,10 @@ the current actuals.
 Hence a tolerance per table rather than exact equality: 2% for `fct_player_gameweek`,
 which is the expectation's own grain, and 15% for `fct_player_fixture`, roughly twice the
 gap observed for the closed 2025-26 season. The three dimensions take 0%, because their
-expectations are exact counts rather than estimates. Double gameweeks push the other way
-and nothing caps the upside — a table larger than expected is not the failure this guards
+expectations are exact counts rather than estimates. `dim_player_status_history` takes 0%
+against a lower bound, the season's distinct `fpl_id` in `stg_player`: every staged player
+has at least one row, and each status change adds one (#127). Double gameweeks push the
+other way and nothing caps the upside — a table larger than expected is not the failure this guards
 against.
 
 The check is applied **per season**, and a season present in staging but absent from a
@@ -556,6 +569,12 @@ None of the three has a known legitimate shrink: 20 teams and 380 fixtures never
 and `dim_player` is the union of every capture, so it only grows. The first publish after
 the dimensions were added reads a manifest that lists none of them, so they were held to
 the floor alone that once.
+
+`dim_player_status_history` is an append-only history built from captures that are never
+rewritten: a new capture can only add a row or leave the count unchanged. A season's rows can
+therefore shrink only if a capture admitted before stops being admitted, or if the
+model's logic changes. The first is a loss upstream that should stop the publish. The second
+is a deliberate restatement, run with `restate` (#127).
 
 **What the floor cannot see is staging itself shrinking.** The expectation is computed
 from the same build's staging, so rows lost *upstream* of staging — a live raw tree that
@@ -623,7 +642,7 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   Verified 2026-09-03 with a throwaway model in `models/marts/`:
   `attempted to reference node model.fpl_warehouse.int_player_gameweek_spine, which is not
   allowed because the referenced node is private to the 'warehouse_internal' group`.
-- The five served models are `access: public` with `contract: enforced: true` and a full
+- The six served models are `access: public` with `contract: enforced: true` and a full
   explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
   retyping a served column now fails the build until the contract is updated, which makes
   every breaking change to the served shape a deliberate, reviewed edit.
@@ -633,9 +652,10 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
 - The served models are group members themselves — dbt allows a `ref()` of a private model
   only from inside the same group, and they must read staging to be built at all. Their
   `access: public` is what keeps them referenceable from outside.
-- CI's `validate` job checks the boundary from what dbt resolved: exactly the five served
+- CI's `validate` job checks the boundary from what dbt resolved: exactly the six served
   models are public, and every `stg_`/`int_`/`base_` model is private (#44 AC3, #95). A new served model
-  must be added to that step's list as well as to `publish_served.py`.
+  must be added to that step's list as well as to `publish_served.py`, the
+  `fpl_intelligence` exposure and `served_diff_tables()` in `macros/served_diff.sql`.
 
 **Documented only, NOT enforced:**
 
@@ -643,11 +663,11 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   parse time. `stg_player_fixture` is a real table in the same DuckDB schema, so anything
   holding the built `.duckdb` file can run `select * from main.stg_player_fixture` — the
   boundary is enforced against dbt models and is a convention for everything else.
-  Publishing narrows this in practice rather than by enforcement: only the five served
+  Publishing narrows this in practice rather than by enforcement: only the six served
   parquet files are uploaded, so a consumer reading `served/` has no path to staging at
   all. That is a property of what the publish step happens to write, not a grant, and it
   holds only as long as nothing else is added under that prefix.
-- The `fpl_intelligence` exposure in `models/exposures.yml` declares the five served models
+- The `fpl_intelligence` exposure in `models/exposures.yml` declares the six served models
   as its dependencies. That documents the contract and puts it in the DAG; it enforces
   nothing.
 
@@ -967,7 +987,7 @@ Dispatch it from `main` with `head_ref`:
 `gh workflow run served_diff.yml --ref main -f head_ref=<branch>`.
 
 - **Two builds, neither publishes.** Two parallel jobs build `main` and `head_ref` with a full
-  `dbt build`. Each exports the five served tables and a `build.json` (build seconds, and the
+  `dbt build`. Each exports the six served tables and a `build.json` (build seconds, and the
   newest run_id its staging read) through the `served_diff_export` run-operation.
 - **One connection for both sides.** The `diff` job loads both exports into one DuckDB, the
   credential-free `served_diff` target, as schemas `served_before` and `served_after`.
@@ -1169,7 +1189,7 @@ Before `dbt build`, the scheduled build checks how old each live input is (#39, 
   normally.
 
 **It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
-runs `scripts/publish_served.py`, which exports the five served tables to parquet and uploads
+runs `scripts/publish_served.py`, which exports the six served tables to parquet and uploads
 them to `s3://fpl-data-safari/served/` alongside a `_manifest.json`. Layout, format and the
 publish-on-success guarantee are specified under "Served contract" — this section covers
 only how the workflow invokes it.
