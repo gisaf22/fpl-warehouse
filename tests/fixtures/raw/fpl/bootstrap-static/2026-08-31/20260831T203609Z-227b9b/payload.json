@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [4, 166, 233, 426, 427, 611]; `events` (all 38 rounds, so the spine's calendar is real), `teams` and `element_types` are kept whole. Every other top-level key is dropped. The element, event, team and position objects themselves are verbatim.",
+ "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [4, 166, 233, 426, 427, 611]; `events` (all 38 rounds, so the spine's calendar is real), `teams` and `element_types` are kept whole. Every other top-level key is dropped. The element, event, team and position objects themselves are verbatim. Player 427's status fields are SYNTHETIC: set to doubtful in this capture only, so the captures read a -> d -> a. See SYNTHETIC_STATUS in build_fixtures.py.",
  "element_types": [
   {
    "element_count": 70,
@@ -707,8 +707,8 @@
    "bps": 49,
    "can_select": true,
    "can_transact": true,
-   "chance_of_playing_next_round": null,
-   "chance_of_playing_this_round": null,
+   "chance_of_playing_next_round": 75,
+   "chance_of_playing_this_round": 75,
    "clean_sheets": 0,
    "clean_sheets_per_90": 0.0,
    "clearances_blocks_interceptions": 0,
@@ -757,8 +757,8 @@
    "influence_rank_type": 65,
    "known_name": "",
    "minutes": 180,
-   "news": "",
-   "news_added": null,
+   "news": "Knock - 75% chance of playing",
+   "news_added": "2026-08-30T10:00:00.000000Z",
    "now_cost": 80,
    "now_cost_rank": 9,
    "now_cost_rank_type": 6,
@@ -809,7 +809,7 @@
    "squad_number": null,
    "starts": 2,
    "starts_per_90": 1.0,
-   "status": "a",
+   "status": "d",
    "tackles": 3,
    "team": 16,
    "team_code": 1,

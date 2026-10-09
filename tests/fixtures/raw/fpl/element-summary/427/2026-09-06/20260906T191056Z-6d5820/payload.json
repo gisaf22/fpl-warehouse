@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Normal case, rounds 1 and 2 \u2014 second player, same settlement sequence as 426, so dedup is asserted over more than one key.",
+ "_fixture_note": "Normal case, rounds 1 and 2 \u2014 second player, same settlement sequence as 426, so dedup is asserted over more than one key. Also the SYNTHETIC status change a -> d -> a in bootstrap-static (R2 only); this element-summary payload is not edited for it.",
  "fixtures": [
   {
    "code": 2645232,

@@ -594,13 +594,45 @@ models:
                   covers: "#42 AC5"
 
   - name: dim_player_status_history
-    description: >
+    description: |
       One row per change in a player's tracked status fields, per season:
       (season, fpl_id) plus the interval [valid_from, valid_to) the state held
       over, read from admitted bootstrap-static captures (#126). valid_to is
       null on the open row. A state opens at the capture that first showed it
       and is never backdated, so before a player's first capture there is no
       row. Private until it is served (Item 4 of #123).
+
+      **As of a deadline** (#128): the state a manager could have known is
+      the row holding the player's last capture strictly before the deadline.
+      Join on season and fpl_id, then
+      `valid_from < deadline and (valid_to is null or valid_to >= deadline)`.
+      This is deliberately not the usual half-open
+      `valid_from <= deadline < valid_to`: a capture exactly at the deadline
+      is not "before" it, so a row that capture opens must not match, and the
+      row it closes still does. Row boundaries are capture times, so the
+      condition picks exactly the row containing the last capture before the
+      deadline. A player with no capture before the deadline matches no row
+      (no backdating), which a left join returns as nulls. For example, every
+      player's status at each 2026-27 deadline, where `deadlines` is the
+      consumer's own (season, gameweek, deadline_time) list until
+      `dim_gameweek` serves one (#133):
+
+      ```sql
+      select g.gameweek, p.fpl_id, h.status
+      from dim_player as p
+      join deadlines as g on g.season = p.season
+      left join dim_player_status_history as h
+          on  h.season = p.season
+          and h.fpl_id = p.fpl_id
+          and h.valid_from < g.deadline_time
+          and (h.valid_to is null or h.valid_to >= g.deadline_time)
+      where p.season = '2026-27'
+      ```
+
+      In dbt the `player_status_as_of` macro does the same. How old that
+      state was at the deadline is a property of the deadline, not the
+      player, since every capture covers every player; it belongs to
+      `dim_gameweek` (#133).
     group: warehouse_internal
     access: private
     columns:
