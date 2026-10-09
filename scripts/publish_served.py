@@ -42,6 +42,7 @@ TABLES = (
     "dim_team",
     "dim_player",
     "dim_fixture",
+    "dim_player_status_history",
 )
 
 # Every staging model, as the source of which seasons the build holds. A season
@@ -94,12 +95,18 @@ PROJECT_FILE = Path("dbt_project.yml")
 # than an estimate: a season has 20 teams and 380 fixtures, and dim_player
 # holds every player staged in the season (int_player_season's set). One row
 # short is a lost row, not variance.
+#
+# dim_player_status_history takes none either, but its expectation is a lower
+# bound rather than an exact count: every staged player has at least one row
+# (their first capture opens it) and a status change adds one, so a season
+# holds at least its distinct players and normally more (#127).
 TOLERANCE = {
     "fct_player_fixture": 0.15,
     "fct_player_gameweek": 0.02,
     "dim_team": 0.0,
     "dim_player": 0.0,
     "dim_fixture": 0.0,
+    "dim_player_status_history": 0.0,
 }
 
 
@@ -185,7 +192,9 @@ def expected_rows(
 
     That players x gameweeks product is the facts' expectation. The dimensions'
     are simpler: TEAMS_PER_SEASON teams, FIXTURES_PER_SEASON fixtures, and the
-    season's staged players, the same distinct fpl_id count as above.
+    season's staged players, the same distinct fpl_id count as above. That
+    count is also dim_player_status_history's floor, at least one row per
+    staged player.
 
     Every season in `seasons` gets an entry for every table. A season that
     lacks players or gameweeks expects 0 fact rows, which is right at the start
@@ -246,6 +255,7 @@ def expected_rows(
         "dim_team": lambda _s: TEAMS_PER_SEASON,
         "dim_player": lambda s: players.get(s, 0),
         "dim_fixture": lambda _s: FIXTURES_PER_SEASON,
+        "dim_player_status_history": lambda s: players.get(s, 0),
     }
     return {
         table: {season: per_season[table](season) for season in seasons}

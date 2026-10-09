@@ -2,7 +2,7 @@
 
 The comparison is the `served_diff` dbt run-operation (macros/served_diff.sql),
 which loads both sides into one DuckDB and compares them with audit_helper.
-Each side is a directory holding the five served tables as parquet and a
+Each side is a directory holding the six served tables as parquet and a
 build.json with the build's seconds and the newest run_id it read, as
 `served_diff_export` writes them. No S3 and no built warehouse: the parquet is
 written here, and dbt runs under the credential-free `served_diff` target, with
@@ -42,6 +42,14 @@ ROWS = {
     "dim_fixture": (
         "season, fixture_id, gameweek",
         [("2025-26", 10, 1), ("2026-27", 12, 1)],
+    ),
+    "dim_player_status_history": (
+        "season, fpl_id, valid_from, status",
+        [
+            ("2025-26", 1, "2026-05-26 03:46:26", "a"),
+            ("2026-27", 1, "2026-08-29 19:11:09", "a"),
+            ("2026-27", 1, "2026-08-31 20:36:09", "d"),
+        ],
     ),
 }
 

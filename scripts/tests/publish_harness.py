@@ -26,10 +26,11 @@ MANIFEST_KEY = "served/_manifest.json"
 
 FACTS = ("fct_player_fixture", "fct_player_gameweek")
 DIMENSIONS = ("dim_team", "dim_player", "dim_fixture")
+HISTORY = ("dim_player_status_history",)
 # Everything that should be served, stated here rather than read from
 # publish_served.TABLES, so a table the script forgets to serve fails these
 # tests instead of silently dropping out of them.
-SERVED = FACTS + DIMENSIONS
+SERVED = FACTS + DIMENSIONS + HISTORY
 
 # Every served table's columns in the harness build, as the manifest records
 # them: [name, type] in order, read back from the exported parquet.
@@ -76,6 +77,7 @@ def season(
     team_rows: int | None = None,
     player_rows: int | None = None,
     fixture_rows: int | None = None,
+    status_history_rows: int | None = None,
     player_fixture_rows: int = 1,
 ) -> dict:
     """One season's staging shape and served row counts.
@@ -85,8 +87,9 @@ def season(
     bootstrap-static, the teams in its team list, the fixtures in the fixtures
     endpoint, and element-summary history rows. Served counts default to
     exactly what staging implies, which clears every table's floor: players x
-    finished gameweeks for both facts, and the staged teams, players and
-    fixtures for the dimensions.
+    finished gameweeks for both facts, the staged teams, players and
+    fixtures for the dimensions, and one status history row per staged
+    player.
     """
     expected = players * finished_gameweeks
     return {
@@ -100,6 +103,9 @@ def season(
         "dim_team": teams if team_rows is None else team_rows,
         "dim_player": players if player_rows is None else player_rows,
         "dim_fixture": fixtures if fixture_rows is None else fixture_rows,
+        "dim_player_status_history": (
+            players if status_history_rows is None else status_history_rows
+        ),
     }
 
 

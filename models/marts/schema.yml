@@ -600,7 +600,9 @@ models:
       over, read from admitted bootstrap-static captures (#126). valid_to is
       null on the open row. A state opens at the capture that first showed it
       and is never backdated, so before a player's first capture there is no
-      row. Private until it is served (Item 4 of #123).
+      row. Part of the served contract, published to
+      served/dim_player_status_history.parquet (#127); the column list below
+      is enforced.
 
       **As of a deadline** (#128): the state a manager could have known is
       the row holding the player's last capture strictly before the deadline.
@@ -634,9 +636,28 @@ models:
       player, since every capture covers every player; it belongs to
       `dim_gameweek` (#133).
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     columns:
+      - name: season
+        data_type: VARCHAR
+      - name: fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
+      - name: valid_from
+        data_type: TIMESTAMP
+        description: >
+          observed_at of the capture that opened the row, in UTC. The state is
+          known from this moment.
+      - name: valid_to
+        data_type: TIMESTAMP
+        description: >
+          observed_at of the capture that opened the next row; null on the
+          open row.
       - name: status
+        data_type: VARCHAR
         description: >
           FPL's availability code. Only the values observed in captures are
           accepted; a new one fails the build until it is classified (#123).
@@ -651,3 +672,40 @@ models:
                 tags: [integration]
                 meta:
                   covers: "#126 AC6"
+      - name: chance_of_playing_this_round
+        data_type: INTEGER
+      - name: chance_of_playing_next_round
+        data_type: INTEGER
+      - name: news
+        data_type: VARCHAR
+        description: FPL's news text; null where FPL publishes an empty string.
+      - name: can_select
+        data_type: BOOLEAN
+      - name: removed
+        data_type: BOOLEAN
+      - name: team_fpl_id
+        data_type: INTEGER
+        description: |
+          The club listed at the capture, valid only within this row's
+          interval. The club a player played for in a fixture is
+          fct_player_fixture.team_fpl_id.
+
+          {{ doc('season_scoped_key') }}
+      - name: position_id
+        data_type: INTEGER
+      - name: news_added
+        data_type: TIMESTAMP
+        description: >
+          When FPL says the news was added, from the opening capture. An
+          attribute: it never opens a row.
+      - name: player_code
+        data_type: INTEGER
+        description: >
+          FPL's cross-season player identifier, from the opening capture.
+          Carried only; never joined, deduplicated or filtered on.
+      - name: capture_key
+        data_type: VARCHAR
+        description: >
+          Key of the raw capture that opened the row, the evidence for
+          valid_from (ADR 0001). An audit reference: consumers cannot read the
+          raw tree.

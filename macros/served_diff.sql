@@ -2,7 +2,7 @@
   Served diff (#102). Run by .github/workflows/served_diff.yml as two
   run-operations:
 
-  - served_diff_export, under `dev` after a `dbt build`, writes the five served
+  - served_diff_export, under `dev` after a `dbt build`, writes the six served
     tables to OUT_DIR as parquet, plus build.json: the build's wall-clock
     seconds and the newest run_id its staging read. It publishes nothing.
   - served_diff, under the `served_diff` target, loads two exported
@@ -26,6 +26,7 @@
     'dim_team': ['season', 'team_fpl_id'],
     'dim_player': ['season', 'fpl_id'],
     'dim_fixture': ['season', 'fixture_id'],
+    'dim_player_status_history': ['season', 'fpl_id', 'valid_from'],
   }) }}
 {% endmacro %}
 
