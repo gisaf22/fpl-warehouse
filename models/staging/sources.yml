@@ -262,6 +262,10 @@ sources:
           - name: events
           - name: teams
           - name: element_types
+          # Player market snapshot (#139): the game's player count, the
+          # ownership denominator, carried per capture. A root scalar, so it has
+          # no record_path.
+          - name: total_players
           - name: elements.id
             meta:
               record_path: '$.elements[*]'
@@ -302,6 +306,20 @@ sources:
             meta:
               record_path: '$.elements[*]'
           - name: elements.team
+            meta:
+              record_path: '$.elements[*]'
+          # Player market snapshot (#139): price, ownership and the gameweek's
+          # transfer flow as of each capture, as the source gives them.
+          - name: elements.now_cost
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.selected_by_percent
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.transfers_in_event
+            meta:
+              record_path: '$.elements[*]'
+          - name: elements.transfers_out_event
             meta:
               record_path: '$.elements[*]'
           - name: events.id
