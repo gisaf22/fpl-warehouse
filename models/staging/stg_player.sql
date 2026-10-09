@@ -12,10 +12,16 @@
 --   a player contributes one row per bootstrap-static run. Selecting a single
 --   capture is the served layer's job, not staging's.
 --
--- Note:
---   `team` is deliberately not carried. Bootstrap-static states a player's
---   team as of the capture, and joining it onto historical fixtures at build
---   time is the known as-of bug this rebuild must not reintroduce.
+-- team_fpl_id:
+--   FPL's `team`: the club the player is listed at as of this capture (#123).
+--   Valid only as of the capture, for player status history's time ranges.
+--   Never a build-time "current team" joined onto past fixtures (CLAUDE.md,
+--   known bug 1); the club for a fixture is fct_player_fixture.team_fpl_id.
+--
+-- Status and availability:
+--   As of the capture, typed only. An empty `news` is NULL, so an empty string
+--   and a null never differ (#125 AC3). `news_added` is kept as published:
+--   FPL can clear `news` and keep its timestamp.
 --
 -- position_id:
 --   FPL's `element_type`, as of the capture. Unlike team it is treated as
@@ -66,7 +72,21 @@ select
     cast(raw."element_type" as integer)        as position_id,
 
     -- Season total as of this capture
-    cast(raw."total_points" as integer)        as total_points
+    cast(raw."total_points" as integer)        as total_points,
+
+    -- Listed club as of this capture
+    cast(raw."team" as integer)                as team_fpl_id,
+
+    -- Status and availability as of this capture
+    cast(raw."status" as varchar)              as status,
+    cast(raw."chance_of_playing_this_round" as integer)
+                                               as chance_of_playing_this_round,
+    cast(raw."chance_of_playing_next_round" as integer)
+                                               as chance_of_playing_next_round,
+    nullif(cast(raw."news" as varchar), '')    as news,
+    cast(raw."news_added" as timestamp)        as news_added,
+    cast(raw."can_select" as boolean)          as can_select,
+    cast(raw."removed" as boolean)             as removed
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted
