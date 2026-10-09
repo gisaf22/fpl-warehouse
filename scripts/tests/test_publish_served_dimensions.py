@@ -121,12 +121,13 @@ def test_dimensions_exactly_at_their_expectation_publish_and_are_listed_per_seas
         {"team_rows": 19},
         {"player_rows": 9},
         {"fixture_rows": 379},
+        {"status_history_rows": 9},
     ],
     ids=list(SERVED),
 )
 def test_any_one_served_table_below_its_floor_publishes_nothing(publish, short):
-    # Every other table clears its floor; the one short table must stop all
-    # five uploads and the manifest, so served/ never pairs new tables with
+    # Every other table clears its floor; the one short table must stop every
+    # upload and the manifest, so served/ never pairs new tables with
     # stale ones.
     result = publish(
         {CLOSED: season(10, 38), LIVE: season(10, 4, **short)},

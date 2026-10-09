@@ -208,6 +208,7 @@ jobs:
           SERVED = {
               "fct_player_fixture", "fct_player_gameweek",
               "dim_team", "dim_player", "dim_fixture",
+              "dim_player_status_history",
           }
           models = {}
           with open("/tmp/models.json") as fh:
