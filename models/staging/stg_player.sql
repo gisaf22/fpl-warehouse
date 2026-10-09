@@ -41,6 +41,21 @@
 --   The player's season total as of the capture. Carried so
 --   stg_test_player_total_points_matches_history can reconcile it against the
 --   same run's element-summary history; not a served column.
+--
+-- Market (#140):
+--   Price, ownership and the gameweek's transfer flow as of the capture, as
+--   the source gives them: typed only, no derived values (#138 M2).
+--   `now_cost` is in tenths, as published. `selected_by_percent` is published
+--   as a string with one decimal place, so DECIMAL(4,1) holds it exactly; an
+--   empty string is NULL. stg_test_player_selected_by_percent_has_one_decimal_place
+--   fails the build if FPL ever publishes more places, which the cast would
+--   otherwise round silently.
+--
+-- total_players:
+--   The game's player count at the capture's root, the ownership denominator
+--   (#138 M3), copied onto every player row of that capture. Read from the
+--   root through declared_records' '$' path (#140 D1), so it is guarded like
+--   the element fields.
 -- =============================================================================
 
 -- Fields come through declared_records, which selects only the columns
@@ -49,6 +64,13 @@
 with raw as (
 
     {{ declared_records('bootstrap_static', '$.elements[*]') }}
+
+),
+
+-- One row per payload: the fields declared at its root.
+root as (
+
+    {{ declared_records('bootstrap_static', '$') }}
 
 )
 
@@ -86,8 +108,20 @@ select
     nullif(cast(raw."news" as varchar), '')    as news,
     cast(raw."news_added" as timestamp)        as news_added,
     cast(raw."can_select" as boolean)          as can_select,
-    cast(raw."removed" as boolean)             as removed
+    cast(raw."removed" as boolean)             as removed,
+
+    -- Market as of this capture
+    cast(raw."now_cost" as integer)            as now_cost,
+    cast(nullif(cast(raw."selected_by_percent" as varchar), '') as decimal(4, 1))
+                                               as selected_by_percent,
+    cast(raw."transfers_in_event" as integer)  as transfers_in_event,
+    cast(raw."transfers_out_event" as integer) as transfers_out_event,
+
+    -- The capture's player count, from its root
+    cast(root."total_players" as integer)      as total_players
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted
     on admitted.capture_key = raw.capture_key
+inner join root
+    on root.capture_key = raw.capture_key
