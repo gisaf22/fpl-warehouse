@@ -272,9 +272,10 @@ values themselves are exactly as captured.
 bootstrap-static is trimmed, because the real object is 1.65 MB and 99% of it
 is unread. `elements` is filtered to the six players above; `events` (all 38,
 so the round calendar the spine is built from is real), `teams` (all 20) and
-`element_types` (the positions) are kept whole. Every other top-level key is
-dropped. The element, event, team and position objects themselves are
-verbatim.
+`element_types` (the positions) are kept whole, and so is `total_players`,
+the root scalar the market snapshot carries per capture (#139). Every other
+top-level key is dropped. The element, event, team and position objects
+themselves are verbatim.
 
 fixtures is trimmed by one key. Every fixture of the season is kept — all 380,
 so a dimension built over the tree sees the real calendar — and every field of
@@ -545,7 +546,8 @@ def build_history_season() -> None:
                 f"season. `elements` is filtered to players {kept}; "
                 "`events` is kept whole — all 38 rounds, every one finished "
                 "and data_checked, which is what the closed-season override is "
-                "checked against — and so are `teams` and `element_types`. No "
+                "checked against — and so are `teams`, `element_types` and "
+                "`total_players`. No "
                 "synthetic edits. Sourced from "
                 f"s3://{BUCKET}/{ARCHIVE_PREFIX}/bootstrap.json; the element, "
                 "event, team and position objects are verbatim."
@@ -554,6 +556,7 @@ def build_history_season() -> None:
             "events": boot["events"],
             "teams": boot["teams"],
             "element_types": boot["element_types"],
+            "total_players": boot["total_players"],
         },
     )
 
@@ -888,8 +891,9 @@ def main() -> None:
                 "_fixture_note": (
                     "Trimmed bootstrap-static capture. `elements` is filtered "
                     f"to players {kept}; `events` (all 38 rounds, so the "
-                    "spine's calendar is real), `teams` and `element_types` "
-                    "are kept whole. Every other top-level key is dropped. The "
+                    "spine's calendar is real), `teams`, `element_types` and "
+                    "`total_players` are kept whole. Every other top-level key "
+                    "is dropped. The "
                     "element, event, team and position objects themselves are "
                     "verbatim."
                     + departure_note
@@ -907,6 +911,7 @@ def main() -> None:
                 "events": mark_synthetic_finished(boot["events"], run_id),
                 "teams": boot["teams"],
                 "element_types": boot["element_types"],
+                "total_players": boot["total_players"],
             },
         )
 

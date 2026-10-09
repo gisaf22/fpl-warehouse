@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [166, 233, 426, 427, 611]; `events` (all 38 rounds, so the spine's calendar is real), `teams` and `element_types` are kept whole. Every other top-level key is dropped. The element, event, team and position objects themselves are verbatim. Player 4 is deliberately ABSENT: a synthetic departure, removed from `elements` for every run after 20260831T203609Z-227b9b. See DEPARTED in build_fixtures.py. Round 4's `finished` flag is SYNTHETIC: the round was played and ratified by this capture but FPL had not yet flipped it. See SYNTHETIC_FINISHED in build_fixtures.py.",
+ "_fixture_note": "Trimmed bootstrap-static capture. `elements` is filtered to players [166, 233, 426, 427, 611]; `events` (all 38 rounds, so the spine's calendar is real), `teams`, `element_types` and `total_players` are kept whole. Every other top-level key is dropped. The element, event, team and position objects themselves are verbatim. Player 4 is deliberately ABSENT: a synthetic departure, removed from `elements` for every run after 20260831T203609Z-227b9b. See DEPARTED in build_fixtures.py. Round 4's `finished` flag is SYNTHETIC: the round was played and ratified by this capture but FPL had not yet flipped it. See SYNTHETIC_FINISHED in build_fixtures.py.",
  "element_types": [
   {
    "element_count": 71,
@@ -2624,5 +2624,6 @@
    "unavailable": false,
    "win": 0
   }
- ]
+ ],
+ "total_players": 10784294
 }
