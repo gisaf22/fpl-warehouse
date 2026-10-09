@@ -28,6 +28,16 @@ models:
       contract.
     group: warehouse_internal
     access: private
+    data_tests:
+      # One row per player per capture: the rows player status history is
+      # built from (#125 AC1).
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, fpl_id, capture_key]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#125 AC1"
     columns:
       - name: capture_key
         description: >
@@ -40,6 +50,25 @@ models:
                 field: capture_key
               config:
                 tags: [integration]
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#125 AC1"
+      - name: season
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#125 AC1"
+      - name: fpl_id
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#125 AC1"
       - name: player_code
         description: >
           FPL's cross-season player identifier (`elements[].code`). Carried

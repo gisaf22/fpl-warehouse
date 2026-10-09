@@ -115,3 +115,83 @@ unit_tests:
       rows:
         - {season: "2025-26", fixture_id: 1, team_h_fpl_id: 12, team_a_fpl_id: 4}
         - {season: "2026-27", fixture_id: 1, team_h_fpl_id: 1,  team_a_fpl_id: 7}
+
+  # --- stg_player: status and availability per capture (#125) ----------------
+  #
+  # bootstrap-static's records sit in the `elements` array, so the source mock
+  # is one row per payload with `elements` as a list of structs. Each element
+  # carries every field stg_player reads.
+
+  - name: unadmitted_capture_contributes_no_player_rows
+    description: >
+      Two bootstrap-static captures of the same player, only one of them
+      admitted. Staging keeps the admitted capture's row and none of the other's:
+      a local or non-production capture must never reach the status history.
+    model: stg_player
+    config:
+      tags: [unit]
+      meta:
+        covers: "#125 AC2"
+    given:
+      - input: source('fpl_raw', 'bootstrap_static')
+        format: sql
+        rows: |
+          select * from (values
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json', 'a'),
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-09-02/20260902T163935Z-07eb06/payload.json', 'i')
+          ) as t(filename, status),
+          lateral (select [{
+              'id': 7::bigint, 'web_name': 'Player', 'code': 1007::bigint,
+              'element_type': 3::bigint, 'total_points': 12::bigint,
+              'status': status,
+              'chance_of_playing_this_round': null::bigint,
+              'chance_of_playing_next_round': null::bigint,
+              'news': 'Knee injury', 'news_added': '2026-09-01T10:00:00.000000Z',
+              'can_select': true, 'removed': false, 'team': 4::bigint
+          }] as elements)
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
+    expect:
+      rows:
+        - {run_id: "20260914T211204Z-a730c3", fpl_id: 7, status: "a"}
+
+  - name: empty_news_is_staged_as_null
+    description: >
+      FPL publishes no news as an empty string. Staged as NULL, so an empty
+      string and a null never read as a change in the status history. Real
+      news is kept as published.
+    model: stg_player
+    config:
+      tags: [unit]
+      meta:
+        covers: "#125 AC3"
+    given:
+      - input: source('fpl_raw', 'bootstrap_static')
+        format: sql
+        rows: |
+          select
+              'tests/fixtures/raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json' as filename,
+              [
+                  {'id': 7::bigint, 'web_name': 'Fit', 'code': 1007::bigint,
+                   'element_type': 3::bigint, 'total_points': 12::bigint,
+                   'status': 'a',
+                   'chance_of_playing_this_round': null::bigint,
+                   'chance_of_playing_next_round': null::bigint,
+                   'news': '', 'news_added': null::varchar,
+                   'can_select': true, 'removed': false, 'team': 4::bigint},
+                  {'id': 8::bigint, 'web_name': 'Hurt', 'code': 1008::bigint,
+                   'element_type': 2::bigint, 'total_points': 3::bigint,
+                   'status': 'd',
+                   'chance_of_playing_this_round': 75::bigint,
+                   'chance_of_playing_next_round': 75::bigint,
+                   'news': 'Knock - 75% chance of playing', 'news_added': '2026-09-12T18:30:05.123456Z',
+                   'can_select': true, 'removed': false, 'team': 9::bigint}
+              ] as elements
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
+    expect:
+      rows:
+        - {fpl_id: 7, news: null, news_added: null, chance_of_playing_this_round: null, team_fpl_id: 4}
+        - {fpl_id: 8, news: "Knock - 75% chance of playing", news_added: "2026-09-12 18:30:05.123456", chance_of_playing_this_round: 75, team_fpl_id: 9}
