@@ -243,3 +243,143 @@ unit_tests:
       rows:
         - {season: "2026-27", fpl_id: 500, fixture_id: 21, team_fpl_id: 1}
         - {season: "2026-27", fpl_id: 500, fixture_id: 22, team_fpl_id: 4}
+
+  # --- dim_player_status_history: one row per change in status (#126) ---------
+  # Mocks list only the columns the model reads; the rest default to null.
+
+  - name: identical_captures_collapse_into_one_open_row
+    description: >
+      Three consecutive captures with the same tracked fields are one state,
+      so one row, open from the first capture. The tracked fields include
+      nulls (no chance of playing, no news): a null compares equal to a null,
+      so it does not open a row every capture.
+    model: dim_player_status_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#126 AC1"
+    given:
+      - input: ref('stg_player')
+        rows:
+          - {season: "2026-27", fpl_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", player_code: 100, status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, news_added: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", player_code: 100, status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, news_added: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r3", capture_key: "k3", observed_at: "2026-09-02 19:00:00", player_code: 100, status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, news_added: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: null}
+
+  - name: each_tracked_field_change_opens_a_row_at_its_capture
+    description: >
+      One player per tracked field, each changing only that field between two
+      captures. Every change opens a row at the second capture's observed_at,
+      and the first row's valid_to equals it. Player 4's change is a news
+      rewording only, which is still a change.
+    model: dim_player_status_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#126 AC2"
+    given:
+      - input: ref('stg_player')
+        rows:
+          - {season: "2026-27", fpl_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "d", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 2, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Knock", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 2, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "d", chance_of_playing_this_round: 50, chance_of_playing_next_round: 75, news: "Knock", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 3, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Knock", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 3, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 100, news: "Knock", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 4, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Hamstring injury - 75% chance of playing", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 4, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Hamstring injury - 75% chance", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 5, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 5, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: false, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 6, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 6, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: true, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 7, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 7, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 9, position_id: 2}
+          - {season: "2026-27", fpl_id: 8, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 8, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", chance_of_playing_this_round: null, chance_of_playing_next_round: null, news: null, can_select: true, removed: false, team_fpl_id: 3, position_id: 3}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 1, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 2, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 2, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 3, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 3, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 4, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 4, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 5, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 5, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 6, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 6, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 7, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 7, valid_from: "2026-09-02 07:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 8, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 8, valid_from: "2026-09-02 07:00:00", valid_to: null}
+
+  - name: status_change_and_return_reopens_rows_in_capture_order
+    description: >
+      a -> d -> a is three rows, each closed by the next one's valid_from.
+      Captures are ordered by observed_at, then run_id: the two captures
+      observed at the same instant are taken in run_id order, so the row
+      opened by "r2b" (status a) follows "r2a" (status d). The mock lists them
+      out of order so that input order cannot decide.
+    model: dim_player_status_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#126 AC2"
+    given:
+      - input: ref('stg_player')
+        rows:
+          - {season: "2026-27", fpl_id: 1, run_id: "r2b", capture_key: "k2b", observed_at: "2026-09-02 07:00:00", status: "a", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r1",  capture_key: "k1",  observed_at: "2026-09-01 19:00:00", status: "a", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r2a", capture_key: "k2a", observed_at: "2026-09-02 07:00:00", status: "d", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 1, status: "a", valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 1, status: "d", valid_from: "2026-09-02 07:00:00", valid_to: "2026-09-02 07:00:00"}
+        - {season: "2026-27", fpl_id: 1, status: "a", valid_from: "2026-09-02 07:00:00", valid_to: null}
+
+  - name: attribute_only_change_opens_no_row
+    description: >
+      Between the two captures only news_added and capture_key change (FPL
+      re-stamped the same news). Attributes never split a state, so this is
+      one row.
+    model: dim_player_status_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#126 AC3"
+    given:
+      - input: ref('stg_player')
+        rows:
+          - {season: "2026-27", fpl_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", player_code: 100, status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Knock", news_added: "2026-09-01 10:00:00", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", player_code: 100, status: "d", chance_of_playing_this_round: 75, chance_of_playing_next_round: 75, news: "Knock", news_added: "2026-09-02 06:00:00", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: null}
+
+  - name: first_row_opens_at_the_players_first_capture
+    description: >
+      No backdating. Player 2 first appears in the second capture of 2026-27,
+      so their first row opens there, not at the season's first capture. The
+      2025-26 player has one capture only (the season's single end-of-season
+      snapshot), so their one open row starts at that capture.
+    model: dim_player_status_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#126 AC4"
+    given:
+      - input: ref('stg_player')
+        rows:
+          - {season: "2026-27", fpl_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", status: "a", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2026-27", fpl_id: 2, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", status: "a", can_select: true, removed: false, team_fpl_id: 3, position_id: 2}
+          - {season: "2025-26", fpl_id: 1, run_id: "h1", capture_key: "h1", observed_at: "2026-05-26 03:46:26", status: "a", can_select: true, removed: false, team_fpl_id: 5, position_id: 4}
+    expect:
+      rows:
+        - {season: "2025-26", fpl_id: 1, valid_from: "2026-05-26 03:46:26", valid_to: null}
+        - {season: "2026-27", fpl_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: null}
+        - {season: "2026-27", fpl_id: 2, valid_from: "2026-09-02 07:00:00", valid_to: null}

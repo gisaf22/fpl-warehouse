@@ -592,3 +592,27 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#42 AC5"
+
+  - name: dim_player_status_history
+    description: >
+      One row per change in a player's tracked status fields, per season:
+      (season, fpl_id) plus the interval [valid_from, valid_to) the state held
+      over, read from admitted bootstrap-static captures (#126). valid_to is
+      null on the open row. A state opens at the capture that first showed it
+      and is never backdated, so before a player's first capture there is no
+      row. Private until it is served (Item 4 of #123).
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: status
+        description: >
+          FPL's availability code. Only the values observed in captures are
+          accepted; a new one fails the build until it is classified (#123).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["a", "u", "i", "d", "s"]
+              config:
+                tags: [integration]
+                meta:
+                  covers: "#126 AC6"
