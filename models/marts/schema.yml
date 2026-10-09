@@ -709,3 +709,118 @@ models:
           Key of the raw capture that opened the row, the evidence for
           valid_from (ADR 0001). An audit reference: consumers cannot read the
           raw tree.
+
+  - name: fct_player_market_snapshot
+    description: >
+      Each player's market state at every admitted bootstrap-static capture:
+      price, ownership and the gameweek's transfer flow as FPL published them,
+      with the capture's player count (#141, Feature #138). One row per
+      (season, fpl_id, capture_key). A fact, not SCD2: every capture is a row.
+      Private until it is served (#143).
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, fpl_id, capture_key]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#141 AC1"
+    columns:
+      - name: season
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC1"
+      - name: fpl_id
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC1"
+      - name: capture_key
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC1"
+      - name: observed_at
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC3"
+      # Ranges (AC2). value_between passes nulls by design (#53), so each field
+      # also carries not_null: never null in any capture to 2026-10-09, so a
+      # null is a source change and fails the build (#141 E3).
+      - name: now_cost
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+      - name: selected_by_percent
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 100}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+      - name: transfers_in_event
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+      - name: transfers_out_event
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+      - name: total_players
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
