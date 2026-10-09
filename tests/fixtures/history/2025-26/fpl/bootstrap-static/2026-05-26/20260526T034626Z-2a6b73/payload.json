@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Trimmed bootstrap-static for the ported 2025-26 season. `elements` is filtered to players [4, 119, 166, 426, 449]; `events` is kept whole \u2014 all 38 rounds, every one finished and data_checked, which is what the closed-season override is checked against \u2014 and so are `teams` and `element_types`. No synthetic edits. Sourced from s3://fpl-data-safari/archive/2025-26/raw/bootstrap.json; the element, event, team and position objects are verbatim.",
+ "_fixture_note": "Trimmed bootstrap-static for the ported 2025-26 season. `elements` is filtered to players [4, 119, 166, 426, 449]; `events` is kept whole \u2014 all 38 rounds, every one finished and data_checked, which is what the closed-season override is checked against \u2014 and so are `teams`, `element_types` and `total_players`. No synthetic edits. Sourced from s3://fpl-data-safari/archive/2025-26/raw/bootstrap.json; the element, event, team and position objects are verbatim.",
  "element_types": [
   {
    "element_count": 97,
@@ -3204,5 +3204,6 @@
    "unavailable": false,
    "win": 0
   }
- ]
+ ],
+ "total_players": 13107732
 }

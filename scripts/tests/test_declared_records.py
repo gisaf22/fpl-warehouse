@@ -158,3 +158,32 @@ def test_reading_an_undeclared_player_field_still_fails_naming_the_field():
 
     assert result.returncode != 0
     assert "team_code" in result.stdout + result.stderr
+
+
+# The market snapshot's element fields (#139). Its root field, total_players,
+# is declared and presence-tested too, but declared_records reads element
+# records only, so no staging read of it exists to test here.
+MARKET_FIELDS = (
+    "now_cost", "selected_by_percent", "transfers_in_event", "transfers_out_event",
+)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#139 AC3")
+@pytest.mark.parametrize("field", MARKET_FIELDS)
+def test_staging_can_read_each_market_field(field):
+    result = show(ELEMENTS + f'select r."{field}" from r')
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f'"{field}"' in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#139 AC3")
+def test_reading_an_undeclared_market_field_still_fails_naming_the_field():
+    # `cost_change_event` is in every bootstrap-static element but is not
+    # declared: it is a derived value, which the market snapshot excludes (M2).
+    result = show(ELEMENTS + "select r.cost_change_event from r")
+
+    assert result.returncode != 0
+    assert "cost_change_event" in result.stdout + result.stderr
