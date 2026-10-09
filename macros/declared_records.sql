@@ -9,9 +9,13 @@
     reference to it fails the build with DuckDB's binder error naming the field,
     and every field staging reads is covered by consumed_keys_present (#114).
 
-    Supported record paths (#115 D2):
+    Supported record paths (#115 D2, #140 D1):
       '$.<array>[*]'  one row per element of a top-level array, unnested
       '$[*]'          the payload is itself an array; one row per element
+      '$'             the payload root; one row per payload. Reads the columns
+                      declared with no record_path, which #114 already checks
+                      for presence at the top of the payload (e.g.
+                      bootstrap-static's total_players)
     Any other path is a compile error naming it.
 
     Renames and casts stay in the staging model, in its own select over this
@@ -27,10 +31,10 @@
 {% macro declared_records(table, record_path) %}
     {%- set relation = source('fpl_raw', table) -%}
     {%- set nested = modules.re.fullmatch('\$\.([A-Za-z_][A-Za-z0-9_]*)\[\*\]', record_path) -%}
-    {%- if not nested and record_path != '$[*]' -%}
+    {%- if not nested and record_path not in ('$[*]', '$') -%}
         {{ exceptions.raise_compiler_error(
             "declared_records: record path " ~ record_path ~ " on fpl_raw." ~ table
-            ~ " is not supported; use '$.<array>[*]' or '$[*]'") }}
+            ~ " is not supported; use '$.<array>[*]', '$[*]' or '$'") }}
     {%- endif -%}
 
     {%- set keys = [] -%}
@@ -38,8 +42,9 @@
     {%- if execute and not unit_test -%}
         {%- for node in graph.sources.values()
               if node.source_name == 'fpl_raw' and node.name == table -%}
+            {#- A root column is declared with no record_path at all. -#}
             {%- for column in node.columns.values()
-                  if (column.meta or {}).get('record_path') == record_path -%}
+                  if (column.meta or {}).get('record_path', '$') == record_path -%}
                 {%- do keys.append(column.name.split('.')[-1]) -%}
             {%- endfor -%}
         {%- endfor -%}

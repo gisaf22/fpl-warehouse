@@ -147,8 +147,10 @@ unit_tests:
               'chance_of_playing_this_round': null::bigint,
               'chance_of_playing_next_round': null::bigint,
               'news': 'Knee injury', 'news_added': '2026-09-01T10:00:00.000000Z',
-              'can_select': true, 'removed': false, 'team': 4::bigint
-          }] as elements)
+              'can_select': true, 'removed': false, 'team': 4::bigint,
+              'now_cost': 55::bigint, 'selected_by_percent': '1.0',
+              'transfers_in_event': 0::bigint, 'transfers_out_event': 0::bigint
+          }] as elements, 10000000::bigint as total_players)
       - input: ref('int_admitted_capture')
         rows:
           - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
@@ -179,15 +181,20 @@ unit_tests:
                    'chance_of_playing_this_round': null::bigint,
                    'chance_of_playing_next_round': null::bigint,
                    'news': '', 'news_added': null::varchar,
-                   'can_select': true, 'removed': false, 'team': 4::bigint},
+                   'can_select': true, 'removed': false, 'team': 4::bigint,
+                   'now_cost': 55::bigint, 'selected_by_percent': '1.0',
+                   'transfers_in_event': 0::bigint, 'transfers_out_event': 0::bigint},
                   {'id': 8::bigint, 'web_name': 'Hurt', 'code': 1008::bigint,
                    'element_type': 2::bigint, 'total_points': 3::bigint,
                    'status': 'd',
                    'chance_of_playing_this_round': 75::bigint,
                    'chance_of_playing_next_round': 75::bigint,
                    'news': 'Knock - 75% chance of playing', 'news_added': '2026-09-12T18:30:05.123456Z',
-                   'can_select': true, 'removed': false, 'team': 9::bigint}
-              ] as elements
+                   'can_select': true, 'removed': false, 'team': 9::bigint,
+                   'now_cost': 45::bigint, 'selected_by_percent': '0.4',
+                   'transfers_in_event': 0::bigint, 'transfers_out_event': 0::bigint}
+              ] as elements,
+              10000000::bigint as total_players
       - input: ref('int_admitted_capture')
         rows:
           - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
@@ -195,3 +202,123 @@ unit_tests:
       rows:
         - {fpl_id: 7, news: null, news_added: null, chance_of_playing_this_round: null, team_fpl_id: 4}
         - {fpl_id: 8, news: "Knock - 75% chance of playing", news_added: "2026-09-12 18:30:05.123456", chance_of_playing_this_round: 75, team_fpl_id: 9}
+
+  # stg_player's market fields (#140). Each mock element carries every field
+  # stg_player reads, and each payload its root total_players.
+
+  - name: market_fields_are_typed_and_carry_their_captures_total_players
+    description: >
+      Two admitted captures of the same player, with different prices,
+      ownership, transfers and total_players. Each row carries its own
+      capture's values, typed, and the total_players of its own capture's root.
+    model: stg_player
+    config:
+      tags: [unit]
+      meta:
+        covers: "#140 AC1"
+    given:
+      - input: source('fpl_raw', 'bootstrap_static')
+        format: sql
+        rows: |
+          select * from (values
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-08-31/20260831T203609Z-227b9b/payload.json', 80, '28.7', 6269, 32314, 10203953),
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-09-06/20260906T191056Z-6d5820/payload.json', 79, '27.7', 19318, 117024, 10539915)
+          ) as t(filename, cost, ownership, t_in, t_out, players),
+          lateral (select [{
+              'id': 427::bigint, 'web_name': 'Player', 'code': 1427::bigint,
+              'element_type': 3::bigint, 'total_points': 12::bigint,
+              'status': 'a',
+              'chance_of_playing_this_round': null::bigint,
+              'chance_of_playing_next_round': null::bigint,
+              'news': '', 'news_added': null::varchar,
+              'can_select': true, 'removed': false, 'team': 4::bigint,
+              'now_cost': cost::bigint, 'selected_by_percent': ownership,
+              'transfers_in_event': t_in::bigint, 'transfers_out_event': t_out::bigint
+          }] as elements, players::bigint as total_players)
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/bootstrap-static/2026-08-31/20260831T203609Z-227b9b/payload.json", season: "2026-27", run_id: "20260831T203609Z-227b9b"}
+          - {capture_key: "raw/fpl/bootstrap-static/2026-09-06/20260906T191056Z-6d5820/payload.json", season: "2026-27", run_id: "20260906T191056Z-6d5820"}
+    expect:
+      rows:
+        - {run_id: "20260831T203609Z-227b9b", fpl_id: 427, now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314, total_players: 10203953}
+        - {run_id: "20260906T191056Z-6d5820", fpl_id: 427, now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024, total_players: 10539915}
+
+  - name: selected_by_percent_string_is_staged_as_an_exact_decimal
+    description: >
+      FPL publishes ownership as a string. Staged as a decimal equal to the
+      string, with no rounding loss at either end of the range. An empty
+      string is NULL (M2).
+    model: stg_player
+    config:
+      tags: [unit]
+      meta:
+        covers: "#140 AC2"
+    given:
+      - input: source('fpl_raw', 'bootstrap_static')
+        format: sql
+        rows: |
+          select
+              'tests/fixtures/raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json' as filename,
+              list_transform(
+                  [(1, '31.2'), (2, '0.0'), (3, '100.0'), (4, '0.1'), (5, '')],
+                  p -> {
+                      'id': p[1]::bigint, 'web_name': 'Player', 'code': (1000 + p[1])::bigint,
+                      'element_type': 3::bigint, 'total_points': 0::bigint,
+                      'status': 'a',
+                      'chance_of_playing_this_round': null::bigint,
+                      'chance_of_playing_next_round': null::bigint,
+                      'news': '', 'news_added': null::varchar,
+                      'can_select': true, 'removed': false, 'team': 4::bigint,
+                      'now_cost': 50::bigint, 'selected_by_percent': p[2],
+                      'transfers_in_event': 0::bigint, 'transfers_out_event': 0::bigint
+                  }
+              ) as elements,
+              10784294::bigint as total_players
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
+    expect:
+      rows:
+        - {fpl_id: 1, selected_by_percent: 31.2}
+        - {fpl_id: 2, selected_by_percent: 0.0}
+        - {fpl_id: 3, selected_by_percent: 100.0}
+        - {fpl_id: 4, selected_by_percent: 0.1}
+        - {fpl_id: 5, selected_by_percent: null}
+
+  - name: unadmitted_capture_contributes_no_market_rows
+    description: >
+      Two bootstrap-static captures with different prices and total_players,
+      only one of them admitted. Staging keeps the admitted capture's market
+      row and total_players, and nothing from the other: neither its elements
+      nor its root.
+    model: stg_player
+    config:
+      tags: [unit]
+      meta:
+        covers: "#140 AC3"
+    given:
+      - input: source('fpl_raw', 'bootstrap_static')
+        format: sql
+        rows: |
+          select * from (values
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json', 80, 10784294),
+              ('tests/fixtures/raw/fpl/bootstrap-static/2026-09-02/20260902T163935Z-07eb06/payload.json', 99, 1)
+          ) as t(filename, cost, players),
+          lateral (select [{
+              'id': 7::bigint, 'web_name': 'Player', 'code': 1007::bigint,
+              'element_type': 3::bigint, 'total_points': 12::bigint,
+              'status': 'a',
+              'chance_of_playing_this_round': null::bigint,
+              'chance_of_playing_next_round': null::bigint,
+              'news': '', 'news_added': null::varchar,
+              'can_select': true, 'removed': false, 'team': 4::bigint,
+              'now_cost': cost::bigint, 'selected_by_percent': '5.0',
+              'transfers_in_event': 0::bigint, 'transfers_out_event': 0::bigint
+          }] as elements, players::bigint as total_players)
+      - input: ref('int_admitted_capture')
+        rows:
+          - {capture_key: "raw/fpl/bootstrap-static/2026-09-14/20260914T211204Z-a730c3/payload.json", season: "2026-27", run_id: "20260914T211204Z-a730c3"}
+    expect:
+      rows:
+        - {run_id: "20260914T211204Z-a730c3", fpl_id: 7, now_cost: 80, total_players: 10784294}

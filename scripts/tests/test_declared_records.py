@@ -187,3 +187,28 @@ def test_reading_an_undeclared_market_field_still_fails_naming_the_field():
 
     assert result.returncode != 0
     assert "cost_change_event" in result.stdout + result.stderr
+
+
+# The payload root (#140 D1): '$' reads the fields declared with no
+# record_path, one row per payload.
+ROOT = "with r as ({{ declared_records('bootstrap_static', '$') }}) "
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#140 AC4")
+def test_staging_can_read_a_declared_root_field():
+    result = show(ROOT + 'select r.capture_key, r."total_players" from r')
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert '"total_players"' in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#140 AC4")
+def test_reading_an_undeclared_root_field_fails_naming_the_field():
+    # `_fixture_note` is at the root of every fixture bootstrap-static payload
+    # but is not declared in sources.yml.
+    result = show(ROOT + "select r._fixture_note from r")
+
+    assert result.returncode != 0
+    assert "_fixture_note" in result.stdout + result.stderr
