@@ -1,8 +1,8 @@
 # fpl-warehouse — agent rules
 
-**This file describes the target architecture the repo is being migrated *to*, not its
-current state.** For current state, read `docs/architecture/current-state.md` if it still
-exists; `docs/architecture/target-state.md` is the governing target document.
+**This file and the ADRs in `docs/adr/` are the governing documents.** This file holds the
+rules for working in the repo and the decisions not yet moved into an ADR; each ADR in
+`docs/adr/` records one decision, with the options it rejected.
 
 These rules sit on top of the global engineering policy in `~/.claude/CLAUDE.md`.
 
@@ -439,6 +439,7 @@ count changes again the next time a season is ported.
   `is_ratified` case of 2026-09-15).
 - **Not breaking, so no bump:** a column appended last, a new served table, a new manifest
   field.
+- **A change that cannot be classified as either is breaking** until it is clarified.
 - **The publish guards the shape.** The manifest also carries `columns`: each served
   table's `[name, type]` pairs in order, read back from the uploaded parquet. A publish is
   refused when `contract_version` is lower than the previous manifest's, or when, at the
