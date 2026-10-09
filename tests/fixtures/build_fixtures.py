@@ -161,6 +161,22 @@ WHAT EACH PLAYER COVERS
           (5-2) and points are final (23) while the whole ICT family still
           reads "0.0" — the corruption class the dedup rule exists to prevent.
 
+          427 also carries the SYNTHETIC status change, the third edited case
+          in the bootstrap payloads. Status is `a` in every real capture, so
+          R2's element is set to `d` (doubtful, 75%, with news) and R1, R3
+          and R4 are left as captured: a -> d -> a. R2 (08-31) and R3 (09-06)
+          straddle the round-3 deadline (09-04 17:30), so an as-of lookup
+          there must return R2's `d` and never R3's `a`, and round 4's must
+          return `a`.
+
+          No fixture player's status changes in any real capture, so without
+          this every player has one dim_player_status_history row and the
+          interval and status checks pass on single-row players only. Feeds
+          #128's as-of tests and gives dim_test_player_status_history_
+          intervals_contiguous_one_open and the status accepted_values test
+          (#126 AC5, AC6) a multi-row player with a non-`a` status. See
+          SYNTHETIC_STATUS.
+
 166       Ghost transfer — the retracted-row case, identified in Phase 2 and
           documented in CLAUDE.md under "Retracted history rows". This player
           transferred mid-season, and FPL published then withdrew a round-2 row
@@ -273,12 +289,13 @@ The fixtures payload is a JSON array, not an object, so it cannot carry a
 `_fixture_note`: any added element would read as a fixture. This docstring is
 its note.
 
-Two departures from "filtered, but verbatim" in the bootstrap payloads, plus
-the synthetic fixture 999 in the fixtures payloads (see 233 above):
+Three departures from "filtered, but verbatim" in the bootstrap payloads,
+plus the synthetic fixture 999 in the fixtures payloads (see 233 above):
 player 4 is dropped from `elements` for R3 and R4 and given no element-summary
-capture in either (see DEPARTED), and round 4's `finished` flag is set in R4's
-`events` (see SYNTHETIC_FINISHED). The element and event objects are otherwise
-untouched.
+capture in either (see DEPARTED), round 4's `finished` flag is set in R4's
+`events` (see SYNTHETIC_FINISHED), and player 427's status fields are set in
+R2's `elements` (see SYNTHETIC_STATUS). The element and event objects are
+otherwise untouched.
 
 `_fixture_note` is a top-level key added to every payload saying what that file
 covers. JSON has no comment syntax, and the models select named fields out of
@@ -302,6 +319,7 @@ import json
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 BUCKET = "fpl-data-safari"
@@ -397,7 +415,9 @@ PLAYERS = {
          "final, ICT still \"0.0\"), then fully ratified. Feeds "
          "fct_test_player_fixture_ratified_preferred.",
     427: "Normal case, rounds 1 and 2 — second player, same settlement "
-         "sequence as 426, so dedup is asserted over more than one key.",
+         "sequence as 426, so dedup is asserted over more than one key. Also "
+         "the SYNTHETIC status change a -> d -> a in bootstrap-static (R2 "
+         "only); this element-summary payload is not edited for it.",
     611: "Blank gameweek. In bootstrap-static `elements` for every capture, so "
          "the spine gives them a row in both finished rounds, but their "
          "history carries no round-1 fixture. fct_player_gameweek must show "
@@ -431,6 +451,24 @@ DEPARTED = {
 SYNTHETIC_FINISHED = {
     "run_id": "20260914T211204Z-a730c3",
     "round": 4,
+}
+
+# The synthetic status change, stated in one place so the edit is auditable.
+# Player 427 is `a` in every real capture. In `run_id`'s `elements` these
+# fields are replaced, so the captures read a -> d -> a; every other run's
+# element, and every other field of this one, is as captured. The run must be
+# followed by a deadline before the next run, so the change straddles it
+# (mark_synthetic_status checks this). news_added sits between R1 and R2.
+SYNTHETIC_STATUS = {
+    "fpl_id": 427,
+    "run_id": "20260831T203609Z-227b9b",
+    "fields": {
+        "status": "d",
+        "chance_of_playing_this_round": 75,
+        "chance_of_playing_next_round": 75,
+        "news": "Knock - 75% chance of playing",
+        "news_added": "2026-08-30T10:00:00.000000Z",
+    },
 }
 
 # The synthetic double gameweek, stated in one place so the edit is auditable.
@@ -741,6 +779,38 @@ def mark_synthetic_finished(events: list, run_id: str) -> list:
     return out
 
 
+def mark_synthetic_status(elements: list, events: list, run_id: str) -> list:
+    """Set one player's status fields in one capture — see SYNTHETIC_STATUS."""
+    if run_id != SYNTHETIC_STATUS["run_id"]:
+        return elements
+    run_ids = [r for r, _ in RUNS]
+    position = run_ids.index(run_id)
+    if position == len(run_ids) - 1:
+        sys.exit("SYNTHETIC_STATUS is on the final run, so the player never "
+                 "returns to `a` and no deadline separates d from a")
+    started = datetime.strptime(run_id[:16], "%Y%m%dT%H%M%SZ")
+    next_started = datetime.strptime(run_ids[position + 1][:16], "%Y%m%dT%H%M%SZ")
+    deadlines = [
+        datetime.strptime(e["deadline_time"], "%Y-%m-%dT%H:%M:%SZ") for e in events
+    ]
+    if not any(started < d < next_started for d in deadlines):
+        sys.exit(f"no deadline falls between {run_id} and the next run, so "
+                 "the synthetic status change straddles nothing")
+    target = [e for e in elements if e["id"] == SYNTHETIC_STATUS["fpl_id"]]
+    if not target:
+        sys.exit(f"player {SYNTHETIC_STATUS['fpl_id']} is not in {run_id}'s "
+                 "`elements` — the synthetic status change has nothing to set")
+    if target[0]["status"] != "a":
+        sys.exit(f"player {SYNTHETIC_STATUS['fpl_id']} is already "
+                 f"{target[0]['status']!r} in {run_id} as captured, so the "
+                 "synthetic change is no longer a -> d -> a")
+    return [
+        dict(e, **SYNTHETIC_STATUS["fields"])
+        if e["id"] == SYNTHETIC_STATUS["fpl_id"] else e
+        for e in elements
+    ]
+
+
 def is_departed(fpl_id: int, run_id: str) -> bool:
     """True once the synthetic departure has taken effect for this run."""
     if fpl_id != DEPARTED["fpl_id"]:
@@ -806,6 +876,12 @@ def main() -> None:
             f"{DEPARTED['last_run_id']}. See DEPARTED in build_fixtures.py."
             if is_departed(DEPARTED["fpl_id"], run_id) else ""
         )
+        status_note = (
+            f" Player {SYNTHETIC_STATUS['fpl_id']}'s status fields are "
+            "SYNTHETIC: set to doubtful in this capture only, so the captures "
+            "read a -> d -> a. See SYNTHETIC_STATUS in build_fixtures.py."
+            if run_id == SYNTHETIC_STATUS["run_id"] else ""
+        )
         write(
             OUT_ROOT / "bootstrap-static" / date / run_id / "payload.json",
             {
@@ -818,11 +894,16 @@ def main() -> None:
                     "verbatim."
                     + departure_note
                     + finished_note
+                    + status_note
                 ),
-                "elements": [
-                    e for e in boot["elements"]
-                    if e["id"] in PLAYERS and not is_departed(e["id"], run_id)
-                ],
+                "elements": mark_synthetic_status(
+                    [
+                        e for e in boot["elements"]
+                        if e["id"] in PLAYERS and not is_departed(e["id"], run_id)
+                    ],
+                    boot["events"],
+                    run_id,
+                ),
                 "events": mark_synthetic_finished(boot["events"], run_id),
                 "teams": boot["teams"],
                 "element_types": boot["element_types"],
