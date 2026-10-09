@@ -12,7 +12,7 @@
 -- row before it is the answer. Player 2's i row opens after it. Player 3 has
 -- no row before it. A missing or extra result row fails too.
 
-with history (season, fpl_id, valid_from, valid_to, status) as (
+with history_rows (season, fpl_id, valid_from, valid_to, status) as (
     values
         ('2026-27', 1, timestamp '2026-09-01 19:00:00', timestamp '2026-09-04 17:30:00', 'a'),
         ('2026-27', 1, timestamp '2026-09-04 17:30:00', timestamp '2026-09-06 19:00:00', 'd'),
@@ -20,6 +20,20 @@ with history (season, fpl_id, valid_from, valid_to, status) as (
         ('2026-27', 2, timestamp '2026-09-01 19:00:00', timestamp '2026-09-05 07:00:00', 'a'),
         ('2026-27', 2, timestamp '2026-09-05 07:00:00', null,                            'i'),
         ('2026-27', 3, timestamp '2026-09-05 07:00:00', null,                            'a')
+),
+
+-- The other tracked fields, which the macro returns, are null throughout.
+history as (
+    select
+        *,
+        cast(null as integer) as chance_of_playing_this_round,
+        cast(null as integer) as chance_of_playing_next_round,
+        cast(null as varchar) as news,
+        cast(null as boolean) as can_select,
+        cast(null as boolean) as removed,
+        cast(null as integer) as team_fpl_id,
+        cast(null as integer) as position_id
+    from history_rows
 ),
 
 requests (season, fpl_id, as_of_time) as (
