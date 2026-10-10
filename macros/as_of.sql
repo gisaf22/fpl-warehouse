@@ -13,7 +13,7 @@
 
     STUB (failing-tests commit): matches nothing.
 #}
-{% macro as_of(requests, relation, time_column, columns, keys=['season', 'fpl_id']) -%}
+{% macro as_of(requests, relation, time_column, columns, keys=['season', 'fpl_id'], max_age=none) -%}
     select
         requests.*
         {%- for column in columns %},
