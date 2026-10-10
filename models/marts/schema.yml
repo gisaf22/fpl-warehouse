@@ -727,6 +727,16 @@ models:
             tags: [unit]
             meta:
               covers: "#141 AC1"
+      # The as-of lookup takes the last capture before a deadline by
+      # observed_at; two captures of a player at the same moment would leave
+      # it undefined, so a tie fails the build rather than resolving silently.
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, fpl_id, observed_at]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#142 AC5"
     columns:
       - name: season
         data_tests:
