@@ -717,6 +717,13 @@ models:
       with the capture's player count (#141, Feature #138). One row per
       (season, fpl_id, capture_key). A fact, not SCD2: every capture is a row.
       Private until it is served (#143).
+
+      Market as of a moment is the player's last capture strictly before it,
+      through the as_of macro (#142): as_of(requests, relation, 'observed_at',
+      columns, max_age=...). The moment is the caller's own as_of_time, not
+      wired to the gameweek deadline. The optional max_age turns a latest
+      capture older than [moment - max_age, moment) into null. Neither has a
+      default here; the callers that need one set it (#142 P4, P5).
     group: warehouse_internal
     access: private
     data_tests:
