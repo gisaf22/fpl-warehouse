@@ -388,10 +388,11 @@ unit_tests:
 
   - name: market_snapshot_rows_carry_their_own_captures_values
     description: >
-      Two players across two captures with different prices, ownership,
-      transfers and total_players. Each snapshot row carries its own capture's
-      key, observed_at and total_players, and its own player's values as
-      staged: nothing taken from another capture or player.
+      Two players across two captures with different prices, ownership and
+      transfers. Each snapshot row carries its own capture's key and
+      observed_at, and its own player's values as staged: nothing taken from
+      another capture or player. total_players is not on the snapshot (#143
+      P3).
     model: fct_player_market_snapshot
     config:
       tags: [unit]
@@ -400,11 +401,11 @@ unit_tests:
     given:
       - input: ref('stg_player')
         rows:
-          - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314, total_players: 10203953}
-          - {season: "2026-27", fpl_id: 611, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 45, selected_by_percent: 0.4, transfers_in_event: 0, transfers_out_event: 12, total_players: 10203953}
-          - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-09-06/r3/payload.json", observed_at: "2026-09-06 19:10:56", now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024, total_players: 10539915}
+          - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314}
+          - {season: "2026-27", fpl_id: 611, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 45, selected_by_percent: 0.4, transfers_in_event: 0, transfers_out_event: 12}
+          - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-09-06/r3/payload.json", observed_at: "2026-09-06 19:10:56", now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024}
     expect:
       rows:
-        - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314, total_players: 10203953}
-        - {season: "2026-27", fpl_id: 611, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 45, selected_by_percent: 0.4, transfers_in_event: 0, transfers_out_event: 12, total_players: 10203953}
-        - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-09-06/r3/payload.json", observed_at: "2026-09-06 19:10:56", now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024, total_players: 10539915}
+        - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314}
+        - {season: "2026-27", fpl_id: 611, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 45, selected_by_percent: 0.4, transfers_in_event: 0, transfers_out_event: 12}
+        - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-09-06/r3/payload.json", observed_at: "2026-09-06 19:10:56", now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024}
