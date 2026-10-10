@@ -3,7 +3,8 @@
 -- Asserts: every stored market value equals stg_player's for the same
 --          (season, fpl_id, capture_key), and the table has exactly the
 --          key, capture and source columns: no derived column exists.
--- Origin: new in #141
+-- Origin: new in #141; total_players left the column set in #143 (P3): it
+--         is capture-level, so it stays on stg_player and is not served.
 -- Tier: integration
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#141 AC4'}) }}
 
@@ -14,7 +15,7 @@
 with expected_columns (column_name) as (
     values ('season'), ('fpl_id'), ('capture_key'), ('observed_at'),
            ('now_cost'), ('selected_by_percent'), ('transfers_in_event'),
-           ('transfers_out_event'), ('total_players')
+           ('transfers_out_event')
 ),
 
 actual_columns as (
@@ -37,7 +38,6 @@ where staged.now_cost            is distinct from snapshot.now_cost
    or staged.selected_by_percent is distinct from snapshot.selected_by_percent
    or staged.transfers_in_event  is distinct from snapshot.transfers_in_event
    or staged.transfers_out_event is distinct from snapshot.transfers_out_event
-   or staged.total_players       is distinct from snapshot.total_players
 
 union all
 

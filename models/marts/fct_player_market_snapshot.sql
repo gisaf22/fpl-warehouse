@@ -16,9 +16,16 @@
 -- Columns:
 --   capture_key and observed_at come from the capture itself (#104).
 --   now_cost, selected_by_percent, transfers_in_event and transfers_out_event
---   are stg_player's, typed only; total_players is the capture root's player
---   count, the ownership denominator (#138 M3). Nothing is derived: no owner
---   count, price change or net transfers (#138 M2).
+--   are stg_player's, typed only. Nothing is derived: no owner count, price
+--   change or net transfers (#138 M2).
+--
+--   total_players is not here. It is the capture's player count, one value per
+--   capture rather than per player, so it is not part of this per-player
+--   served contract; it stays on stg_player (#143 P3).
+--
+-- Served:
+--   Public with an enforced contract, published to
+--   served/fct_player_market_snapshot.parquet (#143).
 --
 -- No backdating:
 --   A row exists only for a capture. 2026-27 history begins 2026-08-29, and
@@ -37,6 +44,5 @@ select
     now_cost,
     selected_by_percent,
     transfers_in_event,
-    transfers_out_event,
-    total_players
+    transfers_out_event
 from {{ ref('stg_player') }}
