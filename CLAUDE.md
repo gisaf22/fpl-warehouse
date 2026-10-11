@@ -820,6 +820,27 @@ against `dev`, where that distinction is not needed. If a stronger live-only ass
 ever wanted, the scale of the accumulated tree — thousands of keys, dozens of runs — is
 the thing to assert.
 
+### Post-merge live checks
+
+A post-merge check against live S3 (AGENT_WORKFLOW stage 5) is a partial `dev` build of the
+item's models, and it always takes two flags (#123 retro F5). For example, for
+`fct_player_market_snapshot`:
+
+```bash
+eval "$(aws configure export-credentials --format env)"
+dbt build --select +fct_player_market_snapshot --indirect-selection cautious \
+  --vars '{history_root: s3://fpl-data-safari/history}'
+```
+
+- **`--indirect-selection cautious`** runs a test only when every model it reads is
+  selected. Without it, a partial build also runs tests that read unselected models, which
+  are whatever stale tables `.local/warehouse.duckdb` holds. #126's check reported 18
+  unrelated errors that way, and the GW6 check reported 21. #125 used the flag and was
+  clean.
+- **`history_root`** makes the build read the ported 2025-26 season, as the scheduled build
+  does through `HISTORY_ROOT`. Its default, `""`, reads live captures only. Both of #134's
+  live checks left it out, so 2025-26 as-of was never checked live.
+
 ### Python tests for `scripts/`
 
 ```bash
