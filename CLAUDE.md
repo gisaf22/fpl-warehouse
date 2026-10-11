@@ -820,6 +820,18 @@ against `dev`, where that distinction is not needed. If a stronger live-only ass
 ever wanted, the scale of the accumulated tree — thousands of keys, dozens of runs — is
 the thing to assert.
 
+### Mutation testing
+
+When mutation testing, confirm the target test actually ran and failed. A red build isn't
+enough, because a failing unit test makes dbt skip the downstream data tests.
+
+- **Run the two kinds separately:** `dbt test --select "<model>,test_type:unit"`, then
+  `dbt build --select <model> --exclude test_type:unit tag:e2e`. Each target test's own
+  line must read `FAIL`.
+- **A mutation that changes nothing proves nothing.** Check that it changes the output on
+  the data the target test reads.
+- **Where this came from:** [PR #155's AC results](https://github.com/gisaf22/fpl-warehouse/pull/155#issuecomment-6105989953).
+
 ### Post-merge live checks
 
 A post-merge check against live S3 (AGENT_WORKFLOW stage 5) is a partial `dev` build of the
