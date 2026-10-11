@@ -611,6 +611,38 @@ models:
       backdated, so before a fixture's first capture there is no row, and
       2025-26 holds one row per fixture, opened at its single end-of-season
       capture. Internal until #154 serves it.
+
+      **As of a moment** (#153): the schedule a manager could have known is
+      the row opened strictly before the moment. The moment is the
+      consumer's own: a deadline, a kickoff or any other time. Join on season
+      and fixture_id, then
+      `valid_from < moment and (valid_to is null or valid_to >= moment)`,
+      as for dim_player_status_history: a row opened exactly at the moment
+      does not match, and the row it closes still does. There is no max_age:
+      a row holds until the next change, however old its opening capture. A
+      fixture with no capture before the moment matches no row, which a left
+      join returns as nulls: every 2025-26 deadline, and 2026-27's gameweek 1
+      and 2, predate their season's first capture. For example, every
+      fixture's schedule at each 2026-27 deadline, where `deadlines` is the
+      consumer's own (season, gameweek, deadline_time) list until
+      `dim_gameweek` serves one (#133):
+
+      ```sql
+      select g.gameweek as deadline_gameweek, f.fixture_id,
+             h.gameweek, h.kickoff_time, h.team_h_fpl_id, h.team_a_fpl_id,
+             h.team_h_difficulty, h.team_a_difficulty
+      from dim_fixture as f
+      join deadlines as g on g.season = f.season
+      left join dim_fixture_schedule_history as h
+          on  h.season = f.season
+          and h.fixture_id = f.fixture_id
+          and h.valid_from < g.deadline_time
+          and (h.valid_to is null or h.valid_to >= g.deadline_time)
+      where f.season = '2026-27'
+      ```
+
+      In dbt the `as_of` macro does the same, on valid_from with keys
+      season and fixture_id, and no max_age.
     group: warehouse_internal
     access: private
     columns:
