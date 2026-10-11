@@ -204,6 +204,13 @@ models:
       fixture_count 0. Part of the served contract consumed by
       fpl-intelligence — the column list below is enforced, so any change to
       it is a breaking change for consumers and must be made deliberately.
+
+      **value, selected and transfers_* are per gameweek**, from the player's
+      element-summary history rows (the gameweek's last fixture, see CLAUDE.md
+      "Grain"). The market as it stood at a given capture, before a deadline,
+      is fct_player_market_snapshot: per capture, from bootstrap-static (#138
+      M4). The two are different measurements; slice 2 (#133) removes these
+      columns from this table.
     group: warehouse_internal
     access: public
     config:
@@ -711,21 +718,51 @@ models:
           raw tree.
 
   - name: fct_player_market_snapshot
-    description: >
+    description: |
       Each player's market state at every admitted bootstrap-static capture:
-      price, ownership and the gameweek's transfer flow as FPL published them,
-      with the capture's player count (#141, Feature #138). One row per
-      (season, fpl_id, capture_key). A fact, not SCD2: every capture is a row.
-      Private until it is served (#143).
+      price, ownership and the gameweek's transfer flow as FPL published them
+      (#141, Feature #138). One row per (season, fpl_id, capture_key). A fact,
+      not SCD2: every capture is a row. Part of the served contract, published
+      to served/fct_player_market_snapshot.parquet (#143); the column list
+      below is enforced.
 
-      Market as of a moment is the player's last capture strictly before it,
-      through the as_of macro (#142): as_of(requests, relation, 'observed_at',
-      columns, max_age=...). The moment is the caller's own as_of_time, not
-      wired to the gameweek deadline. The optional max_age turns a latest
-      capture older than [moment - max_age, moment) into null. Neither has a
-      default here; the callers that need one set it (#142 P4, P5).
+      **Per capture, not per gameweek** (#138 M4). These are bootstrap-static's
+      values at the capture's observed_at. fct_player_gameweek's value,
+      selected and transfers_* are per gameweek, from element-summary history
+      rows, and are a different measurement; slice 2 (#133) removes them.
+
+      The capture's total player count is not served: it is one value per
+      capture, not per player (#143 P3).
+
+      **As of a moment** (#142): the player's last capture strictly before it.
+      The moment is the consumer's own, not wired to the gameweek deadline.
+      Strictly before means a capture exactly at the moment is excluded. From
+      the parquet, for example the market at each 2026-27 deadline, where
+      `deadlines` is the consumer's own (season, gameweek, deadline_time) list
+      until `dim_gameweek` serves one (#133):
+
+      ```sql
+      select g.gameweek, m.fpl_id, m.observed_at, m.now_cost,
+             m.selected_by_percent
+      from deadlines as g
+      join fct_player_market_snapshot as m
+          on  m.season = g.season
+          and m.observed_at < g.deadline_time
+      where g.season = '2026-27'
+      qualify row_number() over (
+          partition by g.gameweek, m.fpl_id order by m.observed_at desc
+      ) = 1
+      ```
+
+      A player with no capture before the moment has no row. In dbt, the
+      `as_of` macro does the same, with an optional max_age that returns
+      null for a latest capture older than [moment - max_age, moment)
+      (#142 P3–P5).
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -746,6 +783,7 @@ models:
               covers: "#142 AC5"
     columns:
       - name: season
+        data_type: VARCHAR
         data_tests:
           - not_null:
               config:
@@ -753,6 +791,8 @@ models:
                 meta:
                   covers: "#141 AC1"
       - name: fpl_id
+        data_type: INTEGER
+        description: "{{ doc('season_scoped_key') }}"
         data_tests:
           - not_null:
               config:
@@ -760,6 +800,10 @@ models:
                 meta:
                   covers: "#141 AC1"
       - name: capture_key
+        data_type: VARCHAR
+        description: >
+          The capture's key in the capture index: an audit reference to the
+          capture this row was read from. Consumers cannot read raw/.
         data_tests:
           - not_null:
               config:
@@ -767,6 +811,8 @@ models:
                 meta:
                   covers: "#141 AC1"
       - name: observed_at
+        data_type: TIMESTAMP
+        description: When the capture was received (fpl-ingest's received_at), in UTC.
         data_tests:
           - not_null:
               config:
@@ -777,6 +823,7 @@ models:
       # also carries not_null: never null in any capture to 2026-10-09, so a
       # null is a source change and fails the build (#141 E3).
       - name: now_cost
+        data_type: INTEGER
         data_tests:
           - value_between:
               arguments: {min_value: 1}
@@ -790,6 +837,7 @@ models:
                 meta:
                   covers: "#141 AC2"
       - name: selected_by_percent
+        data_type: DECIMAL(4,1)
         data_tests:
           - value_between:
               arguments: {min_value: 0, max_value: 100}
@@ -803,6 +851,7 @@ models:
                 meta:
                   covers: "#141 AC2"
       - name: transfers_in_event
+        data_type: INTEGER
         data_tests:
           - value_between:
               arguments: {min_value: 0}
@@ -816,22 +865,10 @@ models:
                 meta:
                   covers: "#141 AC2"
       - name: transfers_out_event
+        data_type: INTEGER
         data_tests:
           - value_between:
               arguments: {min_value: 0}
-              config:
-                tags: [unit]
-                meta:
-                  covers: "#141 AC2"
-          - not_null:
-              config:
-                tags: [unit]
-                meta:
-                  covers: "#141 AC2"
-      - name: total_players
-        data_tests:
-          - value_between:
-              arguments: {min_value: 1}
               config:
                 tags: [unit]
                 meta:

@@ -122,6 +122,7 @@ def test_dimensions_exactly_at_their_expectation_publish_and_are_listed_per_seas
         {"player_rows": 9},
         {"fixture_rows": 379},
         {"status_history_rows": 9},
+        {"market_snapshot_rows": 9},
     ],
     ids=list(SERVED),
 )

@@ -9,7 +9,7 @@
 #
 # It is also the publish path. The `dev` target writes .local/warehouse.duckdb
 # on the runner, which still dies with the runner — but the final step now
-# exports the six served tables from it to parquet and uploads them to
+# exports the seven served tables from it to parquet and uploads them to
 # s3://fpl-data-safari/served/, overwritten in place, alongside a
 # _manifest.json. That is what fpl-intelligence reads, via
 # duckdb.read_parquet() against those stable keys. See CLAUDE.md,

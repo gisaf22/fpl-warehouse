@@ -54,7 +54,7 @@ captures_around as (
 as_of as (
     {{ as_of('requests', ref('fct_player_market_snapshot'), 'observed_at',
              ['capture_key', 'observed_at', 'now_cost', 'selected_by_percent',
-              'transfers_in_event', 'transfers_out_event', 'total_players']) }}
+              'transfers_in_event', 'transfers_out_event']) }}
 ),
 
 checked as (

@@ -43,6 +43,7 @@ TABLES = (
     "dim_player",
     "dim_fixture",
     "dim_player_status_history",
+    "fct_player_market_snapshot",
 )
 
 # Every staging model, as the source of which seasons the build holds. A season
@@ -100,6 +101,12 @@ PROJECT_FILE = Path("dbt_project.yml")
 # bound rather than an exact count: every staged player has at least one row
 # (their first capture opens it) and a status change adds one, so a season
 # holds at least its distinct players and normally more (#127).
+#
+# fct_player_market_snapshot takes none, and its expectation is exact: one row
+# per player per admitted bootstrap-static capture, which is stg_player's row
+# count for the season (#143). The model selects those rows 1:1, so this guards
+# the export rather than data lost upstream; the previous-publish comparison
+# covers that.
 TOLERANCE = {
     "fct_player_fixture": 0.15,
     "fct_player_gameweek": 0.02,
@@ -107,6 +114,7 @@ TOLERANCE = {
     "dim_player": 0.0,
     "dim_fixture": 0.0,
     "dim_player_status_history": 0.0,
+    "fct_player_market_snapshot": 0.0,
 }
 
 
@@ -194,7 +202,8 @@ def expected_rows(
     are simpler: TEAMS_PER_SEASON teams, FIXTURES_PER_SEASON fixtures, and the
     season's staged players, the same distinct fpl_id count as above. That
     count is also dim_player_status_history's floor, at least one row per
-    staged player.
+    staged player. fct_player_market_snapshot's is the season's stg_player
+    rows: one per player per capture.
 
     Every season in `seasons` gets an entry for every table. A season that
     lacks players or gameweeks expects 0 fact rows, which is right at the start
@@ -224,7 +233,10 @@ def expected_rows(
         ),
 
         players as (
-            select season, count(distinct fpl_id) as players
+            select
+                season,
+                count(distinct fpl_id) as players,
+                count(*) as player_captures
             from main.stg_player
             group by season
         ),
@@ -240,14 +252,19 @@ def expected_rows(
             group by calendar.season
         )
 
-        select season, players.players, gameweeks.gameweeks
+        select
+            season,
+            players.players,
+            gameweeks.gameweeks,
+            players.player_captures
         from players
         full outer join gameweeks using (season)
         """,
         {"live_season": live_season()},
     ).fetchall()
-    players = {season: n or 0 for season, n, _ in rows}
-    gameweeks = {season: n or 0 for season, _, n in rows}
+    players = {season: n or 0 for season, n, _, _ in rows}
+    gameweeks = {season: n or 0 for season, _, n, _ in rows}
+    player_captures = {season: n or 0 for season, _, _, n in rows}
 
     per_season = {
         "fct_player_fixture": lambda s: players.get(s, 0) * gameweeks.get(s, 0),
@@ -256,6 +273,7 @@ def expected_rows(
         "dim_player": lambda s: players.get(s, 0),
         "dim_fixture": lambda _s: FIXTURES_PER_SEASON,
         "dim_player_status_history": lambda s: players.get(s, 0),
+        "fct_player_market_snapshot": lambda s: player_captures.get(s, 0),
     }
     return {
         table: {season: per_season[table](season) for season in seasons}

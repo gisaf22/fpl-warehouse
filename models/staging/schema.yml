@@ -102,6 +102,22 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#41 AC2"
+      # The capture's player count, the ownership denominator. Capture-level,
+      # so it is staged here and not served (#143 P3); its range and not-null
+      # guards moved here from fct_player_market_snapshot with it (#141 E3).
+      - name: total_players
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1}
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#141 AC2"
 
   - name: stg_team
     description: >

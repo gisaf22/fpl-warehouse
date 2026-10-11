@@ -2,7 +2,7 @@
 
 The comparison is the `served_diff` dbt run-operation (macros/served_diff.sql),
 which loads both sides into one DuckDB and compares them with audit_helper.
-Each side is a directory holding the six served tables as parquet and a
+Each side is a directory holding the seven served tables as parquet and a
 build.json with the build's seconds and the newest run_id it read, as
 `served_diff_export` writes them. No S3 and no built warehouse: the parquet is
 written here, and dbt runs under the credential-free `served_diff` target, with
@@ -18,6 +18,8 @@ from pathlib import Path
 
 import duckdb
 import pytest
+
+import publish_served
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -49,6 +51,14 @@ ROWS = {
             ("2025-26", 1, "2026-05-26 03:46:26", "a"),
             ("2026-27", 1, "2026-08-29 19:11:09", "a"),
             ("2026-27", 1, "2026-08-31 20:36:09", "d"),
+        ],
+    ),
+    "fct_player_market_snapshot": (
+        "season, fpl_id, capture_key, now_cost",
+        [
+            ("2025-26", 1, "raw/fpl/bootstrap-static/2026-05-26/a/payload.json", 55),
+            ("2026-27", 1, "raw/fpl/bootstrap-static/2026-08-29/b/payload.json", 55),
+            ("2026-27", 1, "raw/fpl/bootstrap-static/2026-09-06/c/payload.json", 54),
         ],
     ),
 }
@@ -150,3 +160,23 @@ def test_builds_that_read_different_newest_runs_are_inconclusive_and_fail(tmp_pa
     assert result.returncode == 1
     assert "**Inconclusive:**" in result.stdout
     assert "| table | season |" not in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#143 AC6")
+def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
+    # The fixture is checked against what is actually published, so a table
+    # served but left out of it fails here instead of going uncompared.
+    assert set(ROWS) == set(publish_served.TABLES)
+    before = write_side(tmp_path / "before")
+    after = write_side(tmp_path / "after")
+
+    result = served_diff(tmp_path, before, after)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    for table, (_, rows) in ROWS.items():
+        for season in sorted({row[0] for row in rows}):
+            n = sum(1 for row in rows if row[0] == season)
+            assert f"| {table} | {season} | {n} | {n} | 0 | 0 |" in result.stdout, (
+                f"{table} {season} is not in the report"
+            )
