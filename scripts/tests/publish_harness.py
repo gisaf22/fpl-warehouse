@@ -28,10 +28,11 @@ FACTS = ("fct_player_fixture", "fct_player_gameweek")
 DIMENSIONS = ("dim_team", "dim_player", "dim_fixture")
 HISTORY = ("dim_player_status_history",)
 MARKET = ("fct_player_market_snapshot",)
+SCHEDULE = ("dim_fixture_schedule_history",)
 # Everything that should be served, stated here rather than read from
 # publish_served.TABLES, so a table the script forgets to serve fails these
 # tests instead of silently dropping out of them.
-SERVED = FACTS + DIMENSIONS + HISTORY + MARKET
+SERVED = FACTS + DIMENSIONS + HISTORY + MARKET + SCHEDULE
 
 # Every served table's columns in the harness build, as the manifest records
 # them: [name, type] in order, read back from the exported parquet.
@@ -80,20 +81,25 @@ def season(
     fixture_rows: int | None = None,
     status_history_rows: int | None = None,
     market_snapshot_rows: int | None = None,
+    schedule_history_rows: int | None = None,
     captures: int = 1,
+    fixture_captures: int = 1,
     player_fixture_rows: int = 1,
 ) -> dict:
     """One season's staging shape and served row counts.
 
-    `players`, `finished_gameweeks`, `teams`, `fixtures`, `captures` and
-    `player_fixture_rows` shape staging: the players and finished gameweeks in
-    bootstrap-static, the teams in its team list, the fixtures in the fixtures
-    endpoint, how many bootstrap-static captures hold every player (stg_player
-    holds players x captures rows), and element-summary history rows. Served counts default to
+    `players`, `finished_gameweeks`, `teams`, `fixtures`, `captures`,
+    `fixture_captures` and `player_fixture_rows` shape staging: the players and
+    finished gameweeks in bootstrap-static, the teams in its team list, the
+    fixtures in the fixtures endpoint, how many bootstrap-static captures hold
+    every player (stg_player holds players x captures rows), how many fixtures
+    captures hold every fixture (stg_fixture holds fixtures x fixture_captures
+    rows), and element-summary history rows. Served counts default to
     exactly what staging implies, which clears every table's floor: players x
     finished gameweeks for both facts, the staged teams, players and
     fixtures for the dimensions, one status history row per staged
-    player, and one market snapshot row per player per capture.
+    player, one market snapshot row per player per capture, and one schedule
+    history row per staged fixture.
     """
     expected = players * finished_gameweeks
     return {
@@ -102,6 +108,7 @@ def season(
         "teams": teams,
         "fixtures": fixtures,
         "captures": captures,
+        "fixture_captures": fixture_captures,
         "player_fixture_rows": player_fixture_rows,
         "fct_player_fixture": expected if fixture is None else fixture,
         "fct_player_gameweek": expected if gameweek is None else gameweek,
@@ -115,6 +122,9 @@ def season(
             players * captures
             if market_snapshot_rows is None
             else market_snapshot_rows
+        ),
+        "dim_fixture_schedule_history": (
+            fixtures if schedule_history_rows is None else schedule_history_rows
         ),
     }
 
@@ -208,9 +218,18 @@ def make_publish(tmp_path, monkeypatch):
                     "from range(?)",
                     [name, shape["players"], shape["players"] * shape["captures"]],
                 )
+                # Likewise one stg_fixture row per fixture per capture.
+                connection.execute(
+                    "insert into stg_fixture select ?, range % ? "
+                    "from range(?)",
+                    [
+                        name,
+                        shape["fixtures"],
+                        shape["fixtures"] * shape["fixture_captures"],
+                    ],
+                )
                 for table, count in (
                     ("stg_team", shape["teams"]),
-                    ("stg_fixture", shape["fixtures"]),
                     ("stg_player_fixture", shape["player_fixture_rows"]),
                 ):
                     connection.execute(

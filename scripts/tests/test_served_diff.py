@@ -2,7 +2,7 @@
 
 The comparison is the `served_diff` dbt run-operation (macros/served_diff.sql),
 which loads both sides into one DuckDB and compares them with audit_helper.
-Each side is a directory holding the seven served tables as parquet and a
+Each side is a directory holding the eight served tables as parquet and a
 build.json with the build's seconds and the newest run_id it read, as
 `served_diff_export` writes them. No S3 and no built warehouse: the parquet is
 written here, and dbt runs under the credential-free `served_diff` target, with
@@ -59,6 +59,14 @@ ROWS = {
             ("2025-26", 1, "raw/fpl/bootstrap-static/2026-05-26/a/payload.json", 55),
             ("2026-27", 1, "raw/fpl/bootstrap-static/2026-08-29/b/payload.json", 55),
             ("2026-27", 1, "raw/fpl/bootstrap-static/2026-09-06/c/payload.json", 54),
+        ],
+    ),
+    "dim_fixture_schedule_history": (
+        "season, fixture_id, valid_from, kickoff_time",
+        [
+            ("2025-26", 10, "2026-05-26 03:46:26", "2025-08-15 19:00:00"),
+            ("2026-27", 44, "2026-08-29 01:23:39", "2026-09-19 14:00:00"),
+            ("2026-27", 44, "2026-09-01 19:13:24", "2026-09-20 13:00:00"),
         ],
     ),
 }
@@ -164,6 +172,7 @@ def test_builds_that_read_different_newest_runs_are_inconclusive_and_fail(tmp_pa
 
 @pytest.mark.integration
 @pytest.mark.covers("#143 AC6")
+@pytest.mark.covers("#154 AC4")
 def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
     # The fixture is checked against what is actually published, so a table
     # served but left out of it fails here instead of going uncompared.
