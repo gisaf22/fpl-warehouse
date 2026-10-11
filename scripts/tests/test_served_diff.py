@@ -189,3 +189,33 @@ def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
             assert f"| {table} | {season} | {n} | {n} | 0 | 0 |" in result.stdout, (
                 f"{table} {season} is not in the report"
             )
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#154 AC4")
+@pytest.mark.parametrize(
+    "table",
+    ["dim_fixture_schedule_history", "dim_new_on_head"],
+    ids=["listed by the macro", "unknown to the macro"],
+)
+def test_a_table_only_the_head_build_exported_is_reported_row_by_row(
+    tmp_path, table
+):
+    # The diff job runs main's copy of the macro, so a table new on head is
+    # one main's list does not name: it must be found from the exported files,
+    # and its rows reported as only after, not skipped as identical.
+    rows = ROWS["dim_fixture_schedule_history"]
+    before_rows = {t: r for t, r in ROWS.items() if t != table}
+    before = write_side(tmp_path / "before", rows=before_rows)
+    after = write_side(tmp_path / "after", rows={**before_rows, table: rows})
+
+    result = served_diff(tmp_path, before, after)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"| {table} | 2025-26 | 0 | 1 | 0 | 1 |" in result.stdout
+    assert f"| {table} | 2026-27 | 0 | 2 | 0 | 2 |" in result.stdout
+    assert "only after: `(2026-27, 44, 2026-08-29 01:23:39, 2026-09-19 14:00:00)`" in (
+        result.stdout
+    )
+    assert "**Result:** differs" in result.stdout
+    assert "**Result:** identical" not in result.stdout
