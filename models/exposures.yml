@@ -9,8 +9,8 @@ exposures:
       of Epic #27 is built for. It is not yet reading served/: as of 2026-10-10
       it still reads its own local database (#143). When it does, it reads the
       served parquet and nothing else: the two `fct_` facts, the three `dim_`
-      dimensions (#44), the player status history (#127) and the market
-      snapshot (#143). Staging and intermediate models are `access: private`
+      dimensions (#44), the player status history (#127), the market
+      snapshot (#143) and the fixture schedule history (#154). Staging and intermediate models are `access: private`
       and outside the served contract.
 
       This exposure documents the dependency and makes it visible in the DAG
@@ -27,3 +27,4 @@ exposures:
       - ref('dim_fixture')
       - ref('dim_player_status_history')
       - ref('fct_player_market_snapshot')
+      - ref('dim_fixture_schedule_history')

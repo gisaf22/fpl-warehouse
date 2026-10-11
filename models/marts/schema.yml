@@ -610,7 +610,18 @@ models:
       row. A schedule opens at the capture that first showed it and is never
       backdated, so before a fixture's first capture there is no row, and
       2025-26 holds one row per fixture, opened at its single end-of-season
-      capture. Internal until #154 serves it.
+      capture. Part of the served contract, published to
+      served/dim_fixture_schedule_history.parquet (#154); the column list
+      below is enforced.
+
+      **Which fixture table answers what** (#151 C8). dim_fixture holds one
+      row per fixture: its latest schedule and result, with the difficulty
+      from its last capture before kickoff where there is one
+      (difficulty_is_pre_kickoff). This table holds every schedule a fixture
+      had, for the schedule as of any moment. Looked up as of kickoff, its
+      difficulty equals dim_fixture's wherever difficulty_is_pre_kickoff is
+      true. Its open row holds FPL's current difficulty, which FPL may revise
+      after kickoff.
 
       **As of a moment** (#153): the schedule a manager could have known is
       the row opened strictly before the moment. The moment is the
@@ -644,35 +655,49 @@ models:
       In dbt the `as_of` macro does the same, on valid_from with keys
       season and fixture_id, and no max_age.
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     columns:
       - name: season
+        data_type: VARCHAR
         description: "{{ doc('season_scoped_key') }}"
       - name: fixture_id
+        data_type: INTEGER
         description: FPL's fixture id within the season.
       - name: valid_from
+        data_type: TIMESTAMP
         description: >
           observed_at of the capture that first showed this schedule.
       - name: valid_to
+        data_type: TIMESTAMP
         description: >
           valid_from of the fixture's next row; null on the open row.
       - name: gameweek
+        data_type: INTEGER
         description: >
           The gameweek the fixture was in. Null while FPL had it unscheduled
           or postponed.
       - name: kickoff_time
+        data_type: TIMESTAMP
         description: >
           The kickoff FPL published (UTC). Null while unscheduled or
           postponed. A reschedule opens a new row.
       - name: team_h_fpl_id
+        data_type: INTEGER
         description: The home side's team id within the season.
       - name: team_a_fpl_id
+        data_type: INTEGER
         description: The away side's team id within the season.
       - name: team_h_difficulty
+        data_type: INTEGER
         description: FPL's difficulty rating for the home side.
       - name: team_a_difficulty
+        data_type: INTEGER
         description: FPL's difficulty rating for the away side.
       - name: capture_key
+        data_type: VARCHAR
         description: >
           The capture that opened the row: the evidence for valid_from
           (ADR 0001). Later captures never change it.
