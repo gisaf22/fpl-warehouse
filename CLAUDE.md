@@ -830,8 +830,7 @@ enough, because a failing unit test makes dbt skip the downstream data tests.
   line must read `FAIL`.
 - **A mutation that changes nothing proves nothing.** Check that it changes the output on
   the data the target test reads.
-- **Found in #152 (PR #155):** under one `dbt build`, the data tests for three ACs were
-  skipped, one mutation changed nothing, and one created no tie on the fixture tree.
+- **Where this came from:** [PR #155's AC results](https://github.com/gisaf22/fpl-warehouse/pull/155#issuecomment-6105989953).
 
 ### Post-merge live checks
 
