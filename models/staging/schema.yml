@@ -182,6 +182,18 @@ models:
       of the served contract.
     group: warehouse_internal
     access: private
+    data_tests:
+      # dim_fixture_schedule_history orders a fixture's captures by
+      # observed_at, and the as-of lookup takes the row opened last before a
+      # moment; two captures of a fixture at the same instant would leave both
+      # undefined, so a tie fails the build rather than resolving silently.
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, fixture_id, observed_at]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#152 AC8"
     columns:
       - name: capture_key
         description: >

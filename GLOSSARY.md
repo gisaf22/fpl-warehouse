@@ -33,7 +33,12 @@ One definition per term. A term is added here before an issue, PR or check cites
 ## State and outcome
 
 - **pre-deadline state**: what was observable before a deadline: a player's status, price
-  and ownership as of that deadline (`dim_player_status_history`, `fct_player_market_snapshot`).
+  and ownership as of that deadline (`dim_player_status_history`, `fct_player_market_snapshot`),
+  and the fixture schedule as of that deadline (slice 1c).
+- **fixture schedule**: which gameweek a fixture is in, its kickoff time, its home and away
+  teams, and each side's difficulty rating. Not its result: a score is a ratified outcome.
+- **reschedule**: FPL changing a fixture's kickoff time after publishing it. A reschedule moves
+  the fixture; the fixture keeps its id.
 - **ratified outcome**: a gameweek's results after FPL has ratified its points and bonus
   (`is_ratified`, the `ratified` doc block in `models/marts/docs.md`). Not knowable before the
   deadline.

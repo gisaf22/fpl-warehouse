@@ -64,3 +64,8 @@ stays `fct_player_fixture.team_fpl_id` (#43). This retires the earlier
   resolution of `valid_from` is the capture cadence.
 - History cannot extend before the first capture: 2026-27 starts 2026-08-29,
   and 2025-26 has a single row per player.
+- The pattern is reused for the fixture schedule (slice 1c,
+  `dim_fixture_schedule_history`): a row per change in gameweek, kickoff, teams
+  or difficulty, keyed `(season, fixture_id, valid_from)`. A capture-grain fact
+  was rejected there: 0.24% of fixture captures changed a schedule field
+  (measured 2026-10-11 over 218 live captures).

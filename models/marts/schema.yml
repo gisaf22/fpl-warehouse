@@ -600,6 +600,51 @@ models:
                 meta:
                   covers: "#42 AC5"
 
+  - name: dim_fixture_schedule_history
+    description: |
+      One row per change in a fixture's schedule, per season: (season,
+      fixture_id) plus the interval [valid_from, valid_to) the schedule held
+      over, read from admitted fixtures captures (#152, Feature #151). The
+      schedule is the gameweek, kickoff, home and away sides and each side's
+      difficulty; the result is not part of it. valid_to is null on the open
+      row. A schedule opens at the capture that first showed it and is never
+      backdated, so before a fixture's first capture there is no row, and
+      2025-26 holds one row per fixture, opened at its single end-of-season
+      capture. Internal until #154 serves it.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: season
+        description: "{{ doc('season_scoped_key') }}"
+      - name: fixture_id
+        description: FPL's fixture id within the season.
+      - name: valid_from
+        description: >
+          observed_at of the capture that first showed this schedule.
+      - name: valid_to
+        description: >
+          valid_from of the fixture's next row; null on the open row.
+      - name: gameweek
+        description: >
+          The gameweek the fixture was in. Null while FPL had it unscheduled
+          or postponed.
+      - name: kickoff_time
+        description: >
+          The kickoff FPL published (UTC). Null while unscheduled or
+          postponed. A reschedule opens a new row.
+      - name: team_h_fpl_id
+        description: The home side's team id within the season.
+      - name: team_a_fpl_id
+        description: The away side's team id within the season.
+      - name: team_h_difficulty
+        description: FPL's difficulty rating for the home side.
+      - name: team_a_difficulty
+        description: FPL's difficulty rating for the away side.
+      - name: capture_key
+        description: >
+          The capture that opened the row: the evidence for valid_from
+          (ADR 0001). Later captures never change it.
+
   - name: dim_player_status_history
     description: |
       One row per change in a player's tracked status fields, per season:

@@ -409,3 +409,142 @@ unit_tests:
         - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 80, selected_by_percent: 28.7, transfers_in_event: 6269, transfers_out_event: 32314}
         - {season: "2026-27", fpl_id: 611, capture_key: "raw/fpl/bootstrap-static/2026-08-31/r2/payload.json", observed_at: "2026-08-31 20:36:09", now_cost: 45, selected_by_percent: 0.4, transfers_in_event: 0, transfers_out_event: 12}
         - {season: "2026-27", fpl_id: 427, capture_key: "raw/fpl/bootstrap-static/2026-09-06/r3/payload.json", observed_at: "2026-09-06 19:10:56", now_cost: 79, selected_by_percent: 27.7, transfers_in_event: 19318, transfers_out_event: 117024}
+
+  # --- dim_fixture_schedule_history: one row per schedule change (#152) -------
+  # Mocks list only the columns the model reads; the rest default to null.
+
+  - name: identical_fixture_captures_collapse_into_one_open_row
+    description: >
+      Three consecutive captures of fixture 1 with the same schedule are one
+      row, open from the first capture. Fixture 2 is unscheduled in all three
+      (null gameweek and kickoff): a null compares equal to a null, so it does
+      not open a row every capture either.
+    model: dim_fixture_schedule_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#152 AC1"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", fixture_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r3", capture_key: "k3", observed_at: "2026-09-02 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 2, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 2, team_a_difficulty: 2}
+          - {season: "2026-27", fixture_id: 2, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 2, team_a_difficulty: 2}
+          - {season: "2026-27", fixture_id: 2, run_id: "r3", capture_key: "k3", observed_at: "2026-09-02 19:00:00", gameweek: null, kickoff_time: null, team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 2, team_a_difficulty: 2}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: null}
+        - {season: "2026-27", fixture_id: 2, valid_from: "2026-09-01 19:00:00", valid_to: null}
+
+  - name: each_tracked_schedule_field_change_opens_a_row_at_its_capture
+    description: >
+      One fixture per tracked field, each changing only that field between
+      two captures: kickoff (1, a reschedule), gameweek (2), home side (3),
+      away side (4), home difficulty alone (5) and away difficulty alone (6),
+      the shape of the live 2026-09-25 recalibration, which the fixture tree
+      does not hold. Every change opens a row at the second capture's
+      observed_at, and the first row's valid_to equals it.
+    model: dim_fixture_schedule_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#152 AC2"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", fixture_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 5, kickoff_time: "2026-09-20 13:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 2, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 2, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 6, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 3, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 5, team_a_fpl_id: 6, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 3, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 7, team_a_fpl_id: 6, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 4, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 8, team_a_fpl_id: 9, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 4, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 8, team_a_fpl_id: 10, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 5, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 11, team_a_fpl_id: 12, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 5, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 11, team_a_fpl_id: 12, team_h_difficulty: 2, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 6, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 13, team_a_fpl_id: 14, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 6, run_id: "r2", capture_key: "k2", observed_at: "2026-09-25 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 13, team_a_fpl_id: 14, team_h_difficulty: 3, team_a_difficulty: 5}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-20 13:00:00"}
+        - {season: "2026-27", fixture_id: 2, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 2, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 3, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 3, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 4, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 4, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 5, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 5, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 6, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-25 07:00:00", kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 6, valid_from: "2026-09-25 07:00:00", valid_to: null, kickoff_time: "2026-09-19 14:00:00"}
+
+  - name: capture_key_only_change_opens_no_row_and_rows_keep_their_opening_key
+    description: >
+      k2 repeats k1's schedule under a new capture_key, so it opens no row and
+      the first row keeps k1. k3 changes the kickoff, so its row carries k3,
+      the capture that observed it.
+    model: dim_fixture_schedule_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#152 AC3"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", fixture_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r3", capture_key: "k3", observed_at: "2026-09-02 19:00:00", gameweek: 5, kickoff_time: "2026-09-20 13:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-02 19:00:00", capture_key: "k1"}
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-02 19:00:00", valid_to: null, capture_key: "k3"}
+
+  - name: first_schedule_row_opens_at_the_fixtures_first_capture
+    description: >
+      No backdating. Fixture 2 first appears in the second 2026-27 capture, so
+      its first row opens there, not at the season's first capture. The
+      2025-26 fixture has the season's single end-of-season capture, so its
+      one open row starts at that capture, after the fixture was played.
+    model: dim_fixture_schedule_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#152 AC4"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", fixture_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 2, run_id: "r2", capture_key: "k2", observed_at: "2026-09-02 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 3, team_a_fpl_id: 4, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2025-26", fixture_id: 1, run_id: "h1", capture_key: "h1", observed_at: "2026-05-26 03:46:26", gameweek: 1, kickoff_time: "2025-08-15 19:00:00", team_h_fpl_id: 12, team_a_fpl_id: 4, team_h_difficulty: 3, team_a_difficulty: 4}
+    expect:
+      rows:
+        - {season: "2025-26", fixture_id: 1, valid_from: "2026-05-26 03:46:26", valid_to: null}
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: null}
+        - {season: "2026-27", fixture_id: 2, valid_from: "2026-09-02 07:00:00", valid_to: null}
+
+  - name: postponed_fixture_keeps_its_unscheduled_spell
+    description: >
+      FPL withdraws gameweek and kickoff from a postponed fixture and restores
+      them when it is rescheduled (stg_fixture's header). The withdrawal opens
+      a row with both null, kept rather than dropped or merged, and the
+      restore opens another, here with a new kickoff in a later gameweek.
+    model: dim_fixture_schedule_history
+    config:
+      tags: [unit]
+      meta:
+        covers: "#152 AC5"
+    given:
+      - input: ref('stg_fixture')
+        rows:
+          - {season: "2026-27", fixture_id: 1, run_id: "r1", capture_key: "k1", observed_at: "2026-09-01 19:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r2", capture_key: "k2", observed_at: "2026-09-10 07:00:00", gameweek: null, kickoff_time: null, team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+          - {season: "2026-27", fixture_id: 1, run_id: "r3", capture_key: "k3", observed_at: "2026-10-01 19:00:00", gameweek: 12, kickoff_time: "2026-11-25 19:30:00", team_h_fpl_id: 1, team_a_fpl_id: 2, team_h_difficulty: 3, team_a_difficulty: 4}
+    expect:
+      rows:
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-10 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00"}
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-10 07:00:00", valid_to: "2026-10-01 19:00:00", gameweek: null, kickoff_time: null}
+        - {season: "2026-27", fixture_id: 1, valid_from: "2026-10-01 19:00:00", valid_to: null, gameweek: 12, kickoff_time: "2026-11-25 19:30:00"}
