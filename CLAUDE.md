@@ -1078,6 +1078,11 @@ Dispatch it from `main` with `head_ref`:
 - **It fails on any difference, a missing table, or a changed column list.** It also fails as
   **inconclusive** when the two builds read different newest run_ids: an ingest run landed
   between them. Re-dispatch.
+- **The tables compared are every table either side exported**, plus the macro's list (#154).
+  The `diff` job runs main's copy of the macro, so a table new on head is one main's list
+  does not name. Run 38184504573 skipped one that way and reported "identical". A table on one
+  side only is compared against an empty table, so each of its rows is reported as only
+  after (new on head) or only before (gone from head).
 - **Both refs need the macro**, so a `head_ref` older than #102 cannot be compared.
 - **It is dispatched from `main` on purpose.** The OIDC subject stays the `main` ref form the
   role already trusts. The head code still runs holding the role, including its served write
