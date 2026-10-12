@@ -1083,6 +1083,18 @@ Dispatch it from `main` with `head_ref`:
   does not name. Run 38184504573 skipped one that way and reported "identical". A table on one
   side only is compared against an empty table, so each of its rows is reported as only
   after (new on head) or only before (gone from head).
+- **A change to `served_diff` itself cannot be verified by dispatch until it merges.** The
+  `diff` job runs main's copy of the macro, and the workflow must be dispatched from `main`,
+  so the run's own report judges with the old macro (#154: run 38185671135 still said
+  "identical"). Only `served_diff_export` runs from head. To check the head macro, run it on
+  that run's exports from the head branch, with no credentials:
+  ```bash
+  run=38185671135; dir=".local/served-diff-$run"
+  gh run download "$run" -D "$dir"
+  DBT_SERVED_DIFF_PATH="$dir/diff.duckdb" uv run dbt -q --no-use-colors run-operation \
+    served_diff --target served_diff \
+    --args "{before: $dir/served-before, after: $dir/served-after}"
+  ```
 - **Both refs need the macro**, so a `head_ref` older than #102 cannot be compared.
 - **It is dispatched from `main` on purpose.** The OIDC subject stays the `main` ref form the
   role already trusts. The head code still runs holding the role, including its served write
