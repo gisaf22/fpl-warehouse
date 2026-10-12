@@ -120,7 +120,8 @@
         {%- endif %}
         {%- endfor %}
         {%- if not specs %}
-        select null::varchar, 0::bigint, 0::bigint where false
+        select null::varchar as column_name, 0::bigint as records, 0::bigint as missing
+        where false
         {%- endif %}
     )
 
