@@ -903,7 +903,7 @@ dbt run --select stg_player_fixture
 
 Without that `eval` the run fails with `HTTP 403 Forbidden — No credentials are provided`.
 A local build is therefore **not self-contained**; the export is a required first step.
-On a fresh clone, run `mkdir -p .local` before any `dev` command: `.local/` is gitignored, and DuckDB fails with `IO Error: Cannot open file ".local/warehouse.duckdb"` rather than create it.
+On a fresh clone, run `mkdir -p .local` before any `dev` or `fixtures` command: `.local/` is gitignored, and DuckDB fails with `IO Error: Cannot open file ".local/warehouse.duckdb"` (or `fixtures.duckdb`) rather than create it.
 
 **In GitHub Actions none of this is needed — disproven 2026-09-10.** This section
 previously said a live build "will not work as-is" in CI and called it an unsolved Phase 5
