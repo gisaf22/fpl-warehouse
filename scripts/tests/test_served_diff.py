@@ -2,7 +2,7 @@
 
 The comparison is the `served_diff` dbt run-operation (macros/served_diff.sql),
 which loads both sides into one DuckDB and compares them with audit_helper.
-Each side is a directory holding the seven served tables as parquet and a
+Each side is a directory holding the eight served tables as parquet and a
 build.json with the build's seconds and the newest run_id it read, as
 `served_diff_export` writes them. No S3 and no built warehouse: the parquet is
 written here, and dbt runs under the credential-free `served_diff` target, with
@@ -59,6 +59,14 @@ ROWS = {
             ("2025-26", 1, "raw/fpl/bootstrap-static/2026-05-26/a/payload.json", 55),
             ("2026-27", 1, "raw/fpl/bootstrap-static/2026-08-29/b/payload.json", 55),
             ("2026-27", 1, "raw/fpl/bootstrap-static/2026-09-06/c/payload.json", 54),
+        ],
+    ),
+    "dim_fixture_schedule_history": (
+        "season, fixture_id, valid_from, kickoff_time",
+        [
+            ("2025-26", 10, "2026-05-26 03:46:26", "2025-08-15 19:00:00"),
+            ("2026-27", 44, "2026-08-29 01:23:39", "2026-09-19 14:00:00"),
+            ("2026-27", 44, "2026-09-01 19:13:24", "2026-09-20 13:00:00"),
         ],
     ),
 }
@@ -164,6 +172,7 @@ def test_builds_that_read_different_newest_runs_are_inconclusive_and_fail(tmp_pa
 
 @pytest.mark.integration
 @pytest.mark.covers("#143 AC6")
+@pytest.mark.covers("#154 AC4")
 def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
     # The fixture is checked against what is actually published, so a table
     # served but left out of it fails here instead of going uncompared.
@@ -180,3 +189,33 @@ def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
             assert f"| {table} | {season} | {n} | {n} | 0 | 0 |" in result.stdout, (
                 f"{table} {season} is not in the report"
             )
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#154 AC4")
+@pytest.mark.parametrize(
+    "table",
+    ["dim_fixture_schedule_history", "dim_new_on_head"],
+    ids=["listed by the macro", "unknown to the macro"],
+)
+def test_a_table_only_the_head_build_exported_is_reported_row_by_row(
+    tmp_path, table
+):
+    # The diff job runs main's copy of the macro, so a table new on head is
+    # one main's list does not name: it must be found from the exported files,
+    # and its rows reported as only after, not skipped as identical.
+    rows = ROWS["dim_fixture_schedule_history"]
+    before_rows = {t: r for t, r in ROWS.items() if t != table}
+    before = write_side(tmp_path / "before", rows=before_rows)
+    after = write_side(tmp_path / "after", rows={**before_rows, table: rows})
+
+    result = served_diff(tmp_path, before, after)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"| {table} | 2025-26 | 0 | 1 | 0 | 1 |" in result.stdout
+    assert f"| {table} | 2026-27 | 0 | 2 | 0 | 2 |" in result.stdout
+    assert "only after: `(2026-27, 44, 2026-08-29 01:23:39, 2026-09-19 14:00:00)`" in (
+        result.stdout
+    )
+    assert "**Result:** differs" in result.stdout
+    assert "**Result:** identical" not in result.stdout

@@ -19,6 +19,7 @@ column: filter on it, because ids are reassigned each season.
 | `s3://fpl-data-safari/served/dim_fixture.parquet` | `(season, fixture_id)` |
 | `s3://fpl-data-safari/served/dim_player_status_history.parquet` | `(season, fpl_id, valid_from)` |
 | `s3://fpl-data-safari/served/fct_player_market_snapshot.parquet` | `(season, fpl_id, capture_key)` |
+| `s3://fpl-data-safari/served/dim_fixture_schedule_history.parquet` | `(season, fixture_id, valid_from)` |
 
 `s3://fpl-data-safari/served/_manifest.json` describes the current publish: row
 counts per table and season, `contract_version`, and each table's columns.

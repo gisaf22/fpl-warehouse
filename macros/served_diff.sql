@@ -2,7 +2,7 @@
   Served diff (#102). Run by .github/workflows/served_diff.yml as two
   run-operations:
 
-  - served_diff_export, under `dev` after a `dbt build`, writes the seven served
+  - served_diff_export, under `dev` after a `dbt build`, writes the eight served
     tables to OUT_DIR as parquet, plus build.json: the build's wall-clock
     seconds and the newest run_id its staging read. It publishes nothing.
   - served_diff, under the `served_diff` target, loads two exported
@@ -11,6 +11,14 @@
     compares each table per season with audit_helper. The markdown report goes
     to stdout. It raises, and the command exits 1, on any difference, a missing
     table, or two builds that read different newest run_ids (inconclusive).
+
+  The tables compared are every table either side exported, plus every table
+  listed below, not the list alone. The diff job runs main's copy of this
+  macro, so a table new on head is one main's list does not name; run
+  38184504573 skipped one that way and reported "identical" (#154). A table on
+  one side only is compared against an empty table of the same columns, so
+  each of its rows is reported as only after (new on head) or only before
+  (gone from head). A table not listed here is ordered by all its columns.
 
   audit_helper compares with set EXCEPT, which cannot see a change in how often
   an identical row repeats. Each season's row counts are therefore compared as
@@ -28,6 +36,7 @@
     'dim_fixture': ['season', 'fixture_id'],
     'dim_player_status_history': ['season', 'fpl_id', 'valid_from'],
     'fct_player_market_snapshot': ['season', 'fpl_id', 'capture_key'],
+    'dim_fixture_schedule_history': ['season', 'fixture_id', 'valid_from'],
   }) }}
 {% endmacro %}
 
@@ -78,21 +87,48 @@
                        '|---|---|---|---|---|---|'] %}
   {% set details = [] %}
 
-  {% for table, key in served_diff_tables().items() %}
+  {% set listed = served_diff_tables() %}
+  {% set exported = run_query(
+    "select parse_filename(file, true) from glob('" ~ before ~ "/*.parquet') "
+    ~ "union select parse_filename(file, true) from glob('" ~ after ~ "/*.parquet') order by 1"
+  ).columns[0].values() %}
+  {% set tables = ((listed.keys() | list) + (exported | list)) | unique | list %}
+
+  {% for table in tables %}
     {% set present = run_query(
       "select (select count(*) from glob('" ~ before ~ "/" ~ table ~ ".parquet')), "
       ~ "(select count(*) from glob('" ~ after ~ "/" ~ table ~ ".parquet'))"
     ).rows[0] %}
-    {% if present[0] == 0 or present[1] == 0 %}
+    {% set one_sided = (present[0] == 0) != (present[1] == 0) %}
+    {% if present[0] == 0 and present[1] == 0 %}
       {% do failures.append(table) %}
-      {% do out.append('**Missing:** `' ~ table ~ '` is absent from '
-                       ~ ('before' if present[0] == 0 else 'after') ~ '.') %}
+      {% do out.append('**Missing:** `' ~ table ~ '` is absent from both sides.') %}
     {% else %}
 
-    {% for side, dir in [('served_before', before), ('served_after', after)] %}
+    {% set sides = [('served_before', before, present[0]), ('served_after', after, present[1])] %}
+    {% for side, dir, exists in sides if exists %}
       {% do run_query('create or replace table ' ~ side ~ '.' ~ table
                       ~ " as select * from read_parquet('" ~ dir ~ '/' ~ table ~ ".parquet')") %}
     {% endfor %}
+    {% if one_sided %}
+      {# A difference even with no rows: the table set itself changed. #}
+      {% do failures.append(table) %}
+      {% set absent = 'served_before' if present[0] == 0 else 'served_after' %}
+      {% set source = 'served_after' if present[0] == 0 else 'served_before' %}
+      {% do run_query('create or replace table ' ~ absent ~ '.' ~ table
+                      ~ ' as select * from ' ~ source ~ '.' ~ table ~ ' limit 0') %}
+      {% do out.append(('**New on head:** `' ~ table ~ '` is absent from before; each of its rows is only after.')
+                       if present[0] == 0 else
+                       ('**Gone from head:** `' ~ table ~ '` is absent from after; each of its rows is only before.')) %}
+    {% endif %}
+    {% if table in listed %}
+      {% set key = listed[table] %}
+    {% else %}
+      {% set key = run_query(
+        "select column_name from duckdb_columns() where schema_name = 'served_after' "
+        ~ "and table_name = '" ~ table ~ "' order by column_index"
+      ).columns[0].values() | list %}
+    {% endif %}
 
     {% set shape = run_query(
       "select count(*) from ((select column_name, data_type, column_index from duckdb_columns() "
@@ -146,7 +182,10 @@
       {% endif %}
     {% endfor %}
 
-    {% if table_differs %}
+    {% if table_differs and one_sided %}
+      {% do failures.append(table) %}
+      {% do details.extend(['', '`' ~ table ~ '` is on one side only, so no key matches across sides.']) %}
+    {% elif table_differs %}
       {% do failures.append(table) %}
       {# Which columns the differences are in, matched on the table's key. #}
       {% set columns = run_query(audit_helper.compare_all_columns(
