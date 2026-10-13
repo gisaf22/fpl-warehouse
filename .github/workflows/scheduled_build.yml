@@ -295,6 +295,28 @@ jobs:
             jq -r '.show[] | "- \(.outcome): \(.captures)"' admission.json
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Unstaged admitted captures (#167): the build above fails on an admitted
+      # capture with no staging row, or warns for an endpoint marked warn-only
+      # (element-summary, G6), but dbt prints only a count. This names each one
+      # in the job summary and as an annotation, so a run that finished
+      # mid-build (G5) is identifiable. continue-on-error, so a reporting
+      # failure can never block the publish below.
+      - name: Report unstaged admitted captures
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 200 --output json -q --inline "
+            select severity, endpoint, season, run_id, capture_key
+            from {{ ref('int_unstaged_admitted_capture') }}
+            order by severity, endpoint, season, run_id, capture_key" > unstaged.json
+          {
+            echo "### Unstaged admitted captures (first 200)"
+            jq -r '.show as $r | if ($r | length) == 0
+              then "- every admitted capture has a staging row"
+              else $r[] | "- \(.severity): \(.endpoint) \(.season), run \(.run_id): \(.capture_key)" end' unstaged.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.show[] | "::\(if .severity == "error" then "error" else "warning" end)::admitted capture with no staging row: \(.endpoint) \(.season), run \(.run_id): \(.capture_key)"' unstaged.json
+
       # Publishes the served fact and dimension tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
       # current objects; there is no published history to pin to.

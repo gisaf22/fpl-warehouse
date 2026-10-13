@@ -334,6 +334,28 @@ not silently corrected.
   whose run was still in progress when the build started. It has no finalized manifest
   yet, and the next build picks it up. Counting such payloads would need a second read of
   every payload source.
+- **An admitted capture with no staging row fails the build** (#167). Each payload staging
+  model's `relationships` test checks staged within admitted; `int_unstaged_admitted_capture`
+  checks the other direction. It lists each admitted capture of an in-scope endpoint
+  with no row in any of that endpoint's staging models (G2). An endpoint is in scope when
+  a payload source declares it in `meta.endpoint`, so `event-live`, with no staging
+  model, is out by rule. Its staging models are every `stg_` model that reads that
+  source, found in the graph; each needs a `depends_on` line in the model, and a missing
+  one fails compilation. `int_test_unstaged_admitted_capture_fails_hard` (e2e, error)
+  fails on any gap. A source marked `meta.unstaged_capture_warn_only`, with a reason, only
+  warns, through `int_test_unstaged_admitted_capture_warns`. Today that is
+  element-summary alone, because its gaps were not measured live: a capture with an empty
+  `history[]` stages no row by design (G6, #175). An endpoint added later fails by
+  default. The scheduled build's job summary names every gap and its run.
+  - **A build without `history_root` fails here**, because ported history captures are
+    admitted but not read (G3). Pass it on every `dev` command that builds staging until
+    #168 makes it the default.
+  - **A run that finalizes mid-build** can read as a gap: its captures are admitted but
+    were not in the payload read (G5). Accepted. The summary names the run; rebuild.
+  - The fixture tree keeps three gaps on purpose (G4): the index-only 2.2.0 run's
+    bootstrap-static and fixtures captures, and fpl_id 9999's element-summary capture.
+    `int_test_unstaged_admitted_capture_holds_fixture_gaps` asserts exactly those, at
+    their severities, and that the tree's index-only `event-live/04` is not listed.
 - **Two warn-severity tests report admission problems without failing the build** (#88
   E4). `int_test_capture_admission_flagged_revalidation_warns` names every admitted
   capture with a failed revalidation. `int_test_capture_admission_recent_unadmitted_warns`
@@ -1211,11 +1233,12 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except seven deliberate warnings: the input-freshness warn over 6h
+test is `error` severity except eight deliberate warnings: the input-freshness warn over 6h
 (#103), the two admission warnings (#104, see "Layering"), the partial-presence warning on
 each payload source (#114, see "Layering"), the two `stg_player` warnings from #126 (a
 player missing from the season's next capture, and a `player_code` mapping to more than
-one `fpl_id` in a season), and the missed pre-deadline
+one `fpl_id` in a season), the unstaged element-summary capture warning (#167, see
+"Layering"), and the missed pre-deadline
 capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
 `[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
 mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a

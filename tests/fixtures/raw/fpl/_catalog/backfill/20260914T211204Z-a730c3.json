@@ -1,5 +1,5 @@
 {
- "_fixture_note": "Backfill catalog for 20260914T211204Z-a730c3, trimmed from 662 entries to the 8 whose payload is in this tree. Entries are verbatim. See CAPTURE INDEX in build_fixtures.py. Plus two SYNTHETIC entries with no payload: fpl_id 9998 unusable, fpl_id 9999 a failed revalidation.",
+ "_fixture_note": "Backfill catalog for 20260914T211204Z-a730c3, trimmed from 662 entries to the 8 whose payload is in this tree, plus event-live/04 with no payload. Entries are verbatim. See CAPTURE INDEX in build_fixtures.py. Plus two SYNTHETIC entries with no payload: fpl_id 9998 unusable, fpl_id 9999 a failed revalidation.",
  "captures": [
   {
    "content_length": 1754107,
@@ -73,6 +73,19 @@
    "http_status": 200,
    "key": "raw/fpl/element-summary/611/2026-09-14/20260914T211204Z-a730c3/payload.json",
    "received_at": "2026-09-14T21:12:15.542449Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "shape_source": "sidecar",
+   "usable": true,
+   "validator_version": null
+  },
+  {
+   "content_length": 469155,
+   "content_sha256": "efed20b8fb0d497c54ad54fa20a97df832373b92d7da398d17ba5e820c7e45dc",
+   "endpoint": "event-live/04",
+   "http_status": 200,
+   "key": "raw/fpl/event-live/04/2026-09-14/20260914T211204Z-a730c3/payload.json",
+   "received_at": "2026-09-14T21:12:07.673633Z",
    "season": "2026-27",
    "shape_ok": true,
    "shape_source": "sidecar",

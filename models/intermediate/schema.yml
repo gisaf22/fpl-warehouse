@@ -62,6 +62,15 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: int_unstaged_admitted_capture
+    description: >
+      One row per admitted capture of an endpoint with a staging source that
+      has no row in any of that endpoint's staging models (#167). severity is
+      error, or warn for an endpoint whose source is marked warn-only.
+      Internal.
+    group: warehouse_internal
+    access: private
+
   - name: int_source_key_presence
     description: >
       One row per consumed source column: whether its key is still in the raw
