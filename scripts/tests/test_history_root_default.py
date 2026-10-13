@@ -10,20 +10,27 @@ connection, so no AWS session is needed, as in CI's `validate` job.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[2]
 
 HISTORY = "s3://fpl-data-safari/history"
 MULTI_SEASON_SOURCES = ("element_summary", "bootstrap_static", "fixtures")
 
+NON_DEV_TARGETS = sorted(
+    set(yaml.safe_load((REPO / "profiles.yml").read_text())["fpl_warehouse"]["outputs"])
+    - {"dev"}
+)
 
-def rendered_locations(target_path: Path, *extra: str) -> dict[str, str]:
+
+def all_locations(target_path: Path, target: str, *extra: str) -> dict[str, str]:
     result = subprocess.run(
-        ["dbt", "--no-use-colors", "parse", "--target", "dev"]
+        ["dbt", "--no-use-colors", "parse", "--target", target]
         + ["--target-path", str(target_path), *extra],
         cwd=REPO,
         capture_output=True,
@@ -32,9 +39,15 @@ def rendered_locations(target_path: Path, *extra: str) -> dict[str, str]:
     assert result.returncode == 0, result.stdout + result.stderr
     sources = json.loads((target_path / "manifest.json").read_text())["sources"]
     return {
-        name: sources[f"source.fpl_warehouse.fpl_raw.{name}"]["meta"]["external_location"]
-        for name in MULTI_SEASON_SOURCES
+        source["name"]: source["meta"]["external_location"]
+        for source in sources.values()
+        if "external_location" in source["meta"]
     }
+
+
+def rendered_locations(target_path: Path, *extra: str) -> dict[str, str]:
+    locations = all_locations(target_path, "dev", *extra)
+    return {name: locations[name] for name in MULTI_SEASON_SOURCES}
 
 
 @pytest.mark.integration
@@ -64,3 +77,24 @@ def test_another_history_root_replaces_the_default(tmp_path):
     for name, location in locations.items():
         assert f"'{other}/*/fpl/" in location, name
         assert HISTORY not in location, name
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#180 AC4")
+@pytest.mark.parametrize("target", NON_DEV_TARGETS)
+def test_no_other_target_reads_an_s3_history_tree(tmp_path, target):
+    locations = all_locations(tmp_path, target)
+
+    assert locations
+    for name, location in locations.items():
+        assert not re.search(r"s3://[^']*history", location), (target, name)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#180 AC4")
+def test_the_fixtures_target_reads_only_the_local_tree(tmp_path):
+    locations = all_locations(tmp_path, "fixtures")
+
+    assert locations
+    for name, location in locations.items():
+        assert "s3://" not in location, name
