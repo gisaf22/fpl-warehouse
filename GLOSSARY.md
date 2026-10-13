@@ -29,12 +29,23 @@ One definition per term. A term is added here before an issue, PR or check cites
 - **repeat**: the same record appearing more than once, for example in two runs. Staging
   resolves a repeat by `run_id`, which breaks an `observed_at` tie in capture order (#104).
   A repeat is expected; a tie is not.
+- **capture clock**: per season, the newest staged `bootstrap-static` capture's `observed_at`.
+  Staged means the capture has rows in `stg_gameweek`, so an admitted capture whose payload
+  did not stage does not move it (#163 S12, S14c). A gameweek has **passed** when its
+  `deadline_time` is at or before the capture clock. It stands in for `now()` so that a
+  rebuild from the same captures gives the same rows (#163 S10).
 
 ## State and outcome
 
 - **pre-deadline state**: what was observable before a deadline: a player's status, price
   and ownership as of that deadline (`dim_player_status_history`, `fct_player_market_snapshot`),
   and the fixture schedule as of that deadline (slice 1c).
+- **pre-deadline freshness**: for a passed gameweek, how old the newest staged
+  `bootstrap-static` capture strictly before its deadline was: `last_capture_before_deadline_at`
+  and `state_age_seconds` on `dim_gameweek` (#169). NULL when the gameweek has not passed by
+  the capture clock, or when no staged capture exists before the deadline (#163 S10, S13).
+  Distinct from *freshness at cutoff*, which counts admitted live captures (#113); neither
+  measures the other.
 - **fixture schedule**: which gameweek a fixture is in, its kickoff time, its home and away
   teams, and each side's difficulty rating. Not its result: a score is a ratified outcome.
 - **reschedule**: FPL changing a fixture's kickoff time after publishing it. A reschedule moves
@@ -63,6 +74,13 @@ One definition per term. A term is added here before an issue, PR or check cites
 - **freshness at cutoff**: at each cutoff, the latest admitted live `bootstrap-static`
   capture before it is at most 15 min old. Target: ≥ 90% of gameweeks from GW6 of 2026-27,
   measured at the deadline, deadline − 1h and deadline − 5h (#113).
+
+## Naming
+
+- **column names** (#133 S8, limited by #163 S14b): a field read from FPL keeps FPL's name
+  (`deadline_time`, `kickoff_time`). A point-in-time timestamp the warehouse derives ends in
+  `_at` (`observed_at`, `last_capture_before_deadline_at`). SCD2 interval bounds are outside
+  this rule and keep ADR 0001's `valid_from` / `valid_to`.
 
 ## Words to avoid
 
