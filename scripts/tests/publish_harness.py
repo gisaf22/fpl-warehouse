@@ -29,10 +29,11 @@ DIMENSIONS = ("dim_team", "dim_player", "dim_fixture")
 HISTORY = ("dim_player_status_history",)
 MARKET = ("fct_player_market_snapshot",)
 SCHEDULE = ("dim_fixture_schedule_history",)
+GAMEWEEK = ("dim_gameweek",)
 # Everything that should be served, stated here rather than read from
 # publish_served.TABLES, so a table the script forgets to serve fails these
 # tests instead of silently dropping out of them.
-SERVED = FACTS + DIMENSIONS + HISTORY + MARKET + SCHEDULE
+SERVED = FACTS + DIMENSIONS + HISTORY + MARKET + SCHEDULE + GAMEWEEK
 
 # Every served table's columns in the harness build, as the manifest records
 # them: [name, type] in order, read back from the exported parquet.
@@ -82,6 +83,8 @@ def season(
     status_history_rows: int | None = None,
     market_snapshot_rows: int | None = None,
     schedule_history_rows: int | None = None,
+    gameweek_dim_rows: int | None = None,
+    bootstrap_admitted: bool = True,
     captures: int = 1,
     fixture_captures: int = 1,
     player_fixture_rows: int = 1,
@@ -94,12 +97,15 @@ def season(
     fixtures in the fixtures endpoint, how many bootstrap-static captures hold
     every player (stg_player holds players x captures rows), how many fixtures
     captures hold every fixture (stg_fixture holds fixtures x fixture_captures
-    rows), and element-summary history rows. Served counts default to
-    exactly what staging implies, which clears every table's floor: players x
+    rows), and element-summary history rows. `bootstrap_admitted` says whether
+    int_admitted_capture holds a bootstrap-static capture of the season; every
+    season also has an admitted fixtures capture, which does not count. Served
+    counts default to exactly what staging and admission imply, which clears every table's floor: players x
     finished gameweeks for both facts, the staged teams, players and
     fixtures for the dimensions, one status history row per staged
-    player, one market snapshot row per player per capture, and one schedule
-    history row per staged fixture.
+    player, one market snapshot row per player per capture, one schedule
+    history row per staged fixture, and 38 gameweeks for a season with an
+    admitted bootstrap-static capture (none otherwise).
     """
     expected = players * finished_gameweeks
     return {
@@ -110,6 +116,7 @@ def season(
         "captures": captures,
         "fixture_captures": fixture_captures,
         "player_fixture_rows": player_fixture_rows,
+        "bootstrap_admitted": bootstrap_admitted,
         "fct_player_fixture": expected if fixture is None else fixture,
         "fct_player_gameweek": expected if gameweek is None else gameweek,
         "dim_team": teams if team_rows is None else team_rows,
@@ -125,6 +132,11 @@ def season(
         ),
         "dim_fixture_schedule_history": (
             fixtures if schedule_history_rows is None else schedule_history_rows
+        ),
+        "dim_gameweek": (
+            (38 if bootstrap_admitted else 0)
+            if gameweek_dim_rows is None
+            else gameweek_dim_rows
         ),
     }
 
@@ -207,6 +219,9 @@ def make_publish(tmp_path, monkeypatch):
             connection.execute(
                 "create table stg_player_fixture (season varchar, fpl_id integer)"
             )
+            connection.execute(
+                "create table int_admitted_capture (season varchar, endpoint varchar)"
+            )
             for table in SERVED:
                 ddl = (columns or {}).get(table, COLUMNS)
                 connection.execute(f"create table {table} ({ddl})")
@@ -235,6 +250,15 @@ def make_publish(tmp_path, monkeypatch):
                     connection.execute(
                         f"insert into {table} select ?, range from range(?)",
                         [name, count],
+                    )
+                connection.execute(
+                    "insert into int_admitted_capture values (?, 'fixtures')", [name]
+                )
+                if shape["bootstrap_admitted"]:
+                    connection.execute(
+                        "insert into int_admitted_capture "
+                        "values (?, 'bootstrap-static')",
+                        [name],
                     )
                 connection.execute(
                     "insert into stg_gameweek select ?, 'run', timestamp '2026-09-27', "

@@ -986,10 +986,14 @@ models:
       One row per (season, gameweek): the gameweek's deadline, and how old the
       newest staged bootstrap-static capture before it was (pre-deadline
       freshness, GLOSSARY.md). Every season with an admitted bootstrap-static
-      capture has gameweeks 1..38 (#169, Feature #163). Private until it is
-      served (#170).
+      capture has gameweeks 1..38 (#169, Feature #163). Part of the served
+      contract, published to served/dim_gameweek.parquet (#170); the column
+      list below is enforced.
     group: warehouse_internal
-    access: private
+    access: public
+    config:
+      contract:
+        enforced: true
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1000,19 +1004,24 @@ models:
               covers: "#169 AC1"
     columns:
       - name: season
+        data_type: VARCHAR
         description: "{{ doc('season_scoped_key') }}"
       - name: gameweek
+        data_type: INTEGER
         description: FPL's gameweek (event) number within the season.
       - name: deadline_time
+        data_type: TIMESTAMP
         description: >
           The transfer deadline (UTC) as the season's newest staged capture
           states it, by observed_at with run_id breaking a repeat.
       - name: last_capture_before_deadline_at
+        data_type: TIMESTAMP
         description: >
           observed_at of the newest staged bootstrap-static capture of the
           season strictly before deadline_time. Null when the deadline has not
           passed by the capture clock, or when no staged capture precedes it.
       - name: state_age_seconds
+        data_type: INTEGER
         description: >
           deadline_time minus last_capture_before_deadline_at, in whole
           seconds. Null when last_capture_before_deadline_at is.
