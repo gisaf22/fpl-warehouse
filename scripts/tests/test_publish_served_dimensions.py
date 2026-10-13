@@ -124,6 +124,7 @@ def test_dimensions_exactly_at_their_expectation_publish_and_are_listed_per_seas
         {"status_history_rows": 9},
         {"market_snapshot_rows": 9},
         {"schedule_history_rows": 379},
+        {"gameweek_dim_rows": 37},
     ],
     ids=list(SERVED),
 )
