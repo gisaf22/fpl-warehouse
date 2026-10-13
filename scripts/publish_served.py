@@ -45,6 +45,7 @@ TABLES = (
     "dim_player_status_history",
     "fct_player_market_snapshot",
     "dim_fixture_schedule_history",
+    "dim_gameweek",
 )
 
 # Every staging model, as the source of which seasons the build holds. A season
@@ -64,6 +65,7 @@ STAGING = (
 # counts toward 380.
 TEAMS_PER_SEASON = 20
 FIXTURES_PER_SEASON = 380
+GAMEWEEKS_PER_SEASON = 38
 
 PROJECT_FILE = Path("dbt_project.yml")
 
@@ -114,6 +116,12 @@ PROJECT_FILE = Path("dbt_project.yml")
 # capture opens it) and a schedule change adds one, so a season holds at least
 # its distinct fixture_id in stg_fixture (#151 C10). Derived rather than
 # FIXTURES_PER_SEASON, because the fixture tree's 2026-27 holds 381.
+#
+# dim_gameweek takes none, and its expectation is exact in both directions:
+# GAMEWEEKS_PER_SEASON rows for every season with an admitted bootstrap-static
+# capture (#163 S11 amended), so a row more is refused as well as a row fewer
+# (EXACT below). Its seasons come from admission rather than staging (S15): a
+# season admitted but never staged must still fail here.
 TOLERANCE = {
     "fct_player_fixture": 0.15,
     "fct_player_gameweek": 0.02,
@@ -123,7 +131,12 @@ TOLERANCE = {
     "dim_player_status_history": 0.0,
     "fct_player_market_snapshot": 0.0,
     "dim_fixture_schedule_history": 0.0,
+    "dim_gameweek": 0.0,
 }
+
+# Tables whose expectation is an exact count with no legitimate surplus, so a
+# season above it is refused too.
+EXACT = {"dim_gameweek"}
 
 
 def live_season() -> str:
@@ -167,6 +180,24 @@ def staged_seasons(connection: duckdb.DuckDBPyConnection) -> list[str]:
     """
     union = " union ".join(f"select distinct season from main.{m}" for m in STAGING)
     return [row[0] for row in connection.execute(f"{union} order by 1").fetchall()]
+
+
+def admitted_bootstrap_seasons(connection: duckdb.DuckDBPyConnection) -> list[str]:
+    """Every season with an admitted bootstrap-static capture: dim_gameweek's.
+
+    Read from admission, not staging, for dim_gameweek only (#163 S15).
+    dim_gameweek is built from stg_gameweek, so a season staging dropped would
+    be missing from both, and a staged season list could never name it. The
+    other tables keep staged_seasons; #167 checks admitted against staged for
+    every endpoint at its source.
+    """
+    return [
+        row[0]
+        for row in connection.execute(
+            "select distinct season from main.int_admitted_capture "
+            "where endpoint = 'bootstrap-static' order by 1"
+        ).fetchall()
+    ]
 
 
 def expected_rows(
@@ -213,7 +244,8 @@ def expected_rows(
     staged player. fct_player_market_snapshot's is the season's stg_player
     rows: one per player per capture. dim_fixture_schedule_history's is the
     season's distinct fixture_id in stg_fixture, at least one row per staged
-    fixture.
+    fixture. dim_gameweek's is GAMEWEEKS_PER_SEASON, for the seasons in
+    admitted_bootstrap_seasons rather than `seasons`.
 
     Every season in `seasons` gets an entry for every table. A season that
     lacks players or gameweeks expects 0 fact rows, which is right at the start
@@ -292,10 +324,16 @@ def expected_rows(
         "fct_player_market_snapshot": lambda s: player_captures.get(s, 0),
         "dim_fixture_schedule_history": lambda s: fixtures.get(s, 0),
     }
-    return {
+    expected = {
         table: {season: per_season[table](season) for season in seasons}
         for table in TABLES
+        if table in per_season
     }
+    expected["dim_gameweek"] = {
+        season: GAMEWEEKS_PER_SEASON
+        for season in admitted_bootstrap_seasons(connection)
+    }
+    return expected
 
 
 def parse_args() -> argparse.Namespace:
@@ -480,7 +518,12 @@ def main() -> int:
         for season, season_expected in sorted(expected[table].items()):
             actual = by_season[table].get(season, 0)
             floor = int(season_expected * (1 - tolerance))
-            if actual < floor:
+            if table in EXACT and actual > season_expected:
+                failures.append(
+                    f"{table} holds {actual:,} rows for {season}, above the "
+                    f"exactly {season_expected:,} expected for that season"
+                )
+            elif actual < floor:
                 shortfall = 1 - actual / season_expected if season_expected else 1
                 failures.append(
                     f"{table} holds {actual:,} rows for {season}, "

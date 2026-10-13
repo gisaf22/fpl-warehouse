@@ -39,14 +39,14 @@ BUILD = {CLOSED: season(841, 38), LIVE: season(667, 5)}
 # records them.
 CONTRACT = (
     "season varchar, gameweek integer, deadline_time timestamp, "
-    "last_capture_before_deadline_at timestamp, state_age_seconds bigint"
+    "last_capture_before_deadline_at timestamp, state_age_seconds integer"
 )
 CONTRACT_SHAPE = [
     ["season", "VARCHAR"],
     ["gameweek", "INTEGER"],
     ["deadline_time", "TIMESTAMP"],
     ["last_capture_before_deadline_at", "TIMESTAMP"],
-    ["state_age_seconds", "BIGINT"],
+    ["state_age_seconds", "INTEGER"],
 ]
 
 
@@ -182,11 +182,11 @@ def previous_with_the_table() -> dict:
         "season varchar, gameweek integer, deadline_time timestamp, "
         "last_capture_before_deadline_at timestamp",
         "season varchar, gameweek integer, deadline_at timestamp, "
-        "last_capture_before_deadline_at timestamp, state_age_seconds bigint",
-        "season varchar, gameweek integer, deadline_time timestamp, "
         "last_capture_before_deadline_at timestamp, state_age_seconds integer",
+        "season varchar, gameweek integer, deadline_time timestamp, "
+        "last_capture_before_deadline_at timestamp, state_age_seconds bigint",
         "season varchar, gameweek integer, last_capture_before_deadline_at "
-        "timestamp, deadline_time timestamp, state_age_seconds bigint",
+        "timestamp, deadline_time timestamp, state_age_seconds integer",
     ],
     ids=["dropped", "renamed", "retyped", "moved"],
 )
