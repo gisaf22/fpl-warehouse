@@ -111,6 +111,21 @@ def test_an_admitted_season_missing_from_staging_and_the_table_is_refused(
 
 @pytest.mark.unit
 @pytest.mark.covers("#170 AC3")
+def test_a_season_admitted_only_for_another_endpoint_is_not_held_to_38(publish):
+    # The live season's only admitted capture is a fixtures one, so it is not
+    # a season with an admitted bootstrap-static capture and has no gameweeks.
+    result = publish(
+        {CLOSED: season(841, 38), LIVE: season(667, 5, bootstrap_admitted=False)},
+        previous_without_the_table(),
+    )
+
+    assert_published(result)
+    _, s3 = result
+    assert s3.published_manifest()["row_counts_by_season"][TABLE] == {CLOSED: 38}
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#170 AC3")
 def test_38_per_admitted_season_publishes_and_the_manifest_lists_it(publish):
     result = publish(
         BUILD, previous_without_the_table(), columns={TABLE: CONTRACT}
