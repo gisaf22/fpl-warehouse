@@ -1209,9 +1209,11 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except five deliberate warnings: the input-freshness warn over 6h
+test is `error` severity except seven deliberate warnings: the input-freshness warn over 6h
 (#103), the two admission warnings (#104, see "Layering"), the partial-presence warning on
-each payload source (#114, see "Layering"), and the missed pre-deadline
+each payload source (#114, see "Layering"), the two `stg_player` warnings from #126 (a
+player missing from the season's next capture, and a `player_code` mapping to more than
+one `fpl_id` in a season), and the missed pre-deadline
 capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
 `[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
 mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a
