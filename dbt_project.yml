@@ -51,15 +51,21 @@ vars:
   # archive by scripts/rekey_history_season.py, laid out as
   # {history_root}/{season}/fpl/{endpoint}/{extraction_date}/{run_id}/payload.json.
   #
-  # Empty means "no history tree": the sources then glob the live root only,
-  # which is what keeps a build working before the tree exists. It is
-  # deliberately NOT under raw_root — see the script's docstring for the two
-  # reasons (the live globs would read it as this season, and fpl-ingest treats
-  # any object under an endpoint prefix as "already captured").
+  # The sources read `history_root`, which is deliberately not defined here.
+  # Unset, it is this value under the `dev` target and "" under every other
+  # one, so a plain `dev` build stages every season (#180) and the default
+  # cannot leak into another target. A var default here would apply to every
+  # target, and a Jinja target check here would not render. `--vars
+  # '{history_root: ""}'` globs the live root only; any other value replaces
+  # the root. The scheduled build and the served diff pass it explicitly.
   #
-  # The `fixtures` target ignores this var, as it ignores raw_root, and reads
+  # It is deliberately NOT under raw_root — see the script's docstring for the
+  # two reasons (the live globs would read it as this season, and fpl-ingest
+  # treats any object under an endpoint prefix as "already captured").
+  #
+  # The `fixtures` target ignores both vars, as it ignores raw_root, and reads
   # the checked-in tree under tests/fixtures/history instead.
-  history_root: ""
+  dev_history_root: "s3://fpl-data-safari/history"
 
   # Seasons that are over and fully settled. Every fct_player_fixture row of a
   # closed season reads is_ratified = true: event-status only ever serves the

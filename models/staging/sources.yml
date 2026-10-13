@@ -63,8 +63,9 @@ sources:
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
           # the payload struct types differ. Season comes from the capture
-          # index (int_admitted_capture). An empty history_root yields the live glob
-          # alone, so a build works before any season has been ported. Project
+          # index (int_admitted_capture). history_root defaults to dev_history_root
+          # under `dev` and to "" under any other target; an empty one yields the
+          # live glob alone (#180). Project
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
           external_location: >-
@@ -74,9 +75,10 @@ sources:
                 'tests/fixtures/raw/fpl/element-summary/*/*/*/payload.json',
                 'tests/fixtures/history/*/fpl/element-summary/*/*/*/payload.json'
                 {% else %}
+                {% set history_root = var("history_root", var("dev_history_root") if target.name == "dev" else "") %}
                 '{{ var("raw_root") }}/fpl/element-summary/*/*/*/payload.json'
-                {% if var("history_root") %}
-                , '{{ var("history_root") }}/*/fpl/element-summary/*/*/*/payload.json'
+                {% if history_root %}
+                , '{{ history_root }}/*/fpl/element-summary/*/*/*/payload.json'
                 {% endif %}
                 {% endif %}
               ],
@@ -242,8 +244,9 @@ sources:
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
           # the payload struct types differ. Season comes from the capture
-          # index (int_admitted_capture). An empty history_root yields the live glob
-          # alone, so a build works before any season has been ported. Project
+          # index (int_admitted_capture). history_root defaults to dev_history_root
+          # under `dev` and to "" under any other target; an empty one yields the
+          # live glob alone (#180). Project
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
           external_location: >-
@@ -253,9 +256,10 @@ sources:
                 'tests/fixtures/raw/fpl/bootstrap-static/*/*/payload.json',
                 'tests/fixtures/history/*/fpl/bootstrap-static/*/*/payload.json'
                 {% else %}
+                {% set history_root = var("history_root", var("dev_history_root") if target.name == "dev" else "") %}
                 '{{ var("raw_root") }}/fpl/bootstrap-static/*/*/payload.json'
-                {% if var("history_root") %}
-                , '{{ var("history_root") }}/*/fpl/bootstrap-static/*/*/payload.json'
+                {% if history_root %}
+                , '{{ history_root }}/*/fpl/bootstrap-static/*/*/payload.json'
                 {% endif %}
                 {% endif %}
               ],
@@ -409,9 +413,10 @@ sources:
                 'tests/fixtures/raw/fpl/fixtures/*/*/payload.json',
                 'tests/fixtures/history/*/fpl/fixtures/*/*/payload.json'
                 {% else %}
+                {% set history_root = var("history_root", var("dev_history_root") if target.name == "dev" else "") %}
                 '{{ var("raw_root") }}/fpl/fixtures/*/*/payload.json'
-                {% if var("history_root") %}
-                , '{{ var("history_root") }}/*/fpl/fixtures/*/*/payload.json'
+                {% if history_root %}
+                , '{{ history_root }}/*/fpl/fixtures/*/*/payload.json'
                 {% endif %}
                 {% endif %}
               ],

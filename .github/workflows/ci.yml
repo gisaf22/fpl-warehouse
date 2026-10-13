@@ -16,14 +16,15 @@ on:
         default: "32"
       history_root:
         description: >-
-          Root of the ported history tree for the live build, e.g.
-          s3://fpl-data-safari/history. Empty (the default) globs the live root
-          only, which is the normal case and is proven a no-op. Setting it
-          makes the live build multi-season — the CI role must hold
-          s3:GetObject on that prefix, or every history payload GET 403s while
-          the glob still expands. See dbt_project.yml, `history_root`.
+          Root of the ported history tree for the live build. The default
+          reads every ported season, as the scheduled build does (#180);
+          without 2025-26 the build fails on dim_gameweek's admitted-season
+          floor and the unstaged-capture guard. Clear it to glob the live root
+          only. Another root needs the CI role to hold s3:GetObject on that
+          prefix, or every history payload GET 403s while the glob still
+          expands. See dbt_project.yml, `dev_history_root`.
         required: false
-        default: ""
+        default: "s3://fpl-data-safari/history"
 
 jobs:
   # Required check. Everything here runs without credentials, because nothing
@@ -386,18 +387,17 @@ jobs:
     # profiles.yml reads DBT_DUCKDB_THREADS directly. HISTORY_ROOT is NOT read
     # by dbt itself — it is passed to each dbt command as `--vars` below. It
     # cannot be an env_var() default in dbt_project.yml: sources.yml guards the
-    # history glob on `{% if var("history_root") %}`, and a var whose value is
+    # history glob on the `history_root` var's value, and a var whose value is
     # the literal string "{{ env_var(...) }}" is truthy, so the guard would fire
     # on every build and emit an unrendered Jinja path. Verified 2026-09-21.
     #
     # The fallbacks cover the push/pull_request events, where the inputs do not
     # exist — though this job does not run on those anyway.
     #
-    # HISTORY_ROOT defaults to empty, which renders the live glob alone, byte
-    # identical to passing no --vars at all. So an ordinary dispatch is the
-    # single-season build this project has always run. It is deliberately an
-    # input rather than a repository variable: pointing a build at history is a
-    # per-run decision made while porting a season, not standing configuration.
+    # HISTORY_ROOT defaults to the history bucket, so an ordinary dispatch
+    # builds every season (#180). A cleared input passes "", which renders the
+    # live glob alone. It stays explicit rather than relying on the dev default,
+    # so the build does not depend on dbt_project.yml's value.
     env:
       DBT_DUCKDB_THREADS: ${{ github.event.inputs.duckdb_threads || '32' }}
       HISTORY_ROOT: ${{ github.event.inputs.history_root || '' }}

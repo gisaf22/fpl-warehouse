@@ -99,7 +99,7 @@ jobs:
     # The scheduled build is multi-season as of the 2025-26 history port's
     # publish step. Same mechanism as ci.yml's live-tests job, which proved it
     # on 2026-09-21 (run 35632785680): HISTORY_ROOT is NOT read by dbt itself —
-    # sources.yml guards the history glob on `{% if var("history_root") %}`,
+    # sources.yml guards the history glob on the `history_root` var's value,
     # and an env_var() default would be the truthy literal string
     # "{{ env_var(...) }}", firing the guard on every build and emitting an
     # unrendered Jinja path. So it is passed to `dbt build` as --vars below.
@@ -109,6 +109,8 @@ jobs:
     # season, and a build that quietly dropped one would overwrite good served
     # data with a single-season table. Changing what gets published is a code
     # change, reviewed, not a field someone fills in at dispatch time.
+    # It is passed even though `dev` now defaults to the same root (#180):
+    # a production build must not depend on a default.
     env:
       HISTORY_ROOT: s3://fpl-data-safari/history
 
