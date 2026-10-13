@@ -634,16 +634,15 @@ models:
       fixture with no capture before the moment matches no row, which a left
       join returns as nulls: every 2025-26 deadline, and 2026-27's gameweek 1
       and 2, predate their season's first capture. For example, every
-      fixture's schedule at each 2026-27 deadline, where `deadlines` is the
-      consumer's own (season, gameweek, deadline_time) list until
-      `dim_gameweek` serves one (#133):
+      fixture's schedule at each 2026-27 deadline, with deadlines read from
+      `dim_gameweek`, one per gameweek (#163):
 
       ```sql
       select g.gameweek as deadline_gameweek, f.fixture_id,
              h.gameweek, h.kickoff_time, h.team_h_fpl_id, h.team_a_fpl_id,
              h.team_h_difficulty, h.team_a_difficulty
       from dim_fixture as f
-      join deadlines as g on g.season = f.season
+      join dim_gameweek as g on g.season = f.season
       left join dim_fixture_schedule_history as h
           on  h.season = f.season
           and h.fixture_id = f.fixture_id
@@ -724,14 +723,13 @@ models:
       condition picks exactly the row containing the last capture before the
       deadline. A player with no capture before the deadline matches no row
       (no backdating), which a left join returns as nulls. For example, every
-      player's status at each 2026-27 deadline, where `deadlines` is the
-      consumer's own (season, gameweek, deadline_time) list until
-      `dim_gameweek` serves one (#133):
+      player's status at each 2026-27 deadline, with deadlines read from
+      `dim_gameweek`, one per gameweek (#163):
 
       ```sql
       select g.gameweek, p.fpl_id, h.status
       from dim_player as p
-      join deadlines as g on g.season = p.season
+      join dim_gameweek as g on g.season = p.season
       left join dim_player_status_history as h
           on  h.season = p.season
           and h.fpl_id = p.fpl_id
@@ -742,8 +740,9 @@ models:
 
       In dbt the `player_status_as_of` macro does the same. How old that
       state was at the deadline is a property of the deadline, not the
-      player, since every capture covers every player; it belongs to
-      `dim_gameweek` (#133).
+      player, since every capture covers every player: `dim_gameweek`
+      serves it as state_age_seconds, beside the deadline, one per gameweek
+      (#163).
     group: warehouse_internal
     access: public
     config:
@@ -839,14 +838,13 @@ models:
       **As of a moment** (#142): the player's last capture strictly before it.
       The moment is the consumer's own, not wired to the gameweek deadline.
       Strictly before means a capture exactly at the moment is excluded. From
-      the parquet, for example the market at each 2026-27 deadline, where
-      `deadlines` is the consumer's own (season, gameweek, deadline_time) list
-      until `dim_gameweek` serves one (#133):
+      the parquet, for example the market at each 2026-27 deadline, with
+      deadlines read from `dim_gameweek`, one per gameweek (#163):
 
       ```sql
       select g.gameweek, m.fpl_id, m.observed_at, m.now_cost,
              m.selected_by_percent
-      from deadlines as g
+      from dim_gameweek as g
       join fct_player_market_snapshot as m
           on  m.season = g.season
           and m.observed_at < g.deadline_time
@@ -989,6 +987,15 @@ models:
       capture has gameweeks 1..38 (#169, Feature #163). Part of the served
       contract, published to served/dim_gameweek.parquet (#170); the column
       list below is enforced.
+
+      **NULL freshness has two meanings** (#163 S13). Either the deadline has
+      not passed by the newest staged capture (S10, S12), or no staged
+      capture exists before it: 2025-26's one capture postdates every
+      deadline, and 2026-27's first postdates gameweeks 1 and 2. To tell them
+      apart, compare deadline_time with the moment of interest: no
+      deadline_passed column is served. deadline_time and the newest staged
+      capture disagree on whether a deadline has passed only between the
+      deadline and the next capture, where freshness is NULL either way.
     group: warehouse_internal
     access: public
     config:
