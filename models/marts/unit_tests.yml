@@ -548,3 +548,27 @@ unit_tests:
         - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-01 19:00:00", valid_to: "2026-09-10 07:00:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00"}
         - {season: "2026-27", fixture_id: 1, valid_from: "2026-09-10 07:00:00", valid_to: "2026-10-01 19:00:00", gameweek: null, kickoff_time: null}
         - {season: "2026-27", fixture_id: 1, valid_from: "2026-10-01 19:00:00", valid_to: null, gameweek: 12, kickoff_time: "2026-11-25 19:30:00"}
+
+  # --- dim_gameweek: one row per gameweek per season (#169) -------------------
+
+  - name: capture_exactly_at_the_deadline_is_not_before_it
+    description: >
+      A capture observed exactly at a deadline is not that gameweek's last
+      capture before its deadline: strictly before, as every as-of lookup
+      (#163 S3, ADR 0002). The capture an hour earlier is, an hour old. A
+      later capture moves the capture clock past the deadline, so the
+      gameweek has passed.
+    model: dim_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#169 AC6"
+    given:
+      - input: ref('stg_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k1", run_id: "r1", observed_at: "2026-10-10 09:00:00"}
+          - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k2", run_id: "r2", observed_at: "2026-10-10 10:00:00"}
+          - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k3", run_id: "r3", observed_at: "2026-10-10 11:00:00"}
+    expect:
+      rows:
+        - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", last_capture_before_deadline_at: "2026-10-10 09:00:00", state_age_seconds: 3600}
