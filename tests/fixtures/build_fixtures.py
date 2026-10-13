@@ -148,6 +148,10 @@ Beside the payloads, the tree carries what ingest writes to index them (#95):
     `shape_ok: false`. Neither state exists in live data (measured 2026-10-03),
     and admission (#97) must handle both. They use fpl_id 9999, which no
     fixture player has.
+  - One real catalog entry kept with no payload (INDEX_ONLY_KEYS): run
+    20260914T211204Z-a730c3's `event-live/04`. No staging model reads
+    event-live, so the unstaged-capture guard (#167) must leave it out, and
+    this is the fixture case that proves it does.
 
 `--index-only` rewrites just these files and leaves the payloads untouched.
 
@@ -369,6 +373,10 @@ RUNS = [
 # synthetic in-progress run modelled on it.
 INDEX_22_RUN = ("20261003T052050Z-fa64a9", "2026-10-03")
 IN_PROGRESS_RUN = ("20261003T060000Z-0000a1", "2026-10-03")
+# Real catalog entries kept although their payload is not in the tree (#167).
+INDEX_ONLY_KEYS = {
+    "raw/fpl/event-live/04/2026-09-14/20260914T211204Z-a730c3/payload.json",
+}
 LOCAL_RUN = ("20260902T163935Z-07eb06", "2026-09-02")
 # The one LOCAL_RUN payload kept in the tree, so staging's admission filter
 # (#104 AC1) has an unadmitted capture with real bytes to exclude.
@@ -600,13 +608,17 @@ def build_index() -> None:
     for run_id in sorted({r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID}):
         catalog = s3_get(f"{RAW_PREFIX}/_catalog/backfill/{run_id}.json")
         total = len(catalog["captures"])
-        catalog["captures"] = [c for c in catalog["captures"] if c["key"] in present]
-        if not catalog["captures"]:
+        index_only = [c["endpoint"] for c in catalog["captures"] if c["key"] in INDEX_ONLY_KEYS]
+        catalog["captures"] = [
+            c for c in catalog["captures"] if c["key"] in present or c["key"] in INDEX_ONLY_KEYS
+        ]
+        if len(catalog["captures"]) == len(index_only):
             sys.exit(f"catalog {run_id} lists none of this tree's payloads")
         catalog["_fixture_note"] = (
             f"Backfill catalog for {run_id}, trimmed from {total} entries to the "
-            f"{len(catalog['captures'])} whose payload is in this tree. Entries "
-            "are verbatim. See CAPTURE INDEX in build_fixtures.py."
+            f"{len(catalog['captures']) - len(index_only)} whose payload is in this tree"
+            + (f", plus {', '.join(index_only)} with no payload" if index_only else "")
+            + ". Entries are verbatim. See CAPTURE INDEX in build_fixtures.py."
         )
         write(OUT_ROOT / "_catalog" / "backfill" / f"{run_id}.json", catalog)
 
