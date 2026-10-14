@@ -11,6 +11,8 @@ version: 2
 # suite, move dbt tests to tests/":
 #   tests/availability/sql/fact_test_keys_not_null.sql      -> the grain columns
 #   tests/availability/sql/fact_test_column_coverage.sql    -> the COALESCEd measures
+#     (retired by #186: fct_player_gameweek's measures are NULL where nothing
+#     was observed, and null_exactly_when checks both directions instead)
 # Their team_fpl_id clause was not carried at the time, because resolving a team
 # at build time is the as-of bug the rebuild exists to remove. fct_player_fixture
 # now carries team_fpl_id resolved per fixture (#43), with its own not_null test.
@@ -200,8 +202,11 @@ models:
   - name: fct_player_gameweek
     description: >
       Player-gameweek aggregate: one row per (season, fpl_id, gameweek),
-      one-for-one with the gameweek spine so blanks are present with
-      fixture_count 0. Part of the served contract consumed by
+      one-for-one with the gameweek spine, so a gameweek with nothing observed
+      (the team had no fixture, the player was not yet registered, or had
+      departed) is present with fixture_count 0 and every measure NULL (#133
+      S17). A 0 in a measure is always an observed zero. Part of the served
+      contract consumed by
       fpl-intelligence — the column list below is enforced, so any change to
       it is a breaking change for consumers and must be made deliberately.
 
@@ -209,8 +214,14 @@ models:
       element-summary history rows (the gameweek's last fixture, see CLAUDE.md
       "Grain"). The market as it stood at a given capture, before a deadline,
       is fct_player_market_snapshot: per capture, from bootstrap-static (#138
-      M4). The two are different measurements; slice 2 (#133) removes these
-      columns from this table.
+      M4). The two are different measurements, and both stay (#133 S18,
+      reversing #138 M4): the snapshot does not reproduce these per-gameweek
+      figures, and both fixture rows of a double gameweek carry the same values
+      in all 409 double gameweek keys of 2025-26.
+
+      **deadline_time is not on this table** (#133 S19, contract_version 2).
+      Read a gameweek's deadline from dim_gameweek, joined on (season,
+      gameweek).
     group: warehouse_internal
     access: public
     config:
@@ -271,15 +282,13 @@ models:
       - name: web_name
         data_type: VARCHAR
         data_tests: *unit_not_null
-      - name: deadline_time
-        data_type: TIMESTAMP
-        data_tests: *unit_not_null
       - name: fixture_count
         data_type: INTEGER
         data_tests: *unit_not_null
-      # Legitimately NULL for a blank gameweek — no fixture states them — so
-      # they are excluded from the not_null sweep below, which exists to catch
-      # a COALESCE being dropped from the additive measures.
+      # NULL where fixture_count is 0 — no fixture states them. The measures
+      # below are NULL there too, by design (#133 S17): there is no COALESCE,
+      # and the model-level null_exactly_when test replaces the not_null sweep
+      # that used to catch one being dropped.
       - name: first_kickoff_time
         data_type: TIMESTAMP
       - name: last_kickoff_time
@@ -289,87 +298,89 @@ models:
         description: "{{ doc('ratified') }}"
       - name: minutes
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: &unobserved_measure >
+          Summed over the gameweek's fixtures. NULL where fixture_count is 0:
+          nothing was observed (#133 S17).
       - name: starts
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: total_points
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: bonus
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: bps
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: goals_scored
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: assists
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: clean_sheets
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: goals_conceded
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: own_goals
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: penalties_saved
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: penalties_missed
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: yellow_cards
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: red_cards
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: saves
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: clearances_blocks_interceptions
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: recoveries
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: tackles
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: defensive_contribution
         data_type: INTEGER
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: expected_goals
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: expected_assists
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: expected_goal_involvements
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: expected_goals_conceded
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: influence
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: creativity
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: threat
         data_type: DOUBLE
-        data_tests: *unit_not_null
+        description: *unobserved_measure
       - name: ict_index
         data_type: DOUBLE
-        data_tests: *unit_not_null
-      # Event-level, taken from the gameweek's last fixture, so NULL for a blank
-      # gameweek for the same reason as the kickoff times above.
+        description: *unobserved_measure
+      # Event-level, taken from the gameweek's last fixture, so NULL where
+      # fixture_count is 0 for the same reason as the kickoff times above.
       - name: value
         data_type: INTEGER
       - name: selected
@@ -524,6 +535,19 @@ models:
       than 10. Nothing here assumes either count. Part of the served contract,
       published to served/dim_fixture.parquet (#44); the column list below is
       enforced.
+
+      **How difficulty is selected** (#133 S20). team_h_difficulty and
+      team_a_difficulty are one version chosen from the fixture's captures:
+      the last capture before kickoff, ordered by observed_at with run_id
+      breaking a tie, with difficulty_is_pre_kickoff true. Kickoff is the
+      latest capture's, and a fixture with no kickoff (postponed) counts every
+      capture as before it. Where no capture precedes kickoff, the earliest
+      capture's value is served instead, with the flag false: all of 2025-26,
+      and live fixtures played before capture history began. They are never
+      null. This is a derived as-of value, not a copy of
+      dim_fixture_schedule_history: an as-of join on that table at kickoff
+      finds a row only where a capture precedes kickoff, which on 2026-10-14
+      was 0 of 380 fixtures in 2025-26 and 369 of 380 in 2026-27.
     group: warehouse_internal
     access: public
     config:

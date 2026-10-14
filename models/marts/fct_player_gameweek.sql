@@ -15,20 +15,23 @@
 --   a gameweek number is only ever matched within the season it belongs to.
 --
 -- fixture_count:
---   0 = blank gameweek (spine row with no fixture), 1 = normal, 2+ = double.
---   It is COUNT(fixture_id) over the joined fact, so it is the real number of
---   fixtures, not an assumption. Live data holds no double gameweek yet; the
---   aggregation below is written so one aggregates correctly when it lands.
+--   0 = nothing observed (spine row with no fixture: the team had no fixture,
+--   the player was not yet registered, or had departed), 1 = normal,
+--   2+ = double. It is COUNT(fixture_id) over the joined fact, so it is the
+--   real number of fixtures, not an assumption. 2025-26 holds 409 double
+--   gameweek keys (#133 S18).
 --   CAST to INTEGER for the same reason as the additive columns: COUNT()
 --   returns BIGINT, and the real range of this column is 0-3.
 --
 -- Aggregation classes:
 --
---   Additive — summed across the gameweek's fixtures, 0 when the gameweek is
---   blank. A blank gameweek genuinely scores zero, and fixture_count is what
---   distinguishes "played and scored nothing" from "had no fixture"; any
---   consumer computing a per-appearance rate must divide by fixture_count
---   rather than assuming one fixture per gameweek.
+--   Additive — summed across the gameweek's fixtures, NULL when fixture_count
+--   is 0 (#133 S17). Nothing was observed for that row, so it states no
+--   measure; a zero is only ever a real observed zero, from a fixture the
+--   player had. There is deliberately no COALESCE: the null_exactly_when test
+--   in schema.yml fails the build if a measure is NULL with a fixture or
+--   non-NULL without one. Any consumer computing a per-appearance rate must
+--   divide by fixture_count rather than assuming one fixture per gameweek.
 --
 --   influence / creativity / threat are additive per-match component scores,
 --   and so is ict_index itself. Verified on 2026-09-03 against FPL's own
@@ -55,10 +58,10 @@
 --   Point-in-time — value, selected and the transfers family are stated by FPL
 --   per event, not per fixture: both rows of a double gameweek repeat the same
 --   event-level number, so summing would double-count. The value from the
---   gameweek's last fixture is taken instead, and is NULL for a blank gameweek
---   because no fixture row states it. NOTE: this is FPL's documented field
---   semantics, not something the current data can prove — no double gameweek
---   has occurred yet to observe the repetition. Revisit at the first double.
+--   gameweek's last fixture is taken instead, and is NULL where fixture_count is 0
+--   because no fixture row states it. Observed, not just documented: both
+--   fixture rows carry the same values in all 409 double gameweek keys of
+--   2025-26 (#133 S18).
 --
 --   No defined gameweek aggregation — fixture_id, opponent_team_fpl_id,
 --   was_home, team_h_score and team_a_score describe a single fixture and have
@@ -88,7 +91,6 @@ select
 
     -- Gameweek context
     spine.web_name,
-    spine.deadline_time,
     cast(count(fixtures.fixture_id) as integer)         as fixture_count,
     min(fixtures.kickoff_time)                          as first_kickoff_time,
     max(fixtures.kickoff_time)                          as last_kickoff_time,
@@ -102,54 +104,43 @@ select
     bool_and(fixtures.is_ratified)                      as is_ratified,
 
     -- Appearance (additive)
-    cast(coalesce(sum(fixtures.minutes), 0) as integer) as minutes,
-    cast(coalesce(sum(fixtures.starts), 0) as integer)  as starts,
+    cast(sum(fixtures.minutes) as integer)              as minutes,
+    cast(sum(fixtures.starts) as integer)               as starts,
 
     -- Scoring (additive)
-    cast(coalesce(sum(fixtures.total_points), 0) as integer)
-                                                        as total_points,
-    cast(coalesce(sum(fixtures.bonus), 0) as integer)   as bonus,
-    cast(coalesce(sum(fixtures.bps), 0) as integer)     as bps,
-    cast(coalesce(sum(fixtures.goals_scored), 0) as integer)
-                                                        as goals_scored,
-    cast(coalesce(sum(fixtures.assists), 0) as integer) as assists,
-    cast(coalesce(sum(fixtures.clean_sheets), 0) as integer)
-                                                        as clean_sheets,
-    cast(coalesce(sum(fixtures.goals_conceded), 0) as integer)
-                                                        as goals_conceded,
-    cast(coalesce(sum(fixtures.own_goals), 0) as integer)
-                                                        as own_goals,
-    cast(coalesce(sum(fixtures.penalties_saved), 0) as integer)
-                                                        as penalties_saved,
-    cast(coalesce(sum(fixtures.penalties_missed), 0) as integer)
-                                                        as penalties_missed,
-    cast(coalesce(sum(fixtures.yellow_cards), 0) as integer)
-                                                        as yellow_cards,
-    cast(coalesce(sum(fixtures.red_cards), 0) as integer)
-                                                        as red_cards,
-    cast(coalesce(sum(fixtures.saves), 0) as integer)   as saves,
+    cast(sum(fixtures.total_points) as integer)         as total_points,
+    cast(sum(fixtures.bonus) as integer)                as bonus,
+    cast(sum(fixtures.bps) as integer)                  as bps,
+    cast(sum(fixtures.goals_scored) as integer)         as goals_scored,
+    cast(sum(fixtures.assists) as integer)              as assists,
+    cast(sum(fixtures.clean_sheets) as integer)         as clean_sheets,
+    cast(sum(fixtures.goals_conceded) as integer)       as goals_conceded,
+    cast(sum(fixtures.own_goals) as integer)            as own_goals,
+    cast(sum(fixtures.penalties_saved) as integer)      as penalties_saved,
+    cast(sum(fixtures.penalties_missed) as integer)     as penalties_missed,
+    cast(sum(fixtures.yellow_cards) as integer)         as yellow_cards,
+    cast(sum(fixtures.red_cards) as integer)            as red_cards,
+    cast(sum(fixtures.saves) as integer)                as saves,
 
     -- Defensive contribution family (additive)
-    cast(coalesce(sum(fixtures.clearances_blocks_interceptions), 0) as integer)
+    cast(sum(fixtures.clearances_blocks_interceptions) as integer)
                                                         as clearances_blocks_interceptions,
-    cast(coalesce(sum(fixtures.recoveries), 0) as integer)
-                                                        as recoveries,
-    cast(coalesce(sum(fixtures.tackles), 0) as integer) as tackles,
-    cast(coalesce(sum(fixtures.defensive_contribution), 0) as integer)
+    cast(sum(fixtures.recoveries) as integer)           as recoveries,
+    cast(sum(fixtures.tackles) as integer)              as tackles,
+    cast(sum(fixtures.defensive_contribution) as integer)
                                                         as defensive_contribution,
 
     -- Expected values (additive)
-    coalesce(sum(fixtures.expected_goals), 0)           as expected_goals,
-    coalesce(sum(fixtures.expected_assists), 0)         as expected_assists,
-    coalesce(sum(fixtures.expected_goal_involvements), 0)
-                                                        as expected_goal_involvements,
-    coalesce(sum(fixtures.expected_goals_conceded), 0)  as expected_goals_conceded,
+    sum(fixtures.expected_goals)                        as expected_goals,
+    sum(fixtures.expected_assists)                      as expected_assists,
+    sum(fixtures.expected_goal_involvements)            as expected_goal_involvements,
+    sum(fixtures.expected_goals_conceded)               as expected_goals_conceded,
 
     -- ICT: components and index are all additive (round() clears float noise)
-    round(coalesce(sum(fixtures.influence), 0), 1)      as influence,
-    round(coalesce(sum(fixtures.creativity), 0), 1)     as creativity,
-    round(coalesce(sum(fixtures.threat), 0), 1)         as threat,
-    round(coalesce(sum(fixtures.ict_index), 0), 1)      as ict_index,
+    round(sum(fixtures.influence), 1)                   as influence,
+    round(sum(fixtures.creativity), 1)                  as creativity,
+    round(sum(fixtures.threat), 1)                      as threat,
+    round(sum(fixtures.ict_index), 1)                   as ict_index,
 
     -- Market: event-level, taken from the gameweek's last fixture
     max_by(fixtures.value, fixtures.kickoff_time)       as value,
@@ -170,5 +161,4 @@ group by
     spine.season,
     spine.fpl_id,
     spine.gameweek,
-    spine.web_name,
-    spine.deadline_time
+    spine.web_name

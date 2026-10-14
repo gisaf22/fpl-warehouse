@@ -83,7 +83,7 @@ vars:
   # column last, serving a new table or adding a manifest field is not breaking.
   # The publish refuses a shape break at the same version, but cannot see a
   # change in meaning — that bump is caught by review only.
-  served_contract_version: 1
+  served_contract_version: 2
 
 models:
   fpl_warehouse:

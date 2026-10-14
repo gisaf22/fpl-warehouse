@@ -32,6 +32,10 @@ SCHEMA = REPO / "models" / "marts" / "schema.yml"
 
 BUILD = {CLOSED: season(10, 38), LIVE: season(10, 4)}
 
+# The real project's version, read before any test points the harness's
+# PROJECT_FILE at its own temporary dbt_project.yml.
+PROJECT_VERSION = publish_served.contract_version()
+
 # fct_player_gameweek's columns as served at contract_version 1, from the
 # manifest's `columns` field: what the previous publish recorded.
 V1_COLUMNS = [
@@ -103,7 +107,7 @@ def test_the_contract_has_no_deadline_time_and_publishes_at_the_project_version(
     result = publish(
         BUILD,
         previous_v1(),
-        version=publish_served.contract_version(),
+        version=PROJECT_VERSION,
         columns={"fct_player_gameweek": ddl(columns)},
     )
 
@@ -168,4 +172,4 @@ def test_one_null_exactly_when_test_covers_every_measure_on_fixture_count_zero()
 def test_the_served_contract_version_is_bumped_past_one():
     # "At least 2" rather than "exactly 2", so a later breaking change can bump
     # again without editing this test.
-    assert publish_served.contract_version() >= 2
+    assert PROJECT_VERSION >= 2
