@@ -55,7 +55,7 @@ jobs:
           - side: after
             ref: ${{ inputs.head_ref }}
     name: build (${{ matrix.side }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Same budget and reasoning as scheduled_build.yml: sized against the worst
     # observed live build, below the one-hour OIDC session.
     timeout-minutes: 45
@@ -87,7 +87,7 @@ jobs:
         run: uv run dbt deps
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -118,7 +118,7 @@ jobs:
 
   diff:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

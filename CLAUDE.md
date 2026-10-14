@@ -1152,12 +1152,20 @@ parse without it, so every workflow runs `dbt deps` and so must a fresh clone.
 
 `actions/upload-artifact` v7 → `043fb46d…` and `actions/download-artifact` v8 → `3e5f45b2…`
 (both lightweight tags) were pinned on 2026-10-04 for the served diff.
+`aws-actions/configure-aws-credentials` v4 → v6.3.0 `e1253824…` (lightweight tag) on
+2026-10-13 (#159): v4 targets Node 20, which the runner deprecates; v6 targets Node 24. It
+is the same pin fpl-ingest uses.
+
+Every job also runs on a pinned `ubuntu-24.04` runner, never `ubuntu-latest` (#159).
+`ubuntu-latest` moves to Ubuntu 26.04 from 2026-10-19, and an unpinned scheduled build would
+publish `served/` from an image this repo was never tested on. Moving to 26.04 is its own
+change.
 
 Every `uses:` in every workflow names a full 40-character commit SHA with the version tag
 kept as a trailing comment, e.g.
 `uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5`. Pinned 2026-09-13:
 `actions/checkout` v5 → `fbc6f399…`, `astral-sh/setup-uv` v7 → `37802adc…`,
-`aws-actions/configure-aws-credentials` v4 → `7474bc46…`.
+`aws-actions/configure-aws-credentials` v4 → `7474bc46…` (replaced by v6.3.0, above).
 
 The reason is credential access, not tidiness. `live-tests` and the scheduled build assume
 an AWS role via OIDC, so a third-party action runs in a job holding real credentials. A
@@ -1176,7 +1184,7 @@ gh api repos/<owner>/<repo>/git/refs/tags/<tag>           # cross-check, see bel
 gh api repos/<owner>/<repo>/commits/<sha> --jq .sha       # the SHA is a real commit
 ```
 
-Mind the annotated-tag trap on the cross-check. `setup-uv@v7` and
+Mind the annotated-tag trap on the cross-check. `setup-uv@v7` and the old
 `configure-aws-credentials@v4` are annotated tags, so `git/refs/tags` returns
 `object.type: tag` and a *tag object* SHA — not the commit, and pinning that value would
 break the workflow. Dereference it with `gh api repos/<owner>/<repo>/git/tags/<tag-object-sha>`
@@ -1342,7 +1350,7 @@ explicitly so that the invariant is visible to anyone adding a `continue-on-erro
 `always()` step above it. A failed build cannot overwrite good served data.
 
 **Credentials.** Same OIDC pattern as `live-tests`: `vars.AWS_ROLE_ARN` plus
-`aws-actions/configure-aws-credentials@v4`, guarded by an explicit check that names the
+`aws-actions/configure-aws-credentials` (v6.3.0), guarded by an explicit check that names the
 missing variable. A scheduled run's OIDC subject is the ref form
 (`repo:gisaf22/fpl-warehouse:ref:refs/heads/main`) because a schedule always runs on the
 default branch — there is no distinct `schedule` subject format, so a role trust policy
