@@ -216,6 +216,46 @@ models:
     config:
       contract:
         enforced: true
+    data_tests:
+      # The 27 measures are NULL exactly where nothing was observed (#133
+      # S17): a row with no fixture states none of them, and a row with one
+      # or more keeps its summed values, real zeros included.
+      - null_exactly_when:
+          name: fct_player_gameweek_measures_null_exactly_when_unobserved
+          arguments:
+            condition: "fixture_count = 0"
+            columns:
+              - minutes
+              - starts
+              - total_points
+              - bonus
+              - bps
+              - goals_scored
+              - assists
+              - clean_sheets
+              - goals_conceded
+              - own_goals
+              - penalties_saved
+              - penalties_missed
+              - yellow_cards
+              - red_cards
+              - saves
+              - clearances_blocks_interceptions
+              - recoveries
+              - tackles
+              - defensive_contribution
+              - expected_goals
+              - expected_assists
+              - expected_goal_involvements
+              - expected_goals_conceded
+              - influence
+              - creativity
+              - threat
+              - ict_index
+          config:
+            tags: [integration]
+            meta:
+              covers: "#186 AC1"
     columns:
       - name: season
         data_type: VARCHAR
