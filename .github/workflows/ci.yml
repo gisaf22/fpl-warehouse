@@ -41,7 +41,7 @@ jobs:
   # served model's real columns against its declared ones when the model is
   # built, so a contract violation surfaces in `fixture-tests`, not here.
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -261,7 +261,7 @@ jobs:
   # e2e is deliberately absent. It asserts the build read the real accumulated
   # raw tree, which is exactly what a fixture build is not — see `live-tests`.
   fixture-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # No `permissions: id-token: write`. Stated rather than omitted, because
     # its absence is the point: this job cannot assume an AWS role even if a
@@ -330,7 +330,7 @@ jobs:
   #
   # Credential-free like `fixture-tests`, and asserted the same way.
   python-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
@@ -382,7 +382,7 @@ jobs:
   # and not only against the five-player fixture.
   live-tests:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # profiles.yml reads DBT_DUCKDB_THREADS directly. HISTORY_ROOT is NOT read
     # by dbt itself — it is passed to each dbt command as `--vars` below. It
@@ -433,7 +433,7 @@ jobs:
         run: uv run dbt deps
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
