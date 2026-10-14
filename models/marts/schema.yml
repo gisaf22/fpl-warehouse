@@ -206,9 +206,9 @@ models:
       (the team had no fixture, the player was not yet registered, or had
       departed) is present with fixture_count 0 and every measure NULL (#133
       S17). A 0 in a measure is always an observed zero. Part of the served
-      contract consumed by
-      fpl-intelligence — the column list below is enforced, so any change to
-      it is a breaking change for consumers and must be made deliberately.
+      contract consumed by fpl-intelligence — the column list below is
+      enforced, so any change to it is a breaking change for consumers and
+      must be made deliberately.
 
       **value, selected and transfers_* are per gameweek**, from the player's
       element-summary history rows (the gameweek's last fixture, see CLAUDE.md
