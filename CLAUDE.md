@@ -986,6 +986,17 @@ Without that `eval` the run fails with `HTTP 403 Forbidden — No credentials ar
 A local build is therefore **not self-contained**; the export is a required first step.
 On a fresh clone, run `mkdir -p .local` before any `dev` or `fixtures` command: `.local/` is gitignored, and DuckDB fails with `IO Error: Cannot open file ".local/warehouse.duckdb"` (or `fixtures.duckdb`) rather than create it.
 
+**For an ad-hoc local query of S3 data, such as the build metrics, sync it first.**
+DuckDB's `credential_chain` cannot read `aws login` credentials, so a local `read_json` on
+an `s3://` path fails. Copy the prefix down and read the local files instead (2026-10-15,
+#191 AC3):
+
+```bash
+aws s3 sync s3://fpl-data-safari/metrics/build/ /tmp/fpl-metrics/
+```
+
+Then run the query with `read_json('/tmp/fpl-metrics/*.json', format = 'auto')`.
+
 **In GitHub Actions none of this is needed — disproven 2026-09-10.** This section
 previously said a live build "will not work as-is" in CI and called it an unsolved Phase 5
 item. That was wrong. `aws-actions/configure-aws-credentials` writes `AWS_ACCESS_KEY_ID`,
