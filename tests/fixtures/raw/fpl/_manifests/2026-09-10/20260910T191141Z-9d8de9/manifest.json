@@ -1,0 +1,57 @@
+{
+ "config": {
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 17.717,
+ "ended_at": "2026-09-10T19:11:58.975184Z",
+ "extraction_date": "2026-09-10",
+ "failures": [],
+ "finality": {
+  "3": {
+   "bonus_added": true,
+   "points": "r"
+  }
+ },
+ "git_sha": "dfb6881d2b68371d3ce88dea2b45e64013a16055",
+ "ingest_version": "1.0.0",
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1743920,
+   "failed": 0,
+   "written": 1
+  },
+  "element-summary/655": {
+   "attempted": 1,
+   "bytes": 8953,
+   "failed": 0,
+   "written": 1
+  },
+  "event-status": {
+   "attempted": 1,
+   "bytes": 224,
+   "failed": 0,
+   "written": 1
+  },
+  "fixtures": {
+   "attempted": 1,
+   "bytes": 186365,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "raw_contract_version": "1.0.0",
+ "run_id": "20260910T191141Z-9d8de9",
+ "source": "fpl",
+ "started_at": "2026-09-10T19:11:41.258124Z",
+ "status": "SUCCESS",
+ "totals": {
+  "attempted": 4,
+  "bytes": 1939462,
+  "failed": 0,
+  "written": 4
+ }
+}
