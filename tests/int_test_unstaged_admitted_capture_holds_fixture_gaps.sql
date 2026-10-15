@@ -3,7 +3,8 @@
 -- Asserts: against the fixture tree, the unstaged admitted captures are
 --          exactly the three known gaps, each at its endpoint's severity, and
 --          no capture of an endpoint without a staging source is listed.
--- Origin: new in #167 (G4, G6)
+-- Origin: new in #167 (G4, G6). fpl_id 9999's gap is error since #175 G7
+--         removed element-summary's warn-only marker.
 -- Tier: integration
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#167 AC2'}) }}
 
@@ -27,7 +28,7 @@ with expected (endpoint, season, run_id, capture_key, severity) as (
         ('fixtures', '2026-27', '20261003T052050Z-fa64a9',
          'raw/fpl/fixtures/2026-10-03/20261003T052050Z-fa64a9/payload.json', 'error'),
         ('element-summary', '2026-27', '20260914T211204Z-a730c3',
-         'raw/fpl/element-summary/9999/2026-09-14/20260914T211204Z-a730c3/payload.json', 'warn')
+         'raw/fpl/element-summary/9999/2026-09-14/20260914T211204Z-a730c3/payload.json', 'error')
 ),
 
 actual as (

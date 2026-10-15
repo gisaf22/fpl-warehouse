@@ -455,3 +455,53 @@ unit_tests:
         - {endpoint: "fixtures", newest_received_at: null, age_hours: null, freshness_status: "error"}
         - {endpoint: "event-status", newest_received_at: null, age_hours: null, freshness_status: "error"}
         - {endpoint: "element-summary", newest_received_at: "2026-10-04 11:00:00", age_hours: 1.0, freshness_status: "exempt"}
+
+  # --- int_player_fixture_history_mismatch: staged rows vs history[] (#175) --
+  # Synthetic: a raw payload cannot produce a drop, because the entry count and
+  # the staged rows come from the same payload. Only staging code loses rows.
+
+  - name: capture_with_entries_and_no_staged_rows_is_listed
+    description: >
+      A full drop: a capture whose history[] has 3 entries and no
+      stg_player_fixture row is listed with expected 3 and staged 0. A matching
+      capture and an empty history[] staging 0 rows are not listed.
+    model: int_player_fixture_history_mismatch
+    config:
+      tags: [unit]
+      meta:
+        covers: "#175 AC2c"
+    given:
+      - input: ref('stg_player_history_capture')
+        rows:
+          - {capture_key: "dropped", season: "2026-27", run_id: "20260914T190000Z-aaaa", history_count: 3}
+          - {capture_key: "matched", season: "2026-27", run_id: "20260914T190000Z-aaaa", history_count: 2}
+          - {capture_key: "empty", season: "2026-27", run_id: "20260914T190000Z-aaaa", history_count: 0}
+      - input: ref('stg_player_fixture')
+        rows:
+          - {capture_key: "matched"}
+          - {capture_key: "matched"}
+    expect:
+      rows:
+        - {capture_key: "dropped", season: "2026-27", run_id: "20260914T190000Z-aaaa", expected_rows: 3, staged_rows: 0}
+
+  - name: capture_with_fewer_staged_rows_than_entries_is_listed
+    description: >
+      A partial drop: a capture whose history[] has 3 entries and 2
+      stg_player_fixture rows is listed with expected 3 and staged 2. #167's
+      admitted-vs-staged guard cannot see this, because the capture has rows.
+    model: int_player_fixture_history_mismatch
+    config:
+      tags: [unit]
+      meta:
+        covers: "#175 AC2d"
+    given:
+      - input: ref('stg_player_history_capture')
+        rows:
+          - {capture_key: "partial", season: "2026-27", run_id: "20260914T190000Z-aaaa", history_count: 3}
+      - input: ref('stg_player_fixture')
+        rows:
+          - {capture_key: "partial"}
+          - {capture_key: "partial"}
+    expect:
+      rows:
+        - {capture_key: "partial", season: "2026-27", run_id: "20260914T190000Z-aaaa", expected_rows: 3, staged_rows: 2}

@@ -152,6 +152,13 @@ Beside the payloads, the tree carries what ingest writes to index them (#95):
     20260914T211204Z-a730c3's `event-live/04`. No staging model reads
     event-live, so the unstaged-capture guard (#167) must leave it out, and
     this is the fixture case that proves it does.
+  - The real manifest and trimmed catalog of EMPTY_HISTORY's run, with one
+    payload: fpl_id 655's element-summary capture, verbatim, whose `history`
+    is empty. It is one of the 31 pre-debut captures #175 AC1 measured on live
+    S3. It stages no stg_player_fixture row by design, so the history-count
+    guard must expect 0 rows for it and neither guard may list it (#175
+    AC2a). No fixture player has fpl_id 655, and the run is older than R4, so
+    it is never element-summary's latest capture.
 
 `--index-only` rewrites just these files and leaves the payloads untouched.
 
@@ -384,6 +391,8 @@ LOCAL_RUN_PAYLOAD_FPL_ID = 166
 # fpl_ids of the two synthetic admission entries; no fixture player has either.
 SYNTHETIC_UNUSABLE_FPL_ID = 9998
 SYNTHETIC_REVALIDATED_FPL_ID = 9999
+# One real admitted capture with an empty `history` (#175 AC2a).
+EMPTY_HISTORY = {"fpl_id": 655, "run_id": "20260910T191141Z-9d8de9", "date": "2026-09-10"}
 
 # (run_id, extraction_date) for event-status — a separate axis from RUNS above.
 # See EVENT-STATUS CAPTURES for why these dates and not the four runs.
@@ -598,14 +607,19 @@ def build_index() -> None:
         for path in fixture_root.glob("*/**/payload.json")
     }
 
-    for run_id, date in sorted(set(RUNS) | set(EVENT_STATUS_RUNS)):
+    empty_history_run = (EMPTY_HISTORY["run_id"], EMPTY_HISTORY["date"])
+    for run_id, date in sorted(set(RUNS) | set(EVENT_STATUS_RUNS) | {empty_history_run}):
         print(f"{date} {run_id}  index")
-        write(
-            OUT_ROOT / "_manifests" / date / run_id / "manifest.json",
-            s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json"),
-        )
+        manifest = s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json")
+        if run_id == EMPTY_HISTORY["run_id"] and manifest.get("captures"):
+            # A manifest's captures[] would index every capture of the run,
+            # and each one with no payload here would read as a gap (#167).
+            sys.exit(f"{run_id} lists captures[]; trim them or pick another run")
+        write(OUT_ROOT / "_manifests" / date / run_id / "manifest.json", manifest)
 
-    for run_id in sorted({r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID}):
+    for run_id in sorted(
+        {r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID, EMPTY_HISTORY["run_id"]}
+    ):
         catalog = s3_get(f"{RAW_PREFIX}/_catalog/backfill/{run_id}.json")
         total = len(catalog["captures"])
         index_only = [c["endpoint"] for c in catalog["captures"] if c["key"] in INDEX_ONLY_KEYS]
@@ -721,6 +735,21 @@ def write_local_run_payload() -> None:
         "admission excludes as not_production. Kept so staging's admission "
         "filter has a payload to exclude (#104 AC1). See CAPTURE INDEX in "
         "build_fixtures.py."
+    )
+    write(OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id / "payload.json", payload)
+
+
+def write_empty_history_payload() -> None:
+    """fpl_id 655's pre-debut element-summary capture, verbatim (#175 AC2a)."""
+    fpl_id, run_id, date = (EMPTY_HISTORY[k] for k in ("fpl_id", "run_id", "date"))
+    payload = s3_get(f"{RAW_PREFIX}/element-summary/{fpl_id}/{date}/{run_id}/payload.json")
+    if payload["history"]:
+        sys.exit(f"element-summary/{fpl_id} in {run_id} no longer has an empty history")
+    payload["_fixture_note"] = (
+        f"Verbatim element-summary capture of fpl_id {fpl_id}, taken before the "
+        "player's first match, so `history` is empty. Kept so the history-count "
+        "guard has a real capture that expects 0 rows (#175 AC2a). See "
+        "EMPTY_HISTORY in build_fixtures.py."
     )
     write(OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id / "payload.json", payload)
 
@@ -948,6 +977,8 @@ def main() -> None:
                 / "payload.json",
                 payload,
             )
+
+    write_empty_history_payload()
 
     # The second season, written last so a full regeneration produces both
     # trees. `--history-only` rewrites just this one, leaving the live tree
