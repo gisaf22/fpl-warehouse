@@ -54,6 +54,10 @@ sources:
           the payload body has no timestamp of its own.
         meta:
           endpoint: element-summary
+          # Test-only (#190): with the capture_cutoff var set, read the file list
+          # the capture_cutoff_files pre-hook computed from this glob, below each
+          # tree's root. Unset, the globs below render unchanged.
+          capture_glob: fpl/element-summary/*/*/*/payload.json
           # Not warn-only (#175 G7): stg_player_history_capture stages every
           # capture, an empty history[] included, so a gap here is a missing
           # or unparseable payload and fails the build.
@@ -67,6 +71,11 @@ sources:
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
           external_location: >-
+            {%- set cutoff = var("capture_cutoff", "") | string -%}
+            {%- if cutoff -%}
+            {%- if not modules.re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", cutoff) -%}{{ exceptions.raise_compiler_error("capture_cutoff must be a YYYY-MM-DD date, got " ~ cutoff) }}{%- endif -%}
+            read_json(getvariable('capture_cutoff_files_element_summary'), union_by_name = true, filename = true)
+            {%- else -%}
             read_json(
               [
                 {% if target.name == "fixtures" %}
@@ -83,6 +92,7 @@ sources:
               union_by_name = true,
               filename = true
             )
+            {%- endif -%}
         columns:
           - name: history
           - name: history.assists
@@ -238,6 +248,10 @@ sources:
           fields used for element-summary.
         meta:
           endpoint: bootstrap-static
+          # Test-only (#190): with the capture_cutoff var set, read the file list
+          # the capture_cutoff_files pre-hook computed from this glob, below each
+          # tree's root. Unset, the globs below render unchanged.
+          capture_glob: fpl/bootstrap-static/*/*/payload.json
           # One read over a list of globs: the live tree, plus each ported
           # history season. read_json's union_by_name absorbs the schema drift
           # between seasons, which a UNION of two sources in staging could not —
@@ -248,6 +262,11 @@ sources:
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
           external_location: >-
+            {%- set cutoff = var("capture_cutoff", "") | string -%}
+            {%- if cutoff -%}
+            {%- if not modules.re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", cutoff) -%}{{ exceptions.raise_compiler_error("capture_cutoff must be a YYYY-MM-DD date, got " ~ cutoff) }}{%- endif -%}
+            read_json(getvariable('capture_cutoff_files_bootstrap_static'), union_by_name = true, filename = true)
+            {%- else -%}
             read_json(
               [
                 {% if target.name == "fixtures" %}
@@ -264,6 +283,7 @@ sources:
               union_by_name = true,
               filename = true
             )
+            {%- endif -%}
         columns:
           - name: elements
           - name: events
@@ -402,9 +422,18 @@ sources:
           `fixtures.json` to this endpoint).
         meta:
           endpoint: fixtures
+          # Test-only (#190): with the capture_cutoff var set, read the file list
+          # the capture_cutoff_files pre-hook computed from this glob, below each
+          # tree's root. Unset, the globs below render unchanged.
+          capture_glob: fpl/fixtures/*/*/payload.json
           # Same list-of-globs shape as bootstrap-static above, for the same
           # reasons.
           external_location: >-
+            {%- set cutoff = var("capture_cutoff", "") | string -%}
+            {%- if cutoff -%}
+            {%- if not modules.re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", cutoff) -%}{{ exceptions.raise_compiler_error("capture_cutoff must be a YYYY-MM-DD date, got " ~ cutoff) }}{%- endif -%}
+            read_json(getvariable('capture_cutoff_files_fixtures'), union_by_name = true, filename = true)
+            {%- else -%}
             read_json(
               [
                 {% if target.name == "fixtures" %}
@@ -421,6 +450,7 @@ sources:
               union_by_name = true,
               filename = true
             )
+            {%- endif -%}
         columns:
           - name: id
             meta:
@@ -498,12 +528,22 @@ sources:
           bootstrap-static, parsed the same way in staging.
         meta:
           endpoint: event-status
+          # Test-only (#190): with the capture_cutoff var set, read the file list
+          # the capture_cutoff_files pre-hook computed from this glob, below each
+          # tree's root. Unset, the globs below render unchanged.
+          capture_glob: fpl/event-status/*/*/payload.json
           external_location: >-
+            {%- set cutoff = var("capture_cutoff", "") | string -%}
+            {%- if cutoff -%}
+            {%- if not modules.re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", cutoff) -%}{{ exceptions.raise_compiler_error("capture_cutoff must be a YYYY-MM-DD date, got " ~ cutoff) }}{%- endif -%}
+            read_json(getvariable('capture_cutoff_files_event_status'), union_by_name = true, filename = true)
+            {%- else -%}
             read_json(
               '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/event-status/*/*/payload.json',
               union_by_name = true,
               filename = true
             )
+            {%- endif -%}
         columns:
           - name: status
           - name: status.event

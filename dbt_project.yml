@@ -93,6 +93,8 @@ models:
       # the exported credential's lifetime with ExpiredToken. As a table the raw
       # tree is read once.
       +materialized: table
+      # Test-only (#190): renders nothing unless the capture_cutoff var is set.
+      +pre-hook: "{{ capture_cutoff_files() }}"
     intermediate:
       +materialized: view
     marts:
