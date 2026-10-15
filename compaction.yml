@@ -1,0 +1,16 @@
+# Element-summary compaction (#198). The one place both values live; read by
+# scripts/compaction_step.py and build_metrics.py. See docs/compacted.md.
+
+# Closed days compacted per scheduled run, oldest first (#78 W6). 0 ships
+# compaction disabled (W12): the step selects no days and lists nothing.
+# #200 sets it, by the W14 rule: N x (max seconds per day from the
+# compaction_dry_run dispatch) + p95 build time (from #191 records) <= 30
+# minutes, under the scheduled job's 45-minute timeout. Secondary check: the
+# dry run's peak RSS < DuckDB's memory_limit. N >= 2, so a day that fails on
+# every run cannot take the only slot (#198 O1). Rollback: set it to 0.
+max_days_per_run: 0
+
+# Day D closes at D+1 00:00 UTC plus this, once every run manifest under
+# raw/fpl/_manifests/D/ is finalized (#198 D1). 6h until fpl-ingest#99 sets the
+# ingest job's own timeout-minutes; then set it to that.
+ingest_job_timeout_hours: 6

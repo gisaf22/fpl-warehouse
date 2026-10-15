@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -48,7 +49,8 @@ import yaml
 
 PROD_PREFIX = "s3://fpl-data-safari/compacted/"
 ENDPOINT = "element-summary"
-SCRIPT = "compact_element_summary"
+# Both run the writer: this module directly, and the compaction step (#198).
+WRITER_SCRIPTS = ("compact_element_summary", "compaction_step")
 MANIFEST_FIELDS = (
     "capture_day",
     "payload_files",
@@ -68,6 +70,8 @@ class DestinationRefused(Exception):
 class DayResult:
     ok: bool
     reason: str = ""
+    files_read: int = 0
+    rows_written: int = 0
 
 
 def check_destination(dest_root: str, event_name: str | None) -> None:
@@ -81,12 +85,26 @@ def check_destination(dest_root: str, event_name: str | None) -> None:
         )
 
 
+def _local_destination(run: str) -> bool:
+    """Whether a command passes a literal, non-S3 `--dest-root`."""
+    args = shlex.split(run.replace("\\\n", " "))
+    if "--dest-root" not in args or args.index("--dest-root") + 1 >= len(args):
+        return False
+    dest = args[args.index("--dest-root") + 1]
+    return not dest.startswith("s3://") and "$" not in dest
+
+
 def runs_writer(workflow_text: str) -> bool:
-    """Whether any step of a workflow runs this writer."""
+    """Whether any step of a workflow runs the writer without a local destination.
+
+    A destination the scan cannot read as a literal path (a variable) counts as
+    not local: the scan fails closed (#198 D3).
+    """
     workflow = yaml.safe_load(workflow_text) or {}
     for job in (workflow.get("jobs") or {}).values():
         for step in job.get("steps") or []:
-            if SCRIPT in str(step.get("run", "")) or SCRIPT in str(step.get("uses", "")):
+            command = f"{step.get('run', '')} {step.get('uses', '')}"
+            if any(s in command for s in WRITER_SCRIPTS) and not _local_destination(command):
                 return True
     return False
 
@@ -186,17 +204,18 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
     files = _glob(con, f"{raw_root}/fpl/{ENDPOINT}/*/{day}/*/payload.json")
     if not files:
         return DayResult(False, f"{day}: no payload files")
+    read = len(files)
 
     manifests = {}
     for run_id in sorted({_run_id(raw_root, f) for f in files}):
         found = _glob(con, f"{raw_root}/fpl/_manifests/*/{run_id}/manifest.json")
         if not found:
-            return DayResult(False, f"{day}: run {run_id} has no run manifest")
+            return DayResult(False, f"{day}: run {run_id} has no run manifest", read)
         manifests[run_id] = _read_json(con, found[0])
         stated = manifests[run_id].get("extraction_date")
         if stated != day:
             return DayResult(
-                False, f"{day}: run {run_id}'s manifest states extraction_date {stated}"
+                False, f"{day}: run {run_id}'s manifest states extraction_date {stated}", read
             )
 
     parquet = parquet_path(dest_root, day)
@@ -212,6 +231,8 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
             False,
             f"{day}: {len(files)} payload files, {rows} parquet rows, "
             f"{distinct} distinct filenames",
+            read,
+            rows,
         )
 
     expected = {}
@@ -219,7 +240,9 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
         index = _index(con, raw_root, run_id, manifest)
         if index is None:
             return DayResult(
-                False, f"{day}: run {run_id} has neither captures[] nor a catalog entry"
+                False, f"{day}: run {run_id} has neither captures[] nor a catalog entry",
+                read,
+                rows,
             )
         for capture in index:
             parts = capture["key"].split("/")
@@ -236,11 +259,16 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
         unindexed = sorted(actual.keys() - expected.keys())
         unlisted = sorted(expected.keys() - actual.keys())
         return DayResult(
-            False, f"{day}: listed but not indexed {unindexed}; indexed but not listed {unlisted}"
+            False,
+            f"{day}: listed but not indexed {unindexed}; indexed but not listed {unlisted}",
+            read,
+            rows,
         )
     mismatched = sorted(k for k in actual if actual[k] != expected[k])
     if mismatched:
-        return DayResult(False, f"{day}: sha256 differs from the index for {mismatched}")
+        return DayResult(
+            False, f"{day}: sha256 differs from the index for {mismatched}", read, rows
+        )
 
     write_manifest(
         {
@@ -254,7 +282,7 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
         },
         manifest_path(dest_root, day),
     )
-    return DayResult(True)
+    return DayResult(True, "", read, rows)
 
 
 def compact_days(

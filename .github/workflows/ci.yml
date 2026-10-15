@@ -34,6 +34,15 @@ on:
           set on the scheduled build; validate fails if it names the var.
         required: false
         default: ""
+      compaction_dry_run:
+        description: >-
+          Measurement only (#198 D6, W12). Comma-separated YYYY-MM-DD capture
+          days: compact them from live raw to .local/compacted on the runner,
+          never to S3, and report the W13 compaction object (seconds per day,
+          peak RSS) in the job summary. #200 sizes N from it by the W14 rule.
+          Empty, the default, skips it.
+        required: false
+        default: ""
 
 jobs:
   # Required check. Everything here runs without credentials, because nothing
@@ -456,6 +465,24 @@ jobs:
 
       - name: Create the local database directory
         run: mkdir -p .local
+
+      # compaction_dry_run (#198 D6): the writer on real raw for the given
+      # days, to a local destination only, so #193 A6's gate allows it from a
+      # dispatch. Before the build so its peak RSS is its own. Its W13 object
+      # reaches the job summary only: a dispatch writes no S3 metrics record.
+      # continue-on-error, so a failed day still lets the build measure.
+      - name: Compaction dry run
+        if: inputs.compaction_dry_run != ''
+        continue-on-error: true
+        env:
+          DAYS: ${{ inputs.compaction_dry_run }}
+        run: >-
+          uv run python scripts/compaction_step.py
+          --days "$DAYS"
+          --raw-root s3://fpl-data-safari/raw
+          --dest-root .local/compacted
+          --out .local/metrics/compaction.json
+          --summary "$GITHUB_STEP_SUMMARY"
 
       # LIST-only: glob() returns key names and opens no payload, so this
       # isolates S3 listing from the ~50k object GETs that dominate the build
