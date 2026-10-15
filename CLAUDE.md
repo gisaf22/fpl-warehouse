@@ -1306,7 +1306,9 @@ fpl-ingest's two checks are documented in that repo.
   stale-input freshness error (build and publish skipped; see "Source freshness"), a
   failed `dbt build` (publish skipped), a refused publish (floor or previous-manifest guard)
   or an upload error leaves `job.status` at `failure` and pings `<url>/fail`, and so does
-  `cancelled`.
+  `cancelled`. The ping reads `job.status` as captured before the build metrics step, so
+  a failed metrics write fails the job without changing the ping (#191; see "Build
+  metrics").
 - **Scheduled runs only.** A manual dispatch, including `restate` and `without_baseline`,
   does not ping, so it can neither raise an alert nor clear one while the schedule is broken.
 - **The ping can never fail the job.** `scripts/healthchecks_ping.sh` always exits 0: it
@@ -1321,6 +1323,58 @@ fpl-ingest's two checks are documented in that repo.
 - **Grace sizing:** 1 h 30 min covers about 25 minutes of scheduler lag plus the 45-minute
   `timeout-minutes` (#34 D2). A build that reaches the timeout may not ping, and it then
   alerts through absence.
+
+### Build metrics
+
+Every scheduled build and every `live-tests` dispatch records one build's passive metrics
+(#191), the W1 baseline for #78. `model_seconds` per model is the primary metric;
+`build_seconds` is the trend.
+
+- **Where it goes.** Every build writes the record to its job summary. Only a scheduled
+  build (`github.event_name == 'schedule'`) also writes
+  `s3://fpl-data-safari/metrics/build/<run_id>.json`. A manual dispatch, of
+  `scheduled_build.yml` or `live-tests`, writes the summary only. The served diff
+  workflow records nothing.
+- **How.** `scripts/timed_build.sh` runs the build under `/usr/bin/time -v`, keeps peak
+  RSS and wall time (#190's measurement), dbt's exit code and that build's
+  `run_results.json` in `.local/metrics/`, and exits with dbt's own code.
+  `scripts/build_metrics.py` then writes the record, with `if: always()`.
+- **A failed S3 write fails the job, but not the ping.** The step is not
+  `continue-on-error`. `Capture build outcome` records `job.status` before it, and the
+  healthchecks.io ping reports that capture, so a metrics failure never changes what the
+  ping says about the build and publish (#191 AC7).
+- **A scheduled `run_id` with no JSON means the run was killed before the metrics step**:
+  the 45-minute timeout, a runner loss or an Actions outage. Compare the expected
+  scheduled runs against the records to find them.
+
+The record has exactly these fields; `scripts/tests/test_build_metrics.py` fails on a
+missing or extra one. Units are MiB throughout. A value is `null` when the run stopped
+before it could be measured, never a guess.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `run_id` | string | `GITHUB_RUN_ID` |
+| `git_sha` | string | the commit built |
+| `built_at` | string | UTC, seconds, when the record was written |
+| `trigger` | string | `github.event_name`: `schedule` or `workflow_dispatch` |
+| `status` | string | job result before the metrics step: `success`, `failure` or `cancelled` |
+| `exit_code` | int or null | dbt's exit code; `null` if dbt never returned |
+| `build_seconds` | float or null | wall time of the dbt build step |
+| `capture_count` | int or null | `count(distinct capture_key)` on `stg_player_history_capture`: element-summary payload files read |
+| `peak_rss_mib` | float or null | peak RSS of the build, from `time -v` |
+| `runner_total_mem_mib` | float or null | the runner's `MemTotal` |
+| `cpu_count` | int | the runner's CPUs |
+| `models` | list | one `{name, model_seconds, status}` per model in `run_results.json`: dbt's `execution_time` and status (`success`, `error`, `skipped`) |
+
+`stg_player_history_capture`'s `model_seconds` across scheduled builds, oldest first:
+
+```sql
+select run_id, built_at, m.model_seconds
+from (select run_id, built_at, unnest(models) as m
+      from read_json('s3://fpl-data-safari/metrics/build/*.json', format = 'auto'))
+where m.name = 'stg_player_history_capture'
+order by built_at
+```
 
 ### Source freshness
 
@@ -1393,7 +1447,8 @@ export that forced `threads: 32` locally, so this build is not racing its creden
 Keep `threads: 32` regardless — but not because more is better: 64 and 128 were measured
 on this runner and 128 is *slower*. See "The latency-bound model does not extrapolate".
 
-**The role reads raw and writes served, under one inline policy.** Publishing needed a
+**The role reads raw and writes served, under one inline policy, and writes build metrics
+under a second.** Publishing needed a
 permission change but **not** a trust-policy change — the distinction is
 authorization versus authentication. The trust policy governs who may assume the role,
 which is unchanged: the same OIDC subject assumes the same role for the same reason. What
@@ -1417,7 +1472,12 @@ policy `fpl-warehouse-s3-read`, five statements:
   (2026-09-28, dispatched from `main` with default inputs) read the manifest with no
   override and published.
 
-Note the policy *name* predates the write grant and is now a misnomer: `-s3-read` describes
+A second inline policy, `fpl-warehouse-metrics-write`, grants `s3:PutObject` on
+`arn:aws:s3:::fpl-data-safari/metrics/build/*` only, for the build metrics record (#191).
+Verified live on 2026-10-15 by the maintainer with `simulate-principal-policy`:
+`metrics/build/` allowed, `served/` allowed, `raw/` implicitly denied.
+
+Note the first policy's *name* predates the write grant and is now a misnomer: `-s3-read` describes
 what the role originally did, not what it does. The statement names are the accurate
 description. Renaming it is cosmetic and would require updating the role, so it has been
 left alone deliberately — do not read the name as evidence the write grant is missing.
