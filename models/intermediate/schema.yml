@@ -71,6 +71,15 @@ models:
     group: warehouse_internal
     access: private
 
+  - name: int_player_fixture_history_mismatch
+    description: >
+      One row per element-summary capture whose stg_player_fixture row count
+      differs from its payload's history[] entry count (#175 G7): a full or
+      partial drop in staging. An empty history[] expects 0 rows and is not
+      listed. Internal.
+    group: warehouse_internal
+    access: private
+
   - name: int_source_key_presence
     description: >
       One row per consumed source column: whether its key is still in the raw
