@@ -69,4 +69,60 @@ overwritten next time, and the other days go on.
 
 A destination under `s3://fpl-data-safari/compacted/` is written only when
 `GITHUB_EVENT_NAME == schedule`; any other value, or none, is refused. Local paths are
-always allowed. No step of `ci.yml` or `served_diff.yml` runs the writer.
+always allowed. Any writer call in `ci.yml` or `served_diff.yml` must pass a literal local
+`--dest-root`; a test fails on an `s3://` or unresolved one (#198 D3).
+
+## Day selection and scheduling (#198)
+
+`scripts/compaction_step.py` runs in the scheduled build before `dbt build`, with
+`continue-on-error`. Nothing after it reads its outcome except a summary marker, so it
+cannot change the build, the publish or the healthchecks.io ping.
+
+**Config: `compaction.yml`**, the only place either value lives:
+
+- `max_days_per_run` (N): closed days compacted per run, oldest first. **Ships at 0**
+  (#78 W12): the step lists nothing, writes nothing, and records `days: []`. #200 sets it
+  by the **W14 rule**: N × (max seconds per day from the dry run) + p95 build time (from
+  #191 records) ≤ 30 minutes, under the scheduled job's 45-minute `timeout-minutes`. The
+  step runs in its own process before dbt, so dbt's ~1.3 GiB headroom (#183) does not
+  bound it; the secondary check is dry-run peak RSS < DuckDB's `memory_limit`. N ≥ 2, so a
+  day that fails on every run cannot take the only slot. Rollback: set it back to 0.
+- `ingest_job_timeout_hours`: 6, until fpl-ingest#99 sets ingest's own job timeout.
+
+**Which days.** A day D is selected when all of these hold:
+
+1. **Closed:** now is past D+1 00:00 UTC + the ingest job timeout, and every run manifest
+   under `raw/fpl/_manifests/D/` is finalized. A day with a run still `IN_PROGRESS` past
+   its grace (a killed run) stays open and is named in the summary.
+2. **A candidate:** its finalized manifests record at least one element-summary object
+   written. A day with none is skipped, not failed, and named in the summary (#198 O1).
+3. **Uncompacted:** it has no compaction manifest.
+
+At most N, oldest first. A day that fails stays a candidate and takes one slot on every
+run until fixed; no failure state is kept, and the summary flags it each run (O1).
+
+**What it records.** The W13 `compaction` object in the #191 build record (see CLAUDE.md,
+"Build metrics"), and a job summary headed `**failed**` when any day failed.
+
+### Runbook
+
+- **The first scheduled run after #200 merges starts the backfill.** It compacts the N
+  oldest closed candidate days, and each later run takes the next N, until every closed
+  day is compacted. Days missed during an outage are caught up the same way. There is no
+  separate backfill.
+- **Turning it off:** set `max_days_per_run: 0`. Existing compacted days stay; nothing is
+  deleted.
+- **A day failing every run:** its reason is in each run's summary. Fix the cause in raw
+  or the index (or recompact by hand). It keeps taking one slot until it succeeds.
+
+### Dry run (measurement for #200)
+
+Dispatch `live-tests` from `main` with `compaction_dry_run` set to comma-separated capture
+days. The step compacts those days from live raw to `.local/compacted` on the runner,
+with no selection and never to S3, and reports the W13 object in the job summary only.
+
+```sh
+gh workflow run ci.yml --ref main -f compaction_dry_run=2026-09-06,2026-09-14
+```
+
+Record the per-day `seconds`, `peak_rss_mib` and the run URL on #78, then size N by W14.
