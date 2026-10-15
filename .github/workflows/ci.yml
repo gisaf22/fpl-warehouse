@@ -493,10 +493,10 @@ jobs:
           bash scripts/sample_build_memory.sh memory_samples.csv "$temp_dir" &
           sampler=$!
           status=0
-          /usr/bin/time -v -o time_v.log uv run dbt run \
+          bash scripts/timed_build.sh .local/metrics uv run dbt run \
             --vars "{history_root: '$HISTORY_ROOT', capture_cutoff: '$CAPTURE_CUTOFF'}" || status=$?
           kill "$sampler"
-          cat time_v.log >&2
+          cat .local/metrics/time_v.log >&2
           exit "$status"
 
       - name: Runner memory after the build
@@ -522,8 +522,8 @@ jobs:
       - name: Report memory experiment
         run: >-
           uv run python scripts/summarize_experiment.py
-          --time-log time_v.log --samples memory_samples.csv
-          --settings duckdb_settings.json --run-results target/run_results.json
+          --time-log .local/metrics/time_v.log --samples memory_samples.csv
+          --settings duckdb_settings.json --run-results .local/metrics/run_results.json
           --cutoff "$CAPTURE_CUTOFF" >> "$GITHUB_STEP_SUMMARY"
 
       # A cutoff build leaves admitted captures unstaged, so #167's guard and
@@ -551,3 +551,13 @@ jobs:
         run: >-
           uv run dbt test --select tag:e2e
           --vars "{history_root: '$HISTORY_ROOT'}"
+
+      # Passive build metrics (#191), job summary only: a dispatch never
+      # writes the S3 record (AC4). Last, so job.status covers every tier.
+      - name: Record build metrics
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: >-
+          uv run python scripts/build_metrics.py --out .local/metrics
+          --job-status "$JOB_STATUS" --summary "$GITHUB_STEP_SUMMARY"
