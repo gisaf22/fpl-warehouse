@@ -56,7 +56,9 @@ def two_day_tree(raw: Path) -> None:
 
 
 def same_relation(con, left: str, right: str) -> None:
+    left, right = f"select * from {left}", f"select * from {right}"
     assert con.sql(f"describe {left}").fetchall() == con.sql(f"describe {right}").fetchall()
+    assert con.sql(f"select count(*) from ({left})").fetchone()[0] > 0
     for a, b in ((left, right), (right, left)):
         assert con.sql(f"select count(*) from ({a} except all {b})").fetchone()[0] == 0
 
