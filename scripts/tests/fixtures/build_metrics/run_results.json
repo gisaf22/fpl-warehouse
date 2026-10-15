@@ -1,0 +1,12 @@
+{
+  "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json", "invocation_id": "fixture"},
+  "elapsed_time": 450.0,
+  "results": [
+    {"unique_id": "model.fpl_warehouse.stg_player_history_capture", "status": "success", "execution_time": 412.5, "timing": []},
+    {"unique_id": "model.fpl_warehouse.stg_player_fixture", "status": "success", "execution_time": 3.25, "timing": []},
+    {"unique_id": "model.fpl_warehouse.fct_player_fixture", "status": "error", "execution_time": 1.5, "timing": []},
+    {"unique_id": "model.fpl_warehouse.fct_player_gameweek", "status": "skipped", "execution_time": 0.0, "timing": []},
+    {"unique_id": "test.fpl_warehouse.not_null_stg_player_fpl_id.abc123", "status": "pass", "execution_time": 0.2, "timing": []},
+    {"unique_id": "seed.fpl_warehouse.seed_run_origin", "status": "success", "execution_time": 0.1, "timing": []}
+  ]
+}
