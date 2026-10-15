@@ -370,3 +370,26 @@ jobs:
         run: uv run python scripts/compact_element_summary.py --day 2026-09-20
 """
     assert runs_writer(workflow)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#193 AC4")
+def test_a_day_with_no_payload_files_fails_the_day(tmp_path):
+    raw, dest = tmp_path / "raw", tmp_path / "compacted"
+    two_day_tree(raw)
+    results = compact_days(["2026-09-25"], raw_root=str(raw), dest_root=str(dest))
+    assert not results["2026-09-25"].ok
+    assert "no payload files" in results["2026-09-25"].reason
+    assert not Path(manifest_path(str(dest), "2026-09-25")).exists()
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#193 AC4")
+def test_a_run_whose_run_manifest_is_missing_fails_the_day(tmp_path):
+    raw, dest = tmp_path / "raw", tmp_path / "compacted"
+    build_tree(raw, [Run("20260920T190000Z-kkkkkk", D1, [Capture(1, [], "x")], index="catalog")])
+    (raw / f"fpl/_manifests/{D1}/20260920T190000Z-kkkkkk/manifest.json").unlink()
+    results = compact_days([D1], raw_root=str(raw), dest_root=str(dest))
+    assert not results[D1].ok
+    assert "no run manifest" in results[D1].reason
+    assert not Path(manifest_path(str(dest), D1)).exists()

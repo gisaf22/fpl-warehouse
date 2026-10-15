@@ -56,7 +56,8 @@ A failed check fails that day only: no manifest, the parquet stays unreferenced 
 overwritten next time, and the other days go on.
 
 1. **Capture day = extraction_date.** Each file's run manifest
-   (`raw/fpl/_manifests/*/<run_id>/manifest.json`) must state `extraction_date` = D.
+   (`raw/fpl/_manifests/*/<run_id>/manifest.json`) must state `extraction_date` = D. A day
+   with no payload files, or with a run that has no run manifest, fails.
 2. **Counts.** Listed payload files = parquet rows = distinct `filename`.
 3. **Index.** The listed files' keys equal the element-summary keys of D in the index of
    D's runs, and each file's sha256 equals the index's `content_sha256`. A run's index is
