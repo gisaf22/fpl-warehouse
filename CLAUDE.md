@@ -1102,6 +1102,18 @@ job that reads live S3 fails for reasons that have nothing to do with the pull r
 front of it, so it should not gate merges. The same reasoning keeps the scheduled build off
 the required list.
 
+**`capture_cutoff` is a test-only var for #183's memory experiments** (#190), set through
+`live-tests`' `capture_cutoff` input. Given a `YYYY-MM-DD` date, a staging pre-hook
+(`macros/capture_cutoff.sql`) lists each payload source's files and stores the ones dated
+before it in a DuckDB variable, which the source reads instead of its globs. Date-pattern
+globs were rejected: DuckDB fails a glob list when any pattern matches nothing. A filter
+was rejected too, because DuckDB reads every globbed file even when a `filename` filter
+excludes it. Unset, no hook runs and every glob renders as before. Only payloads are cut,
+not the capture index, so a cutoff run fails #167's guard by design: `live-tests` skips
+its tiers and says so in the summary. Every dispatch writes peak RSS, sampled spill,
+DuckDB's memory settings, staged captures and per-model peaks (attributed by timeline) to
+its job summary. `validate` fails if `scheduled_build.yml` names the var.
+
 **The OIDC role now exists — this closes the Phase 5 credential item.**
 `arn:aws:iam::737634035092:role/github-actions-fpl-warehouse` is set as the `AWS_ROLE_ARN`
 repository variable (confirmed present 2026-09-10 via `gh variable list`). Its trust policy

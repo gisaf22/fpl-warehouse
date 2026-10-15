@@ -25,6 +25,15 @@ on:
           expands. See dbt_project.yml, `dev_history_root`.
         required: false
         default: "s3://fpl-data-safari/history"
+      capture_cutoff:
+        description: >-
+          Test-only (#190). A YYYY-MM-DD date: stage only payloads dated before
+          it, to measure the build as it stood then (#183). Empty, the
+          default, builds every capture. A cutoff run skips the test tiers,
+          because captures after the cutoff are admitted but unstaged. Never
+          set on the scheduled build; validate fails if it names the var.
+        required: false
+        default: ""
 
 jobs:
   # Required check. Everything here runs without credentials, because nothing
@@ -198,6 +207,12 @@ jobs:
       # are exempt: their struct_pack read already fixes the schema.
       - name: Check payload staging models read only declared source fields
         run: uv run python scripts/check_staging_reads_declared.py
+
+      # A test-only var narrows what a build reads, so the scheduled build,
+      # which publishes served/, must never name one (#190 D3). Today that is
+      # capture_cutoff, which live-tests takes as a dispatch input.
+      - name: Check the publish path names no test-only var
+        run: uv run python scripts/check_publish_path_vars.py
 
       - name: Check exactly the served models are public
         run: |
@@ -401,6 +416,7 @@ jobs:
     env:
       DBT_DUCKDB_THREADS: ${{ github.event.inputs.duckdb_threads || '32' }}
       HISTORY_ROOT: ${{ github.event.inputs.history_root || '' }}
+      CAPTURE_CUTOFF: ${{ github.event.inputs.capture_cutoff || '' }}
 
     permissions:
       id-token: write
@@ -459,10 +475,29 @@ jobs:
       - name: Load seeds
         run: uv run dbt seed
 
-      - name: Build models
+      # DuckDB's memory settings as the build sees them, read through dbt's own
+      # connection so profiles.yml's settings apply (#190 AC2).
+      - name: Read DuckDB memory settings
         run: >-
-          /usr/bin/time -v uv run dbt run
-          --vars "{history_root: '$HISTORY_ROOT'}"
+          uv run dbt show -q --output json --inline
+          "select current_setting('memory_limit') as memory_limit,
+          current_setting('temp_directory') as temp_directory"
+          > duckdb_settings.json
+
+      # The sampler records RSS and the temp directory's size every 5s while
+      # the build runs, because DuckDB removes temp files when it closes
+      # (#190 D4). time -v's report is kept for the experiment summary.
+      - name: Build models
+        run: |
+          temp_dir=$(jq -r '.show[0].temp_directory' duckdb_settings.json)
+          bash scripts/sample_build_memory.sh memory_samples.csv "$temp_dir" &
+          sampler=$!
+          status=0
+          /usr/bin/time -v -o time_v.log uv run dbt run \
+            --vars "{history_root: '$HISTORY_ROOT', capture_cutoff: '$CAPTURE_CUTOFF'}" || status=$?
+          kill "$sampler"
+          cat time_v.log >&2
+          exit "$status"
 
       - name: Runner memory after the build
         if: always()
@@ -483,17 +518,36 @@ jobs:
       - name: Report build shape
         run: uv run python scripts/summarize_build.py
 
+      # #183's measurements, on every dispatch (#190 AC2).
+      - name: Report memory experiment
+        run: >-
+          uv run python scripts/summarize_experiment.py
+          --time-log time_v.log --samples memory_samples.csv
+          --settings duckdb_settings.json --run-results target/run_results.json
+          --cutoff "$CAPTURE_CUTOFF" >> "$GITHUB_STEP_SUMMARY"
+
+      # A cutoff build leaves admitted captures unstaged, so #167's guard and
+      # the freshness tests would fail on it by design (#190 D2).
+      - name: Note skipped tiers
+        if: env.CAPTURE_CUTOFF != ''
+        run: >-
+          echo "**tests skipped: cutoff run** (capture_cutoff $CAPTURE_CUTOFF)"
+          >> "$GITHUB_STEP_SUMMARY"
+
       - name: Fast tier — unit
+        if: env.CAPTURE_CUTOFF == ''
         run: >-
           uv run dbt test --select tag:unit
           --vars "{history_root: '$HISTORY_ROOT'}"
 
       - name: Fast tier — integration
+        if: env.CAPTURE_CUTOFF == ''
         run: >-
           uv run dbt test --select tag:integration
           --vars "{history_root: '$HISTORY_ROOT'}"
 
       - name: e2e tier
+        if: env.CAPTURE_CUTOFF == ''
         run: >-
           uv run dbt test --select tag:e2e
           --vars "{history_root: '$HISTORY_ROOT'}"
