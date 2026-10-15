@@ -200,6 +200,39 @@ jobs:
       - name: Create the local database directory
         run: mkdir -p .local
 
+      # Element-summary compaction (#198): compacts closed days to
+      # s3://fpl-data-safari/compacted/, at most max_days_per_run per run, oldest
+      # first. compaction.yml ships it at 0 (W12), and with 0 the step lists
+      # and writes nothing. #200 is the on-switch.
+      #
+      # Before dbt and continue-on-error, so it can never change the build's
+      # outcome, the publish or the healthchecks.io ping: nothing below reads
+      # this step except the summary marker. A failed day exits 1 and marks
+      # this step's summary failed. The W13 object goes to
+      # .local/metrics/compaction.json for the metrics record. See
+      # docs/compacted.md.
+      - name: Compact closed element-summary days
+        id: compaction
+        continue-on-error: true
+        run: >-
+          uv run python scripts/compaction_step.py
+          --raw-root s3://fpl-data-safari/raw
+          --dest-root s3://fpl-data-safari/compacted
+          --out .local/metrics/compaction.json
+          --summary "$GITHUB_STEP_SUMMARY"
+
+      # The step's own summary covers a failed day; this covers a crash, when
+      # the step wrote no summary at all.
+      - name: Mark compaction failed in the summary
+        if: steps.compaction.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          {
+            echo "### Compaction (#198): **failed**"
+            echo ""
+            echo "The compaction step failed; see its log. The dbt build and publish are unaffected."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Input guard (#103, replacing #39's `dbt source freshness`): refuse to
       # rebuild served/ from stale inputs. int_endpoint_freshness gives each
       # live endpoint's newest *admitted* capture and its age, so a local or

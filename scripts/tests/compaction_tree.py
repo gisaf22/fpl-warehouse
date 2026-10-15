@@ -67,10 +67,16 @@ def build_tree(raw_root: Path, runs: list[Run]) -> None:
                     "usable": True,
                 }
             )
+        # As ingest records it: one entry per object written, by endpoint/id.
+        objects = {
+            f"element-summary/{c.fpl_id}": {"attempted": 1, "failed": 0, "written": 1}
+            for c in run.captures
+        }
         manifest = {
             "run_id": run.run_id,
             "extraction_date": run.extraction_date,
             "status": run.status,
+            "objects": objects,
         }
         if run.index == "manifest":
             manifest["raw_contract_version"] = "2.1.0"

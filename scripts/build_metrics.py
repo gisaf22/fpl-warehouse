@@ -25,6 +25,7 @@ from pathlib import Path
 
 import duckdb
 
+from compaction_step import load_config
 from summarize_experiment import time_log
 
 BUCKET = "fpl-data-safari"
@@ -34,9 +35,14 @@ DATABASE = os.environ.get("FPL_WAREHOUSE_DB", ".local/warehouse.duckdb")
 FIELDS = (
     "run_id", "git_sha", "built_at", "trigger", "status", "exit_code",
     "build_seconds", "capture_count", "peak_rss_mib", "runner_total_mem_mib",
-    "cpu_count", "models",
+    "cpu_count", "models", "compaction",
 )
 MODEL_FIELDS = ("name", "model_seconds", "status")
+# The compaction step's W13 object (#198 D4), from .local/metrics/compaction.json.
+COMPACTION_FIELDS = ("n", "seconds", "days_selected", "days", "peak_rss_mib")
+COMPACTION_DAY_FIELDS = (
+    "capture_day", "ok", "reason", "seconds", "files_read", "rows_written",
+)
 JOB_STATUSES = ("success", "failure", "cancelled")
 
 
@@ -73,7 +79,32 @@ def schema_problems(record: dict) -> list[str]:
     for i, model in enumerate(record.get("models") or []):
         problems += [f"models[{i}] missing field {f}" for f in MODEL_FIELDS if f not in model]
         problems += [f"models[{i}] extra field {f}" for f in model if f not in MODEL_FIELDS]
+    compaction = record.get("compaction")
+    if isinstance(compaction, dict):
+        problems += [f"compaction missing field {f}" for f in COMPACTION_FIELDS if f not in compaction]
+        problems += [f"compaction extra field {f}" for f in compaction if f not in COMPACTION_FIELDS]
+        for i, day in enumerate(compaction.get("days") or []):
+            problems += [
+                f"compaction days[{i}] missing field {f}" for f in COMPACTION_DAY_FIELDS if f not in day
+            ]
+            problems += [
+                f"compaction days[{i}] extra field {f}" for f in day if f not in COMPACTION_DAY_FIELDS
+            ]
     return problems
+
+
+def compaction_record(out: Path) -> dict:
+    """The compaction step's object, or nulls if the step never wrote one (#198 O4)."""
+    path = out / "compaction.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    return {
+        "n": load_config().max_days_per_run,
+        "seconds": None,
+        "days_selected": None,
+        "days": [],
+        "peak_rss_mib": None,
+    }
 
 
 def capture_count() -> int | None:
@@ -120,17 +151,26 @@ def build_record(out: Path, job_status: str) -> dict:
         "runner_total_mem_mib": runner_total_mem_mib(),
         "cpu_count": os.cpu_count(),
         "models": models_from_run_results(json.loads(results.read_text())) if results.exists() else [],
+        "compaction": compaction_record(out),
     }
 
 
 def summary(record: dict, written_to: str | None) -> str:
     lines = ["### Build metrics (#191)", "", "| Field | Value |", "|---|---|"]
-    lines += [f"| `{f}` | {record[f]} |" for f in FIELDS if f != "models"]
+    lines += [f"| `{f}` | {record[f]} |" for f in FIELDS if f not in ("models", "compaction")]
     target = f"{written_to} (this step fails if the write fails)" if written_to else "not written (not a scheduled build)"
     lines += ["", f"S3 record: {target}", ""]
     lines += ["| Model | `model_seconds` | Status |", "|---|---|---|"]
     for model in sorted(record["models"], key=lambda m: -m["model_seconds"]):
         lines.append(f"| {model['name']} | {model['model_seconds']:.1f} | {model['status']} |")
+    compaction = record["compaction"]
+    lines += ["", "| Compaction | Value |", "|---|---|"]
+    lines += [f"| `{f}` | {compaction[f]} |" for f in COMPACTION_FIELDS if f != "days"]
+    for day in compaction["days"]:
+        lines.append(
+            f"| `{day['capture_day']}` | {'ok' if day['ok'] else 'failed: ' + day['reason']}, "
+            f"{day['files_read']} files, {day['rows_written']} rows, {day['seconds']}s |"
+        )
     return "\n".join(lines) + "\n"
 
 

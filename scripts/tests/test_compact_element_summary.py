@@ -351,15 +351,14 @@ def test_a_dispatch_calling_the_writer_for_production_is_refused_before_any_writ
 
 @pytest.mark.unit
 @pytest.mark.covers("#193 AC6")
+@pytest.mark.covers("#198 AC3")
 @pytest.mark.parametrize("workflow", ["ci.yml", "served_diff.yml"])
 def test_no_dispatch_workflow_runs_the_writer(workflow):
     assert not runs_writer((REPO / ".github" / "workflows" / workflow).read_text())
 
 
-@pytest.mark.unit
-@pytest.mark.covers("#193 AC6")
-def test_the_workflow_scan_flags_a_step_that_runs_the_writer():
-    workflow = """
+def synthetic_workflow(run: str) -> str:
+    return f"""
 name: synthetic
 on: workflow_dispatch
 jobs:
@@ -367,9 +366,32 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Compact
-        run: uv run python scripts/compact_element_summary.py --day 2026-09-20
+        run: {run}
 """
-    assert runs_writer(workflow)
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#193 AC6")
+@pytest.mark.covers("#198 AC3")
+@pytest.mark.parametrize("run", [
+    "uv run python scripts/compact_element_summary.py --day 2026-09-20"
+    " --raw-root s3://fpl-data-safari/raw --dest-root s3://fpl-data-safari/compacted",
+    "uv run python scripts/compaction_step.py --days 2026-09-20"
+    " --raw-root s3://fpl-data-safari/raw --dest-root s3://fpl-data-safari/compacted",
+    "uv run python scripts/compaction_step.py --days 2026-09-20"
+    " --raw-root s3://fpl-data-safari/raw --dest-root \"$DEST\"",
+], ids=["writer-s3", "step-s3", "step-unresolved-destination"])
+def test_the_workflow_scan_flags_a_writer_call_without_a_local_destination(run):
+    assert runs_writer(synthetic_workflow(run))
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#198 AC3")
+def test_the_workflow_scan_passes_a_writer_call_with_a_local_destination():
+    assert not runs_writer(synthetic_workflow(
+        "uv run python scripts/compaction_step.py --days 2026-09-20"
+        " --raw-root s3://fpl-data-safari/raw --dest-root .local/compacted"
+    ))
 
 
 @pytest.mark.integration

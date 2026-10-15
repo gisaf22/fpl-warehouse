@@ -1324,6 +1324,16 @@ fpl-ingest's two checks are documented in that repo.
   `timeout-minutes` (#34 D2). A build that reaches the timeout may not ping, and it then
   alerts through absence.
 
+### Compaction
+
+Before `dbt build`, the scheduled build runs `scripts/compaction_step.py` with
+`continue-on-error` (#198). It compacts closed element-summary days to
+`s3://fpl-data-safari/compacted/`, at most `max_days_per_run` per run. `compaction.yml`
+ships it at 0, so it lists and writes nothing until #200. A failure marks the step's summary,
+never the build, the publish or the ping. `live-tests`' `compaction_dry_run` input runs it to a
+local destination for measurement. Selection, config, the W14 sizing rule and the runbook:
+`docs/compacted.md`.
+
 ### Build metrics
 
 Every scheduled build and every `live-tests` dispatch records one build's passive metrics
@@ -1365,6 +1375,7 @@ before it could be measured, never a guess.
 | `runner_total_mem_mib` | float or null | the runner's `MemTotal` |
 | `cpu_count` | int | the runner's CPUs |
 | `models` | list | one `{name, model_seconds, status}` per model in `run_results.json`: dbt's `execution_time` and status (`success`, `error`, `skipped`) |
+| `compaction` | object | the compaction step's W13 object (#198): `n`, `seconds`, `days_selected`, `days` (each `{capture_day, ok, reason, seconds, files_read, rows_written}`) and `peak_rss_mib`. Always present: with N = 0, `days_selected` 0 and `days` `[]`; if the step wrote nothing (killed, or a dispatch without the dry run), `n` from `compaction.yml`, `days` `[]`, the rest `null`. Totals are derived from `days`. Added 2026-10-15, Fred-approved; the query below is unchanged |
 
 `stg_player_history_capture`'s `model_seconds` across scheduled builds, oldest first:
 
