@@ -17,11 +17,14 @@ import pytest
 
 import compact_element_summary as writer
 from compact_element_summary import (
+    MANIFEST_FIELDS,
     DestinationRefused,
     check_destination,
     compact_days,
     manifest_path,
+    manifest_problems,
     parquet_path,
+    runs_writer,
 )
 from compaction_tree import Capture, Run, build_tree, history_row
 
@@ -196,7 +199,48 @@ def test_a_day_reconciled_against_its_runs_index_is_added_to_the_manifest(tmp_pa
     ])
     assert compact_days([D1], raw_root=str(raw), dest_root=str(dest))[D1].ok
     entry = json.loads(Path(manifest_path(str(dest), D1)).read_text())
-    assert entry["file_count"] == 2
+    assert manifest_problems(entry) == []
+    assert entry["payload_files"] == entry["parquet_rows"] == entry["distinct_filenames"] == 2
+    assert entry["capture_day"] == D1
+    assert entry["run_ids"] == ["20260920T190000Z-ffffff"]
+
+
+def valid_manifest() -> dict:
+    return {
+        "capture_day": D1,
+        "payload_files": 2,
+        "parquet_rows": 2,
+        "distinct_filenames": 2,
+        "run_ids": ["20260920T190000Z-ffffff"],
+        "compacted_at": "2026-10-15T19:45:00Z",
+        "git_sha": "0" * 40,
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#193 AC4")
+def test_the_manifest_schema_is_exactly_the_pinned_fields():
+    assert MANIFEST_FIELDS == (
+        "capture_day", "payload_files", "parquet_rows", "distinct_filenames",
+        "run_ids", "compacted_at", "git_sha",
+    )
+    assert manifest_problems(valid_manifest()) == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#193 AC4")
+@pytest.mark.parametrize("missing", list(valid_manifest()))
+def test_a_manifest_missing_a_field_is_flagged(missing):
+    record = valid_manifest()
+    del record[missing]
+    assert any(missing in p for p in manifest_problems(record))
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#193 AC4")
+def test_a_manifest_with_an_extra_field_is_flagged():
+    record = valid_manifest() | {"file_count": 2}
+    assert any("file_count" in p for p in manifest_problems(record))
 
 
 @pytest.mark.integration
@@ -307,5 +351,20 @@ def test_a_dispatch_calling_the_writer_for_production_is_refused_before_any_writ
 @pytest.mark.covers("#193 AC6")
 @pytest.mark.parametrize("workflow", ["ci.yml", "served_diff.yml"])
 def test_no_dispatch_workflow_runs_the_writer(workflow):
-    text = (REPO / ".github" / "workflows" / workflow).read_text()
-    assert "compact_element_summary" not in text
+    assert not runs_writer((REPO / ".github" / "workflows" / workflow).read_text())
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#193 AC6")
+def test_the_workflow_scan_flags_a_step_that_runs_the_writer():
+    workflow = """
+name: synthetic
+on: workflow_dispatch
+jobs:
+  live-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Compact
+        run: uv run python scripts/compact_element_summary.py --day 2026-09-20
+"""
+    assert runs_writer(workflow)
