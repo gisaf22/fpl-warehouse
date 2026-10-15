@@ -16,9 +16,11 @@
 --
 -- Source:
 --   fpl_raw.element_summary — the `history` array of each
---   per-player payload, read through declared_records (#115).
---   `fixtures` (upcoming) and `history_past` (prior seasons) are deliberately
---   not declared, so they cannot be read here.
+--   per-player payload, unnested from stg_player_history_capture (#175),
+--   which reads the source once through declared_records (#115) and keeps
+--   only the fields declared at `$.history[*]`. `fixtures` (upcoming) and
+--   `history_past` (prior seasons) are deliberately not declared, so they
+--   cannot be read here.
 --
 -- Naming:
 --   Follows the retired src/models/ convention — `fpl_id` for the player key,
@@ -36,8 +38,8 @@
 --   at build time is the known as-of bug this rebuild must not reintroduce.
 --
 -- Capture identity:
---   Only admitted captures are staged: each payload's key, from
---   capture_key_from_filename, is inner-joined to int_admitted_capture (#104).
+--   Only admitted captures are staged: stg_player_history_capture
+--   inner-joins each payload's key to int_admitted_capture (#104), and
 --   capture_key, season, extraction_date, run_id, extracted_at and
 --   observed_at all come from there, never from the object's path. A payload
 --   that is unadmitted or not yet indexed is not staged.
@@ -54,23 +56,32 @@
 --   appears on every stg_ model.
 -- =============================================================================
 
--- Fields come through declared_records, which selects only the columns
--- declared at `$.history[*]` in sources.yml (#115): an undeclared field fails
--- the build rather than escaping the presence test.
-with raw as (
+-- Each history record holds only the fields declared at `$.history[*]` in
+-- sources.yml (#115): an undeclared field fails the build rather than escaping
+-- the presence test. int_player_fixture_history_mismatch fails the build if
+-- this model keeps fewer or more rows than a capture's history[] holds (#175).
+with captures as (
 
-    {{ declared_records('element_summary', '$.history[*]') }}
+    select
+        capture_key,
+        season,
+        extraction_date,
+        run_id,
+        extracted_at,
+        observed_at,
+        unnest(history) as raw
+    from {{ ref('stg_player_history_capture') }}
 
 )
 
 select
     -- Capture identity
-    admitted.capture_key,
-    admitted.season,
-    admitted.extraction_date,
-    admitted.run_id,
-    admitted.extracted_at,
-    admitted.observed_at,
+    capture_key,
+    season,
+    extraction_date,
+    run_id,
+    extracted_at,
+    observed_at,
 
     -- Keys
     cast(raw."element"         as integer)   as fpl_id,
@@ -130,6 +141,4 @@ select
 
     cast(raw."modified"        as boolean)   as modified
 
-from raw
-inner join {{ ref('int_admitted_capture') }} as admitted
-    on admitted.capture_key = raw.capture_key
+from captures

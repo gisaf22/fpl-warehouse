@@ -344,10 +344,20 @@ not silently corrected.
   source, found in the graph; each needs a `depends_on` line in the model, and a missing
   one fails compilation. `int_test_unstaged_admitted_capture_fails_hard` (e2e, error)
   fails on any gap. A source marked `meta.unstaged_capture_warn_only`, with a reason, only
-  warns, through `int_test_unstaged_admitted_capture_warns`. Today that is
-  element-summary alone, because its gaps were not measured live: a capture with an empty
-  `history[]` stages no row by design (G6, #175). An endpoint added later fails by
-  default. The scheduled build's job summary names every gap and its run.
+  warns, through `int_test_unstaged_admitted_capture_warns`. No source is, since #175
+  G7 replaced element-summary's marker (G6): `stg_player_history_capture` stages every
+  element-summary capture, an empty `history[]` included. An endpoint added later fails
+  by default. The scheduled build's job summary names every gap and its run.
+  - **Element-summary also checks staged rows against `history[]`** (#175 G7).
+    `stg_player_history_capture` is the one read of the source: one row per capture,
+    its `history[]` kept to the declared fields, and the array's entry count.
+    `stg_player_fixture` unnests from it, so counting needs no second scan.
+    `int_player_fixture_history_mismatch` lists every capture whose `stg_player_fixture`
+    rows differ from that count, and `int_test_player_fixture_history_mismatch_fails_hard`
+    (integration, error) fails on any. An empty `history[]` expects 0 rows and passes; a
+    full or partial drop fails. On live S3 on 2026-10-13, all 31 element-summary gaps
+    #167 reported were pre-debut captures with an empty `history[]` (#175 AC1). The
+    scheduled build's job summary names each mismatch with both counts.
   - **A build without `history_root` fails here**, because ported history captures are
     admitted but not read (G3). Pass it on every `dev` command that builds staging until
     #168 makes it the default.
@@ -1252,12 +1262,11 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except eight deliberate warnings: the input-freshness warn over 6h
+test is `error` severity except seven deliberate warnings: the input-freshness warn over 6h
 (#103), the two admission warnings (#104, see "Layering"), the partial-presence warning on
 each payload source (#114, see "Layering"), the two `stg_player` warnings from #126 (a
 player missing from the season's next capture, and a `player_code` mapping to more than
-one `fpl_id` in a season), the unstaged element-summary capture warning (#167, see
-"Layering"), and the missed pre-deadline
+one `fpl_id` in a season), and the missed pre-deadline
 capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
 `[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
 mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a
@@ -1407,7 +1416,8 @@ separate rather than widening one to the whole bucket.
 
 **CI runtime, measured on 2026-09-15/16.** Effectively the whole job is one model —
 `stg_player_fixture` is the S3 read and every other model is sub-second — so these are the
-same number twice:
+same number twice (since #175 the read is `stg_player_history_capture`, and
+`stg_player_fixture` unnests from it in the database):
 
 | run | `stg_player_fixture` | job total |
 |---|---|---|

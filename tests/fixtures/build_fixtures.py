@@ -152,6 +152,13 @@ Beside the payloads, the tree carries what ingest writes to index them (#95):
     20260914T211204Z-a730c3's `event-live/04`. No staging model reads
     event-live, so the unstaged-capture guard (#167) must leave it out, and
     this is the fixture case that proves it does.
+  - The real manifest and trimmed catalog of EMPTY_HISTORY's run, with one
+    payload: fpl_id 655's element-summary capture, verbatim, whose `history`
+    is empty. It is one of the 31 pre-debut captures #175 AC1 measured on live
+    S3. It stages no stg_player_fixture row by design, so the history-count
+    guard must expect 0 rows for it and neither guard may list it (#175
+    AC2a). No fixture player has fpl_id 655, and the run is older than R4, so
+    it is never element-summary's latest capture.
 
 `--index-only` rewrites just these files and leaves the payloads untouched.
 
@@ -211,6 +218,15 @@ WHAT EACH PLAYER COVERS
           rebuild exists to fix. Exercises
           fct_test_player_gameweek_blank_gameweek_is_zero.
 
+          611's R4 capture also carries a SYNTHETIC undeclared history field:
+          one key that sources.yml does not declare at `$.history[*]`, added
+          to its first history row (see SYNTHETIC_UNDECLARED). Every real
+          history field is declared, so without it the root read's trim to
+          declared fields (#175) changes nothing on this tree and
+          stg_test_player_history_capture_reads_only_declared_history_fields
+          could not fail (#175 AC3). Every model selects history fields by
+          name, so the key is otherwise inert.
+
 4         Departed player — SYNTHETIC removal, the second edited case in this
           tree. Played rounds 1 and 2 for real (90 min / 5 pts, 76 min /
           6 pts), is present in `elements` for R1 and R2, and is then removed
@@ -268,7 +284,8 @@ TRIMMING
 --------
 element-summary payloads are checked in whole: every history row of every
 captured object, ~16-21 KB each. The only content changes are player 233's
-synthetic row and the `_fixture_note` key added to every file. They are
+synthetic row, player 611's synthetic undeclared field in R4, and the
+`_fixture_note` key added to every file. They are
 re-serialised pretty-printed and key-sorted rather than stored byte-for-byte,
 so a regeneration produces a readable diff instead of one reflowed line; the
 values themselves are exactly as captured.
@@ -384,6 +401,8 @@ LOCAL_RUN_PAYLOAD_FPL_ID = 166
 # fpl_ids of the two synthetic admission entries; no fixture player has either.
 SYNTHETIC_UNUSABLE_FPL_ID = 9998
 SYNTHETIC_REVALIDATED_FPL_ID = 9999
+# One real admitted capture with an empty `history` (#175 AC2a).
+EMPTY_HISTORY = {"fpl_id": 655, "run_id": "20260910T191141Z-9d8de9", "date": "2026-09-10"}
 
 # (run_id, extraction_date) for event-status — a separate axis from RUNS above.
 # See EVENT-STATUS CAPTURES for why these dates and not the four runs.
@@ -498,6 +517,17 @@ SYNTHETIC_DGW = {
     "kickoff_time": "2026-09-01T19:00:00Z",
 }
 
+# The synthetic undeclared history field, stated in one place so the edit is
+# auditable (#175 AC3). This key is added to the first history row of one
+# capture; it is declared nowhere in sources.yml, so the root read of
+# element-summary must drop it. Every other field and row is as captured.
+SYNTHETIC_UNDECLARED = {
+    "fpl_id": 611,
+    "run_id": "20260914T211204Z-a730c3",
+    "field": "synthetic_undeclared_field",
+    "value": 1,
+}
+
 
 def s3_get(key: str) -> dict | list:
     """Fetch one object and parse it. Fails loudly — a partial tree is worse
@@ -598,14 +628,19 @@ def build_index() -> None:
         for path in fixture_root.glob("*/**/payload.json")
     }
 
-    for run_id, date in sorted(set(RUNS) | set(EVENT_STATUS_RUNS)):
+    empty_history_run = (EMPTY_HISTORY["run_id"], EMPTY_HISTORY["date"])
+    for run_id, date in sorted(set(RUNS) | set(EVENT_STATUS_RUNS) | {empty_history_run}):
         print(f"{date} {run_id}  index")
-        write(
-            OUT_ROOT / "_manifests" / date / run_id / "manifest.json",
-            s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json"),
-        )
+        manifest = s3_get(f"{RAW_PREFIX}/_manifests/{date}/{run_id}/manifest.json")
+        if run_id == EMPTY_HISTORY["run_id"] and manifest.get("captures"):
+            # A manifest's captures[] would index every capture of the run,
+            # and each one with no payload here would read as a gap (#167).
+            sys.exit(f"{run_id} lists captures[]; trim them or pick another run")
+        write(OUT_ROOT / "_manifests" / date / run_id / "manifest.json", manifest)
 
-    for run_id in sorted({r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID}):
+    for run_id in sorted(
+        {r for r, _ in RUNS + EVENT_STATUS_RUNS} | {HISTORY_RUN_ID, EMPTY_HISTORY["run_id"]}
+    ):
         catalog = s3_get(f"{RAW_PREFIX}/_catalog/backfill/{run_id}.json")
         total = len(catalog["captures"])
         index_only = [c["endpoint"] for c in catalog["captures"] if c["key"] in INDEX_ONLY_KEYS]
@@ -725,6 +760,21 @@ def write_local_run_payload() -> None:
     write(OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id / "payload.json", payload)
 
 
+def write_empty_history_payload() -> None:
+    """fpl_id 655's pre-debut element-summary capture, verbatim (#175 AC2a)."""
+    fpl_id, run_id, date = (EMPTY_HISTORY[k] for k in ("fpl_id", "run_id", "date"))
+    payload = s3_get(f"{RAW_PREFIX}/element-summary/{fpl_id}/{date}/{run_id}/payload.json")
+    if payload["history"]:
+        sys.exit(f"element-summary/{fpl_id} in {run_id} no longer has an empty history")
+    payload["_fixture_note"] = (
+        f"Verbatim element-summary capture of fpl_id {fpl_id}, taken before the "
+        "player's first match, so `history` is empty. Kept so the history-count "
+        "guard has a real capture that expects 0 rows (#175 AC2a). See "
+        "EMPTY_HISTORY in build_fixtures.py."
+    )
+    write(OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id / "payload.json", payload)
+
+
 def trim_fixtures(fixtures: list) -> list:
     """Drop `stats` from every fixture; keep every fixture and other field."""
     return [{k: v for k, v in f.items() if k != "stats"} for f in fixtures]
@@ -767,6 +817,29 @@ def add_synthetic_dgw(payload: dict) -> dict:
     dgw["fixture"] = SYNTHETIC_DGW["fixture"]
     dgw["kickoff_time"] = SYNTHETIC_DGW["kickoff_time"]
     payload["history"] = payload["history"] + [dgw]
+    return payload
+
+
+def add_synthetic_undeclared_field(payload: dict) -> dict:
+    """Add an undeclared key to the first history row — see SYNTHETIC_UNDECLARED."""
+    if not payload["history"]:
+        sys.exit(
+            f"player {SYNTHETIC_UNDECLARED['fpl_id']} has no history row in "
+            f"{SYNTHETIC_UNDECLARED['run_id']} to carry the undeclared field"
+        )
+    if SYNTHETIC_UNDECLARED["field"] in payload["history"][0]:
+        sys.exit(
+            f"FPL now serves `{SYNTHETIC_UNDECLARED['field']}` — the synthetic "
+            "field is no longer undeclared by construction; rename it"
+        )
+    first = dict(payload["history"][0])
+    first[SYNTHETIC_UNDECLARED["field"]] = SYNTHETIC_UNDECLARED["value"]
+    payload["history"] = [first] + payload["history"][1:]
+    payload["_fixture_note"] += (
+        f" The first history row's `{SYNTHETIC_UNDECLARED['field']}` is "
+        "SYNTHETIC: a field sources.yml does not declare, which the root read "
+        "must drop. See SYNTHETIC_UNDECLARED in build_fixtures.py."
+    )
     return payload
 
 
@@ -943,11 +1016,16 @@ def main() -> None:
             if fpl_id == SYNTHETIC_DGW["fpl_id"]:
                 payload = add_synthetic_dgw(payload)
             payload["_fixture_note"] = note
+            if (fpl_id, run_id) == (SYNTHETIC_UNDECLARED["fpl_id"],
+                                    SYNTHETIC_UNDECLARED["run_id"]):
+                payload = add_synthetic_undeclared_field(payload)
             write(
                 OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id
                 / "payload.json",
                 payload,
             )
+
+    write_empty_history_payload()
 
     # The second season, written last so a full regeneration produces both
     # trees. `--history-only` rewrites just this one, leaving the live tree

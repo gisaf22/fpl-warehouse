@@ -15,7 +15,11 @@
       '$'             the payload root; one row per payload. Reads the columns
                       declared with no record_path, which #114 already checks
                       for presence at the top of the payload (e.g.
-                      bootstrap-static's total_players)
+                      bootstrap-static's total_players). A root array whose
+                      records are also declared ('$.<array>[*]') is read as a
+                      list holding only those declared fields, so the array
+                      can be kept whole without exposing an undeclared field
+                      (#175: element-summary's history, counted and unnested)
     Any other path is a compile error naming it.
 
     Renames and casts stay in the staging model, in its own select over this
@@ -38,6 +42,8 @@
     {%- endif -%}
 
     {%- set keys = [] -%}
+    {#- Root arrays with declared records: array name -> its declared keys. -#}
+    {%- set arrays = {} -%}
     {%- set unit_test = execute and declared_records_passes_through(model.resource_type, graph) -%}
     {%- if execute and not unit_test -%}
         {%- for node in graph.sources.values()
@@ -47,6 +53,17 @@
                   if (column.meta or {}).get('record_path', '$') == record_path -%}
                 {%- do keys.append(column.name.split('.')[-1]) -%}
             {%- endfor -%}
+            {%- if record_path == '$' -%}
+                {%- for column in node.columns.values() -%}
+                    {%- set element = modules.re.fullmatch(
+                        '\$\.([A-Za-z_][A-Za-z0-9_]*)\[\*\]',
+                        (column.meta or {}).get('record_path', '')) -%}
+                    {%- if element -%}
+                        {%- do arrays.setdefault(element.group(1), []).append(
+                            column.name.split('.')[-1]) -%}
+                    {%- endif -%}
+                {%- endfor -%}
+            {%- endif -%}
         {%- endfor -%}
         {%- if not keys -%}
             {{ exceptions.raise_compiler_error(
@@ -62,7 +79,15 @@
         {{ record }}.*
         {%- endif %}
         {%- for key in keys %},
+        {%- if key in arrays %}
+        list_transform({{ record }}."{{ key }}", lambda r: struct_pack(
+            {%- for field in arrays[key] %}
+            "{{ field }}" := r."{{ field }}"{{ "," if not loop.last }}
+            {%- endfor %}
+        )) as "{{ key }}"
+        {%- else %}
         {{ record }}."{{ key }}" as "{{ key }}"
+        {%- endif %}
         {%- endfor %}
     from
     {%- if nested %} (

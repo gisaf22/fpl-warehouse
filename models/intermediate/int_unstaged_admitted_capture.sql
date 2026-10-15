@@ -40,6 +40,7 @@
 -- depends_on: {{ ref('stg_gameweek_status') }}
 -- depends_on: {{ ref('stg_player') }}
 -- depends_on: {{ ref('stg_player_fixture') }}
+-- depends_on: {{ ref('stg_player_history_capture') }}
 -- depends_on: {{ ref('stg_position') }}
 -- depends_on: {{ ref('stg_team') }}
 

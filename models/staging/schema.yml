@@ -1,6 +1,27 @@
 version: 2
 
 models:
+  - name: stg_player_history_capture
+    description: >
+      One row per admitted element-summary capture: its history[] array, kept
+      to the fields declared at `$.history[*]`, and the array's entry count.
+      The one read of the element-summary source; stg_player_fixture unnests
+      from it (#175). Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
+
   - name: stg_player_fixture
     description: >
       1:1 with the element-summary `history` array — typing and renaming only.

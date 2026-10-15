@@ -297,7 +297,7 @@ jobs:
 
       # Unstaged admitted captures (#167): the build above fails on an admitted
       # capture with no staging row, or warns for an endpoint marked warn-only
-      # (element-summary, G6), but dbt prints only a count. This names each one
+      # (none since #175 G7), but dbt prints only a count. This names each one
       # in the job summary and as an annotation, so a run that finished
       # mid-build (G5) is identifiable. continue-on-error, so a reporting
       # failure can never block the publish below.
@@ -316,6 +316,26 @@ jobs:
               else $r[] | "- \(.severity): \(.endpoint) \(.season), run \(.run_id): \(.capture_key)" end' unstaged.json
           } >> "$GITHUB_STEP_SUMMARY"
           jq -r '.show[] | "::\(if .severity == "error" then "error" else "warning" end)::admitted capture with no staging row: \(.endpoint) \(.season), run \(.run_id): \(.capture_key)"' unstaged.json
+
+      # Element-summary captures whose stg_player_fixture rows differ from
+      # their history[] entry count (#175 G7). The build above fails on any,
+      # but dbt prints only a count; this names each capture with both counts.
+      # continue-on-error, as above.
+      - name: Report element-summary history count mismatches
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 200 --output json -q --inline "
+            select season, run_id, capture_key, expected_rows, staged_rows
+            from {{ ref('int_player_fixture_history_mismatch') }}
+            order by season, run_id, capture_key" > history_mismatch.json
+          {
+            echo "### Element-summary history count mismatches (first 200)"
+            jq -r '.show as $r | if ($r | length) == 0
+              then "- every capture staged one row per history[] entry"
+              else $r[] | "- \(.season), run \(.run_id): \(.capture_key) expected \(.expected_rows), staged \(.staged_rows)" end' history_mismatch.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.show[] | "::error::history count mismatch: \(.season), run \(.run_id): \(.capture_key) expected \(.expected_rows), staged \(.staged_rows)"' history_mismatch.json
 
       # Publishes the served fact and dimension tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
