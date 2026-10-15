@@ -172,8 +172,17 @@ def test_an_oldest_day_that_fails_every_run_does_not_stop_the_next_day_with_n_tw
 def test_a_failed_day_marks_the_step_summary_failed_and_the_step_exit_nonzero(tmp_path):
     raw, dest = tree(tmp_path, [run(D1, "aaaaaa", index="none")])
     result = run_step(raw, dest, LATE, n=1, timeout=TIMEOUT)
-    assert "failed" in result.summary.lower()
+    heading = result.summary.splitlines()[0]
+    assert heading.startswith("### Compaction") and "**failed**" in heading
     assert result.exit_code != 0
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#198 AC3")
+def test_a_clean_step_summary_is_not_marked_failed(tmp_path):
+    raw, dest = tree(tmp_path, [run(D1, "aaaaaa")])
+    heading = run_step(raw, dest, LATE, n=1, timeout=TIMEOUT).summary.splitlines()[0]
+    assert "failed" not in heading.lower()
 
 
 @pytest.mark.integration
