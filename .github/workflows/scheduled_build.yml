@@ -247,9 +247,14 @@ jobs:
       # deliberately failing test returned exit 1 from `dbt build`. Every test
       # is error severity except the deliberate warnings listed in CLAUDE.md
       # ("Scheduled build"), each a condition that must not block the publish.
+      #
+      # scripts/timed_build.sh runs it under `/usr/bin/time -v` for the build
+      # metrics below (#191): peak RSS, wall time, dbt's exit code and this
+      # build's run_results.json, kept in .local/metrics. It exits with dbt's
+      # own code, so a failed build still fails this step.
       - name: Build and test against live S3
         run: >-
-          uv run dbt build
+          bash scripts/timed_build.sh .local/metrics uv run dbt build
           --vars "{history_root: '$HISTORY_ROOT'}"
 
       # Missed pre-deadline captures (#111): the warn test in the build above
@@ -373,17 +378,43 @@ jobs:
           fi
           uv run python scripts/publish_served.py "${args[@]}"
 
+      # The build's outcome, captured before the metrics step (#191 AC7). The
+      # metrics step can fail the job when its S3 write fails, so the ping
+      # reads this capture rather than job.status: a metrics failure fails the
+      # job but never changes what the ping reports for the build and publish.
+      - name: Capture build outcome
+        id: build_outcome
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+      # Passive build metrics (#191): per-model model_seconds (primary) and
+      # build_seconds (trend), the W1 baseline for #78. Every run writes the
+      # job summary; a scheduled run also writes
+      # s3://fpl-data-safari/metrics/build/<run_id>.json, and a failed write
+      # fails the job. Not continue-on-error, on purpose. A scheduled run_id
+      # with no JSON means the run was killed before this step. See CLAUDE.md,
+      # "Build metrics".
+      - name: Record build metrics
+        if: always()
+        env:
+          JOB_STATUS: ${{ steps.build_outcome.outputs.status }}
+        run: >-
+          uv run python scripts/build_metrics.py --out .local/metrics
+          --job-status "$JOB_STATUS" --summary "$GITHUB_STEP_SUMMARY"
+
       # Heartbeat to healthchecks.io (#79). The last step, on every outcome of
       # a scheduled run, and it can never change the job's conclusion.
       #
-      # job.status is `success` only if the publish above succeeded, and
+      # It reports the status captured by `Capture build outcome`, which is
+      # job.status before the metrics step (#191 AC7). That is `success` only
+      # if the publish above succeeded, and
       # publish_served.py uploads _manifest.json last, so a success ping means
       # the manifest landed. A stale-input freshness error or a failed build
       # (both skip the publish), a refused publish or an upload error all send
       # /fail.
       #
       # Manual runs do not ping, including restate and without_baseline runs,
-      # so they neither raise nor clear an alert. job.status is passed through
+      # so they neither raise nor clear an alert. The status is passed through
       # env, not interpolated into the script. The script is duplicated from
       # fpl-ingest's and needs no uv environment, so it still runs when
       # `uv sync` has failed. See CLAUDE.md, "Scheduled build".
@@ -393,5 +424,5 @@ jobs:
         timeout-minutes: 2
         env:
           HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL_SCHEDULED_BUILD }}
-          JOB_STATUS: ${{ job.status }}
+          JOB_STATUS: ${{ steps.build_outcome.outputs.status }}
         run: bash scripts/healthchecks_ping.sh "$JOB_STATUS"
