@@ -2,9 +2,10 @@
 
 #183's memory experiments rebuild the warehouse as it stood at an earlier date.
 DuckDB reads every file a glob matches, even one a `filename` filter excludes,
-so the cutoff must narrow the globs themselves (#190 D1): each payload source's
-date directory renders as a list of patterns covering only dates before the
-cutoff. Only the four payload sources are cut, never the capture index (D2).
+and fails a glob list if any pattern matches nothing. So a cutoff build reads a
+file list computed by a staging pre-hook (#190 D1 revised), and with no cutoff
+every glob renders unchanged. Only the four payload sources are cut, never the
+capture index (D2).
 
 The parse tests read each source's rendered `external_location` from the
 manifest, as test_history_root_default.py does; parsing opens no connection.
@@ -15,8 +16,6 @@ untouched.
 
 from __future__ import annotations
 
-import datetime as dt
-import fnmatch
 import json
 import re
 import subprocess
@@ -66,13 +65,6 @@ UNCUT = {
 
 GLOB = re.compile(r"'([^']*payload\.json)'")
 
-# Every day of three years around the live season, and the fixture tree's
-# ported-history date.
-DATES = [
-    (dt.date(2025, 1, 1) + dt.timedelta(days=n)).isoformat() for n in range(3 * 366)
-] + ["2019-12-31", "2026-05-26", "2031-01-01"]
-
-
 def parse(target_path: Path, target: str, *extra: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["dbt", "--no-use-colors", "parse", "--target", target]
@@ -91,13 +83,6 @@ def payload_globs(target_path: Path, target: str, *extra: str) -> dict[str, list
     return {name: GLOB.findall(by_name[name]) for name in PAYLOAD_SOURCES}
 
 
-def template(glob: str) -> str:
-    """The glob with its date directory, third from last, blanked."""
-    parts = glob.split("/")
-    parts[-3] = "{date}"
-    return "/".join(parts)
-
-
 @pytest.mark.integration
 @pytest.mark.covers("#190 AC1")
 @pytest.mark.parametrize("target", ["fixtures", "dev"])
@@ -111,24 +96,22 @@ def test_without_a_cutoff_every_payload_source_renders_its_globs_unchanged(
 @pytest.mark.integration
 @pytest.mark.covers("#190 AC1")
 @pytest.mark.parametrize("target", ["fixtures", "dev"])
-@pytest.mark.parametrize(
-    "cutoff", ["2026-09-06", "2026-09-15", "2026-10-01", "2026-01-01", "2030-12-31"]
-)
-def test_a_cutoff_renders_only_dates_before_it_on_every_tree_of_every_payload_source(
-    tmp_path, target, cutoff
+def test_a_cutoff_makes_every_payload_source_read_the_computed_file_list_not_a_glob(
+    tmp_path, target
 ):
-    rendered = payload_globs(tmp_path, target, "--vars", f"{{capture_cutoff: '{cutoff}'}}")
+    result = parse(tmp_path, target, "--vars", "{capture_cutoff: '2026-09-15'}")
+    assert result.returncode == 0, result.stdout + result.stderr
+    sources = json.loads((tmp_path / "manifest.json").read_text())["sources"]
+    by_name = {s["name"]: s["meta"] for s in sources.values()}
 
     for name in PAYLOAD_SOURCES:
-        # Same trees, same paths: only the date directory differs.
-        expected_templates = {template(g) for g in UNCUT[target][name]}
-        assert {template(g) for g in rendered[name]} == expected_templates, name
-        for tmpl in expected_templates:
-            patterns = [g.split("/")[-3] for g in rendered[name] if template(g) == tmpl]
-            assert "*" not in patterns, (name, tmpl)
-            for date in DATES:
-                read = any(fnmatch.fnmatchcase(date, p) for p in patterns)
-                assert read == (date < cutoff), (name, tmpl, date, patterns)
+        location = by_name[name]["external_location"]
+        assert f"getvariable('capture_cutoff_files_{name}')" in location, name
+        assert not GLOB.findall(location), name
+        # The pre-hook lists from this glob, below each tree's root.
+        assert by_name[name]["capture_glob"] == UNCUT["fixtures"][name][0].removeprefix(
+            "tests/fixtures/raw/"
+        ), name
 
 
 @pytest.mark.integration
