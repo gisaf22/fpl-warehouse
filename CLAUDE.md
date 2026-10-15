@@ -27,7 +27,9 @@ and states it can be deleted on migration.
   `gameweeks` table is gone (deleted upstream in fpl-ingest).
 - Build `fct_player_fixture` at **per-fixture grain** first.
 - Derive `fct_player_gameweek` from it, spine-joined, with an explicit `fixture_count`
-  column: `0` = blank gameweek, `1` = normal, `2+` = double.
+  column: `0` = nothing observed (the team had no fixture, the player was not yet
+  registered, or had departed), `1` = normal, `2+` = double. Where it is `0`, every
+  measure is `NULL`, never `0`: a zero is always an observed zero (#133 S17, #186).
 - **Never model at gameweek grain directly from raw data.**
 - **Gameweek, not round.** FPL calls the same number `round` (element-summary history)
   and `event` (fixtures, event-status, bootstrap-static). This project calls it `gameweek`
@@ -51,13 +53,12 @@ and states it can be deleted on migration.
   (`elements[].code`) sits on `stg_player` as a plain column so a consumer can follow a
   person across seasons. Nothing in this project joins, deduplicates or filters on it;
   `fpl_id` remains the key within a season.
-- **ASSUMED, not verified: the double-gameweek rule for the event-level fields.**
+- **The double-gameweek rule for the event-level fields — observed.**
   `fct_player_gameweek` takes `value`, `selected` and the `transfers_*` family from the
-  gameweek's last fixture (`max_by(..., kickoff_time)` — last write wins) on the basis that FPL
-  states them per event, so both rows of a double would repeat the same number and summing
-  would double-count. **No double gameweek has occurred in the captured data, so this has
-  never been observed.** Re-verify at the first real double before trusting these columns
-  across one.
+  gameweek's last fixture (`max_by(..., kickoff_time)` — last write wins), because FPL
+  states them per event, so both rows of a double repeat the same number and summing
+  would double-count. 2025-26 holds 409 double gameweek keys, and both fixture rows carry
+  the same values in all of them (#133 S18).
 
 ---
 
@@ -488,6 +489,16 @@ count changes again the next time a season is ported.
 Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it. From #74 on, each entry states the `contract_version` it ships in.
+
+- **2026-10-14 — `fct_player_gameweek`: unobserved measures NULL, `deadline_time`
+  dropped (#186). Breaking, `contract_version` 2.** Two changes under one bump (#133 S1).
+  The 27 measures (`minutes` through `ict_index`) are now `NULL`, not `0`, on every row
+  with `fixture_count = 0` (#133 S17); rows with a fixture keep their summed values, real
+  zeros included. Same shape, new meaning, so the publish guard cannot see it. And
+  `deadline_time TIMESTAMP`, the fifth column, is removed (#133 S19): read a gameweek's
+  deadline from `dim_gameweek` on `(season, gameweek)`. Every later column moves up one
+  place, so a consumer reading by position must re-map. Every other served table is
+  unchanged. A consumer should assert `contract_version == 2`.
 
 - **2026-10-12 — `dim_gameweek` served (#170). Additive, `contract_version` 1.**
   A new object under `served/`, with an enforced contract of 5 columns (`season`,
