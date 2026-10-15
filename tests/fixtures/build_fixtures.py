@@ -218,6 +218,15 @@ WHAT EACH PLAYER COVERS
           rebuild exists to fix. Exercises
           fct_test_player_gameweek_blank_gameweek_is_zero.
 
+          611's R4 capture also carries a SYNTHETIC undeclared history field:
+          one key that sources.yml does not declare at `$.history[*]`, added
+          to its first history row (see SYNTHETIC_UNDECLARED). Every real
+          history field is declared, so without it the root read's trim to
+          declared fields (#175) changes nothing on this tree and
+          stg_test_player_history_capture_reads_only_declared_history_fields
+          could not fail (#175 AC3). Every model selects history fields by
+          name, so the key is otherwise inert.
+
 4         Departed player — SYNTHETIC removal, the second edited case in this
           tree. Played rounds 1 and 2 for real (90 min / 5 pts, 76 min /
           6 pts), is present in `elements` for R1 and R2, and is then removed
@@ -275,7 +284,8 @@ TRIMMING
 --------
 element-summary payloads are checked in whole: every history row of every
 captured object, ~16-21 KB each. The only content changes are player 233's
-synthetic row and the `_fixture_note` key added to every file. They are
+synthetic row, player 611's synthetic undeclared field in R4, and the
+`_fixture_note` key added to every file. They are
 re-serialised pretty-printed and key-sorted rather than stored byte-for-byte,
 so a regeneration produces a readable diff instead of one reflowed line; the
 values themselves are exactly as captured.
@@ -505,6 +515,17 @@ SYNTHETIC_DGW = {
     "source_fixture": 12,
     "fixture": 999,
     "kickoff_time": "2026-09-01T19:00:00Z",
+}
+
+# The synthetic undeclared history field, stated in one place so the edit is
+# auditable (#175 AC3). This key is added to the first history row of one
+# capture; it is declared nowhere in sources.yml, so the root read of
+# element-summary must drop it. Every other field and row is as captured.
+SYNTHETIC_UNDECLARED = {
+    "fpl_id": 611,
+    "run_id": "20260914T211204Z-a730c3",
+    "field": "synthetic_undeclared_field",
+    "value": 1,
 }
 
 
@@ -799,6 +820,29 @@ def add_synthetic_dgw(payload: dict) -> dict:
     return payload
 
 
+def add_synthetic_undeclared_field(payload: dict) -> dict:
+    """Add an undeclared key to the first history row — see SYNTHETIC_UNDECLARED."""
+    if not payload["history"]:
+        sys.exit(
+            f"player {SYNTHETIC_UNDECLARED['fpl_id']} has no history row in "
+            f"{SYNTHETIC_UNDECLARED['run_id']} to carry the undeclared field"
+        )
+    if SYNTHETIC_UNDECLARED["field"] in payload["history"][0]:
+        sys.exit(
+            f"FPL now serves `{SYNTHETIC_UNDECLARED['field']}` — the synthetic "
+            "field is no longer undeclared by construction; rename it"
+        )
+    first = dict(payload["history"][0])
+    first[SYNTHETIC_UNDECLARED["field"]] = SYNTHETIC_UNDECLARED["value"]
+    payload["history"] = [first] + payload["history"][1:]
+    payload["_fixture_note"] += (
+        f" The first history row's `{SYNTHETIC_UNDECLARED['field']}` is "
+        "SYNTHETIC: a field sources.yml does not declare, which the root read "
+        "must drop. See SYNTHETIC_UNDECLARED in build_fixtures.py."
+    )
+    return payload
+
+
 def mark_synthetic_finished(events: list, run_id: str) -> list:
     """Flip `finished` on one round of one capture — see SYNTHETIC_FINISHED."""
     if run_id != SYNTHETIC_FINISHED["run_id"]:
@@ -972,6 +1016,9 @@ def main() -> None:
             if fpl_id == SYNTHETIC_DGW["fpl_id"]:
                 payload = add_synthetic_dgw(payload)
             payload["_fixture_note"] = note
+            if (fpl_id, run_id) == (SYNTHETIC_UNDECLARED["fpl_id"],
+                                    SYNTHETIC_UNDECLARED["run_id"]):
+                payload = add_synthetic_undeclared_field(payload)
             write(
                 OUT_ROOT / "element-summary" / str(fpl_id) / date / run_id
                 / "payload.json",

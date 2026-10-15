@@ -4,10 +4,10 @@
 --          fields declared at $.history[*] in sources.yml, so reading history
 --          at the payload root exposes no undeclared field (#115, #175 AC3).
 -- Origin: new in #175 (proposed AC3)
--- Tier: integration. Every raw history field is declared today, so on the
---       fixture tree this fails only if a declared field goes missing; in the
---       live build it also fails the day FPL adds a history field and the
---       root read stops projecting to the declared ones.
+-- Tier: integration. Every real history field is declared, so the fixture
+--       tree carries one synthetic undeclared field (SYNTHETIC_UNDECLARED in
+--       tests/fixtures/build_fixtures.py, fpl_id 611's R4 capture); without
+--       the root read's trim to declared fields this lists it.
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#175 AC3'}) }}
 
 {%- set declared = [] -%}
