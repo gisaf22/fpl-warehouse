@@ -1,0 +1,165 @@
+{
+ "raw_contract_version": "2.4.0",
+ "run_id": "20261013T072947Z-8f09c4",
+ "source": "fpl",
+ "extraction_date": "2026-10-13",
+ "started_at": "2026-10-13T07:29:47.951524Z",
+ "ended_at": "2026-10-13T07:34:16.488569Z",
+ "duration_seconds": 268.537,
+ "status": "SUCCESS",
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "written": 1,
+   "failed": 0,
+   "bytes": 1780266
+  },
+  "element-summary/1": {
+   "attempted": 1,
+   "written": 1,
+   "failed": 0,
+   "bytes": 15727
+  },
+  "element-summary/2": {
+   "attempted": 1,
+   "written": 1,
+   "failed": 0,
+   "bytes": 17371
+  },
+  "event-status": {
+   "attempted": 1,
+   "written": 1,
+   "failed": 0,
+   "bytes": 220
+  }
+ },
+ "totals": {
+  "attempted": 670,
+  "written": 670,
+  "failed": 0,
+  "bytes": 11685059
+ },
+ "failures": [],
+ "endpoints": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "usable": 1,
+   "failed": 0,
+   "outcome": "SUCCESS",
+   "failures": [],
+   "drift": {
+    "status": "ok",
+    "checked": 1,
+    "reasons": [],
+    "entries": []
+   }
+  },
+  "element-summary": {
+   "attempted": 667,
+   "usable": 667,
+   "failed": 0,
+   "outcome": "SUCCESS",
+   "failures": [],
+   "drift": {
+    "status": "ok",
+    "checked": 667,
+    "reasons": [],
+    "entries": []
+   }
+  },
+  "event-status": {
+   "attempted": 1,
+   "usable": 1,
+   "failed": 0,
+   "outcome": "SUCCESS",
+   "failures": [],
+   "drift": {
+    "status": "ok",
+    "checked": 1,
+    "reasons": [],
+    "entries": []
+   }
+  },
+  "fixtures": {
+   "attempted": 1,
+   "usable": 1,
+   "failed": 0,
+   "outcome": "SUCCESS",
+   "failures": [],
+   "drift": {
+    "status": "ok",
+    "checked": 1,
+    "reasons": [],
+    "entries": []
+   }
+  }
+ },
+ "git_sha": "d640ca66ba0032ac05a0e6ea2fdb4f4603aaa8d0",
+ "ingest_version": "1.0.0",
+ "config": {
+  "raw_dir": null,
+  "rate": 10.0,
+  "strict": false,
+  "verbose": false
+ },
+ "trigger": "scheduled",
+ "origin": {
+  "kind": "ci",
+  "workflow": "Scheduled Ingestion \u2014 Daily",
+  "ref": "refs/heads/main",
+  "github_run_id": "38362979234",
+  "aws_principal": "github-actions-fpl-ingest"
+ },
+ "finality": {
+  "6": {
+   "points": "p",
+   "bonus_added": false
+  }
+ },
+ "captures": [
+  {
+   "key": "raw/fpl/event-status/2026-10-13/20261013T072947Z-8f09c4/payload.json",
+   "endpoint": "event-status",
+   "received_at": "2026-10-13T07:29:48.240115Z",
+   "content_sha256": "35b8e87e2dfdd8f3f86aa65b3efb8b663cefd50c99168c837da79e7c7c7e195b",
+   "content_length": 220,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27"
+  },
+  {
+   "key": "raw/fpl/bootstrap-static/2026-10-13/20261013T072947Z-8f09c4/payload.json",
+   "endpoint": "bootstrap-static",
+   "received_at": "2026-10-13T07:29:48.248936Z",
+   "content_sha256": "de8d29243da2a49cf4b07e2f1ee1aaaafee2f6fb2cf809d5682c0650938376d0",
+   "content_length": 1780266,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27"
+  },
+  {
+   "key": "raw/fpl/element-summary/1/2026-10-13/20261013T072947Z-8f09c4/payload.json",
+   "endpoint": "element-summary/1",
+   "received_at": "2026-10-13T07:29:49.921984Z",
+   "content_sha256": "a4eff29084c39aa6dd4abd3f3613270a6d5832508c462d0d4a7ff52de6c80190",
+   "content_length": 15727,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27"
+  },
+  {
+   "key": "raw/fpl/element-summary/2/2026-10-13/20261013T072947Z-8f09c4/payload.json",
+   "endpoint": "element-summary/2",
+   "received_at": "2026-10-13T07:29:49.934688Z",
+   "content_sha256": "3dfc28018765839a25710e287bef3e262c40da8e0e70b9efcfc8478f30dba8d5",
+   "content_length": 17371,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27"
+  }
+ ]
+}

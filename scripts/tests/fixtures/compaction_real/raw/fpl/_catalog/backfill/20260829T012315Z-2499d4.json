@@ -1,0 +1,47 @@
+{
+ "run_id": "20260829T012315Z-2499d4",
+ "source": "fpl",
+ "scope": "live",
+ "generated_at": "2026-10-02T17:21:01Z",
+ "captures": [
+  {
+   "key": "raw/fpl/bootstrap-static/2026-08-29/20260829T012315Z-2499d4/payload.json",
+   "endpoint": "bootstrap-static",
+   "received_at": "2026-08-29T01:23:16.298546Z",
+   "content_sha256": "3ba29c272271d8141b70a549facad78eb9c15ddc35e2adcb636df876e92414d9",
+   "content_length": 1648060,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27",
+   "shape_source": "sidecar",
+   "validator_version": null
+  },
+  {
+   "key": "raw/fpl/element-summary/1/2026-08-29/20260829T012315Z-2499d4/payload.json",
+   "endpoint": "element-summary/1",
+   "received_at": "2026-08-29T01:23:19.602617Z",
+   "content_sha256": "485c598f56a61446fe96284cb6b1a7646975413ce6c92f4603104240373cb2e8",
+   "content_length": 13933,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27",
+   "shape_source": "sidecar",
+   "validator_version": null
+  },
+  {
+   "key": "raw/fpl/element-summary/10/2026-08-29/20260829T012315Z-2499d4/payload.json",
+   "endpoint": "element-summary/10",
+   "received_at": "2026-08-29T01:23:19.616639Z",
+   "content_sha256": "225f1a7c615e9370003b7f552d2b64c46fec93e0f726315434b87867fb606e97",
+   "content_length": 15109,
+   "http_status": 200,
+   "shape_ok": true,
+   "usable": true,
+   "season": "2026-27",
+   "shape_source": "sidecar",
+   "validator_version": null
+  }
+ ]
+}

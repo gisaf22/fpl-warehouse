@@ -415,3 +415,72 @@ def test_a_run_whose_run_manifest_is_missing_fails_the_day(tmp_path):
     assert not results[D1].ok
     assert "no run manifest" in results[D1].reason
     assert not Path(manifest_path(str(dest), D1)).exists()
+
+
+# --- #203: the index's real shapes ----------------------------------------------------
+#
+# fixtures/compaction_real/raw is trimmed from live S3 on 2026-10-15: run
+# 20261013T072947Z-8f09c4's manifest (captures[], contract 2.4.0) and run
+# 20260829T012315Z-2499d4's manifest and backfill catalog entry, each cut to two
+# element-summary captures plus other endpoints' entries, with those captures'
+# real payloads. Ingest records the endpoint as `element-summary/<fpl_id>`.
+
+REAL = Path(__file__).resolve().parent / "fixtures" / "compaction_real" / "raw"
+REAL_DAYS = {
+    "manifest": ("2026-10-13", "20261013T072947Z-8f09c4"),
+    "catalog": ("2026-08-29", "20260829T012315Z-2499d4"),
+}
+
+
+def real_tree(tmp_path: Path) -> Path:
+    raw = tmp_path / "raw"
+    for f in REAL.rglob("*"):
+        if f.is_file():
+            (raw / f.relative_to(REAL)).parent.mkdir(parents=True, exist_ok=True)
+            (raw / f.relative_to(REAL)).write_bytes(f.read_bytes())
+    return raw
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+@pytest.mark.parametrize("index", ["manifest", "catalog"])
+def test_a_day_indexed_in_the_real_shape_compacts(tmp_path, index):
+    day, run_id = REAL_DAYS[index]
+    dest = tmp_path / "compacted"
+    result = compact_days([day], raw_root=str(REAL), dest_root=str(dest))[day]
+    assert result.ok, result.reason
+    entry = json.loads(Path(manifest_path(str(dest), day)).read_text())
+    assert entry["payload_files"] == entry["parquet_rows"] == 2
+    assert entry["run_ids"] == [run_id]
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+@pytest.mark.parametrize("index", ["manifest", "catalog"])
+def test_a_real_shape_payload_whose_bytes_differ_from_its_index_fails_on_sha256(
+    tmp_path, index
+):
+    day, run_id = REAL_DAYS[index]
+    raw, dest = real_tree(tmp_path), tmp_path / "compacted"
+    (raw / f"fpl/element-summary/1/{day}/{run_id}/payload.json").write_text(
+        json.dumps({"fixtures": [], "history": [], "history_past": []})
+    )
+    result = compact_days([day], raw_root=str(raw), dest_root=str(dest))[day]
+    assert not result.ok
+    assert "sha256" in result.reason
+    assert not Path(manifest_path(str(dest), day)).exists()
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+@pytest.mark.parametrize("index", ["manifest", "catalog"])
+def test_a_real_shape_listed_file_missing_from_the_index_is_the_one_named(tmp_path, index):
+    day, run_id = REAL_DAYS[index]
+    raw, dest = real_tree(tmp_path), tmp_path / "compacted"
+    extra = f"fpl/element-summary/999/{day}/{run_id}/payload.json"
+    (raw / extra).parent.mkdir(parents=True)
+    (raw / extra).write_text(json.dumps({"fixtures": [], "history": [], "history_past": []}))
+    result = compact_days([day], raw_root=str(raw), dest_root=str(dest))[day]
+    assert not result.ok
+    assert f"listed but not indexed ['raw/{extra}']; indexed but not listed []" in result.reason
+    assert not Path(manifest_path(str(dest), day)).exists()
