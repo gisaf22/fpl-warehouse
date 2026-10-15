@@ -1477,6 +1477,15 @@ A second inline policy, `fpl-warehouse-metrics-write`, grants `s3:PutObject` on
 Verified live on 2026-10-15 by the maintainer with `simulate-principal-policy`:
 `metrics/build/` allowed, `served/` allowed, `raw/` implicitly denied.
 
+A third inline policy, `fpl-warehouse-compacted-rw`, grants `s3:PutObject` and
+`s3:GetObject` on `arn:aws:s3:::fpl-data-safari/compacted/*`, for the element-summary
+compaction writer (#193; layout and manifest in `docs/compacted.md`, ADR 0004). It has no
+`s3:DeleteObject`: recompacting a day overwrites its parquet. Verified live on 2026-10-15
+by the maintainer with `simulate-principal-policy`: `compacted/fpl/element-summary/*` put
+and get allowed and delete implicitly denied; `ListBucket` with prefix `compacted/`
+allowed; get on `raw/fpl/element-summary/*`, `raw/fpl/_manifests/*` and
+`raw/fpl/_catalog/*` allowed. The writer is not wired into any workflow yet (#198).
+
 Note the first policy's *name* predates the write grant and is now a misnomer: `-s3-read` describes
 what the role originally did, not what it does. The statement names are the accurate
 description. Renaming it is cosmetic and would require updating the role, so it has been
