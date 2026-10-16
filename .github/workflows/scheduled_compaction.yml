@@ -1,0 +1,95 @@
+# Scheduled element-summary compaction (#205, #78 W16).
+#
+# Compacts closed element-summary days from raw/ to
+# s3://fpl-data-safari/compacted/, oldest first, until compaction.yml's
+# max_seconds_per_run is spent. A started day always runs to completion.
+# compaction.yml ships the budget at 0, and with 0 the step makes no S3 call;
+# #200 is the on-switch. See docs/compacted.md.
+#
+# Its own workflow, apart from scheduled_build.yml (W16): a day can take ~18
+# minutes on the runner (dry run 38828339698), and builds read only the
+# compaction manifest (W4), so neither needs to wait for the other.
+#
+# The only workflow allowed a production destination. scripts/tests enforce
+# that, and that it has no trigger but its schedule: #193 A6's gate refuses a
+# production write from any other trigger.
+
+name: Scheduled Compaction
+
+on:
+  schedule:
+    # 01:30 and 13:30 UTC, away from the 07:45/19:45 builds. Day D closes at
+    # 06:00 UTC on D+1 (compaction.yml's ingest timeout), so each day is
+    # compacted within ~1.5 days (#205 Stage 0).
+    - cron: "30 1,13 * * *"
+
+permissions:
+  id-token: write
+  contents: read
+
+# Runs never overlap: a run still compacting a heavy day finishes before the
+# next starts, rather than two runs racing on one day's parquet and manifest.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  compact:
+    runs-on: ubuntu-24.04
+
+    # Below the one-hour OIDC session (W16), so a stuck run ends in a clean
+    # timeout rather than an expired credential. The budget plus the heaviest
+    # day must fit inside it; see compaction.yml.
+    timeout-minutes: 50
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Require an AWS role to be configured
+        run: |
+          if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
+            echo "::error::Set the AWS_ROLE_ARN repository variable to an IAM \
+          role whose trust policy admits repo:${{ github.repository }} on \
+          refs/heads/main. See CLAUDE.md, 'Scheduled build'."
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The schedule's OIDC subject is the main ref form, which the role
+      # already trusts, as for scheduled_build.yml.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      # Not continue-on-error: a failed day exits 1 and fails the run, which
+      # alerts through GitHub's failed-run email. The impact is a longer raw
+      # tail, never wrong data. The W13 object goes to
+      # .local/metrics/compaction.json for the record below.
+      - name: Compact closed element-summary days
+        run: >-
+          uv run python scripts/compaction_step.py
+          --raw-root s3://fpl-data-safari/raw
+          --dest-root s3://fpl-data-safari/compacted
+          --out .local/metrics/compaction.json
+          --summary "$GITHUB_STEP_SUMMARY"
+
+      # The compaction record (#205 G5): the job summary always, and
+      # s3://fpl-data-safari/metrics/compaction/<run_id>.json on a scheduled
+      # run. A failed write fails the job. A scheduled run_id with no JSON
+      # means the run was killed before this step.
+      - name: Record compaction metrics
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: >-
+          uv run python scripts/compaction_metrics.py --out .local/metrics
+          --job-status "$JOB_STATUS" --summary "$GITHUB_STEP_SUMMARY"
