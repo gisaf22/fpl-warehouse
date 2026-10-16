@@ -60,7 +60,8 @@ overwritten next time, and the other days go on.
    with no payload files, or with a run that has no run manifest, fails.
 2. **Counts.** Listed payload files = parquet rows = distinct `filename`.
 3. **Index.** The listed files' keys equal the element-summary keys of D in the index of
-   D's runs, and each file's sha256 equals the index's `content_sha256`. A run's index is
+   D's runs (a key under `raw/fpl/element-summary/`, never the `endpoint` field, which
+   ingest records as `element-summary/<fpl_id>`, #203), and each file's sha256 equals the index's `content_sha256`. A run's index is
    its finalized manifest's `captures[]` (any status but `IN_PROGRESS`) if present,
    otherwise `raw/fpl/_catalog/backfill/<run_id>.json`: `base_capture_index`'s precedence.
    A run with neither fails the day.
@@ -102,7 +103,9 @@ At most N, oldest first. A day that fails stays a candidate and takes one slot o
 run until fixed; no failure state is kept, and the summary flags it each run (O1).
 
 **What it records.** The W13 `compaction` object in the #191 build record (see CLAUDE.md,
-"Build metrics"), and a job summary headed `**failed**` when any day failed.
+"Build metrics"), and a job summary headed `**failed**` when any day failed. As each day finishes, the
+step prints `compaction: day=<D> files=<n> seconds=<s> ok=<bool>` to its log, so a
+killed run still shows the days it completed (#203 F4).
 
 ### Runbook
 
