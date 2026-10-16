@@ -294,3 +294,32 @@ def test_a_run_killed_mid_day_has_already_printed_the_days_before_it(
         run_step(raw, dest, LATE, n=0, timeout=TIMEOUT, days=[D1, D2])
     out = capsys.readouterr().out.splitlines()
     assert [re.match(PROGRESS, l).group(1) for l in out if re.match(PROGRESS, l)] == [D1]
+
+
+# --- #203 F6: selection reads the index's real shape ---------------------------------
+
+REAL = Path(__file__).resolve().parent / "fixtures" / "compaction_real" / "raw"
+AFTER_REAL = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+def test_a_real_contract_1_0_0_day_is_selected_as_a_candidate(tmp_path):
+    selection = select_days(str(REAL), str(tmp_path / "compacted"), AFTER_REAL, n=5,
+                            timeout=TIMEOUT)
+    assert "2026-08-29" in selection.days
+    assert "2026-08-29" not in selection.skipped_empty
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+def test_a_real_captures_list_alone_makes_its_day_a_candidate(tmp_path):
+    raw = tmp_path / "raw"
+    path = "fpl/_manifests/2026-10-13/20261013T072947Z-8f09c4/manifest.json"
+    manifest = json.loads((REAL / path).read_text())
+    del manifest["objects"]
+    (raw / path).parent.mkdir(parents=True)
+    (raw / path).write_text(json.dumps(manifest))
+    selection = select_days(str(raw), str(tmp_path / "compacted"), AFTER_REAL, n=5,
+                            timeout=TIMEOUT)
+    assert selection.days == ["2026-10-13"]
