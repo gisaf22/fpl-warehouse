@@ -51,9 +51,9 @@ def compact_outright(raw: str, dest: str, day: str) -> None:
 
 @pytest.mark.unit
 @pytest.mark.covers("#205 AC3")
-def test_the_checked_in_config_ships_a_zero_budget_with_a_six_hour_timeout():
+def test_the_checked_in_config_ships_a_1800_second_budget_with_a_six_hour_timeout():
     config = load_config()
-    assert config.max_seconds_per_run == 0
+    assert config.max_seconds_per_run == 1800
     assert config.ingest_job_timeout == timedelta(hours=6)
 
 

@@ -9,7 +9,7 @@
 # figures: dry run 38828339698's heaviest day took 1,084.4s, and the budget
 # plus that day must stay under scheduled_compaction.yml's 50-minute
 # timeout-minutes. Rollback: set it to 0.
-max_seconds_per_run: 0
+max_seconds_per_run: 1800
 
 # Day D closes at D+1 00:00 UTC plus this, once every run manifest under
 # raw/fpl/_manifests/D/ is finalized (#198 D1). 6h until fpl-ingest#99 sets the
