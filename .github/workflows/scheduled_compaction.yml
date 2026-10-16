@@ -84,7 +84,7 @@ jobs:
 
       # The compaction record (#205 G5): the job summary always, and
       # s3://fpl-data-safari/metrics/compaction/<run_id>.json on a scheduled
-      # run. A failed write fails the job. A scheduled run_id with no JSON
+      # run with a budget above 0. A failed write fails the job. A scheduled run_id with no JSON
       # means the run was killed before this step.
       - name: Record compaction metrics
         if: always()

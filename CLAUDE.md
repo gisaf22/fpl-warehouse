@@ -1342,7 +1342,8 @@ The scheduled build does not compact (#205, #78 W16). `scheduled_compaction.yml`
 allowed to write `s3://fpl-data-safari/compacted/`. It compacts closed element-summary days
 oldest first until `max_seconds_per_run` in `compaction.yml` is spent; a started day runs to
 completion. The budget ships at 0, so it makes no S3 call until #200. Its record goes to
-`s3://fpl-data-safari/metrics/compaction/<run_id>.json` on scheduled runs. A failure alerts
+`s3://fpl-data-safari/metrics/compaction/<run_id>.json` on scheduled runs with a budget
+above 0. A failure alerts
 through GitHub's failed-run email only; it never touches a build. `live-tests`'
 `compaction_dry_run` input runs it to a local destination for measurement. Selection,
 config, the record, the sizing rule and the runbook: `docs/compacted.md`.

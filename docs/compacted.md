@@ -117,9 +117,10 @@ shows the days it completed (#203 F4).
 ### The compaction record
 
 `scripts/compaction_metrics.py` runs after the step with `if: always()`. It writes the
-record to the job summary on every run, and on a scheduled run also to
-`s3://fpl-data-safari/metrics/compaction/<run_id>.json`; a failed write fails the job.
-A dispatch writes the summary only. Exactly these fields, pinned by
+record to the job summary on every run, and on a scheduled run with a budget above 0
+also to `s3://fpl-data-safari/metrics/compaction/<run_id>.json`; a failed write fails the
+job. A dispatch, or a run with the budget at 0, writes the summary only, so disabled
+compaction writes nothing to production. Exactly these fields, pinned by
 `scripts/tests/test_compaction_metrics.py`:
 
 | Field | Meaning |
@@ -147,8 +148,9 @@ from those runs still carry it; the #191 extraction query reads both.
 - **A day failing every run:** its reason is in each run's summary. Fix the cause in raw
   or the index (or recompact by hand). It is retried, and spends budget, until it
   succeeds.
-- **A scheduled `run_id` with no record** under `metrics/compaction/` means the run was
-  killed before the record step: the 50-minute timeout, a runner loss or an outage.
+- **A scheduled `run_id` with no record** under `metrics/compaction/`, while the budget is
+  above 0, means the run was killed before the record step: the 50-minute timeout, a
+  runner loss or an outage.
 
 ### Dry run (measurement for #200)
 

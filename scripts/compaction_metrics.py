@@ -2,9 +2,10 @@
 
 Wraps the compaction step's W13 object (#198 D4, `budget_seconds` since #205)
 in one record: `run_id`, `git_sha`, `built_at`, `status` and `compaction`.
-Every run writes it to its job summary. A scheduled run also writes it to
-s3://fpl-data-safari/metrics/compaction/<run_id>.json, and a failed write fails
-the job: the gate build_metrics.py uses for build records (#191 AC4).
+Every run writes it to its job summary. A scheduled run with a budget above 0
+also writes it to s3://fpl-data-safari/metrics/compaction/<run_id>.json, and a
+failed write fails the job: the gate build_metrics.py uses for build records
+(#191 AC4), plus "disabled writes nothing" (#205).
 
 Called with `if: always()` from scheduled_compaction.yml, and from ci.yml's
 live-tests job after a compaction_dry_run. It reads `compaction.json` from the
@@ -92,7 +93,7 @@ def summary(record: dict, written_to: str | None) -> str:
             f"| `{day['capture_day']}` | {'ok' if day['ok'] else 'failed: ' + day['reason']}, "
             f"{day['files_read']} files, {day['rows_written']} rows, {day['seconds']}s |"
         )
-    target = f"{written_to} (this step fails if the write fails)" if written_to else "not written (not a scheduled run)"
+    target = f"{written_to} (this step fails if the write fails)" if written_to else "not written (not a scheduled run, or the budget is 0)"
     lines += ["", f"S3 record: {target}"]
     return "\n".join(lines) + "\n"
 
@@ -112,7 +113,9 @@ def main() -> int:
         return 1
 
     event = os.environ.get("GITHUB_EVENT_NAME", "")
-    key = s3_key(record["run_id"]) if writes_to_s3(event) else None
+    # A disabled run (budget 0) writes nothing to production, its record included.
+    enabled = (record["compaction"]["budget_seconds"] or 0) > 0
+    key = s3_key(record["run_id"]) if writes_to_s3(event) and enabled else None
     # The summary is written first, so it survives a failed upload.
     with args.summary.open("a") as f:
         f.write(summary(record, f"s3://{BUCKET}/{key}" if key else None))
