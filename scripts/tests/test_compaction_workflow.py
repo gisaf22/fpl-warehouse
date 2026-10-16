@@ -52,11 +52,43 @@ def compaction_steps(steps_: list[dict]) -> list[int]:
 # --- G1: the new workflow -------------------------------------------------------------
 
 
+REGULAR_CRON = "30 1,13 * * *"
+# #200's one-off first live run, 02:45 UTC 2026-10-16; removed by 78h.
+ONE_OFF_CRON = "45 2 16 10 *"
+
+
+def triggers_allowed(on: dict) -> bool:
+    """Only a schedule: the regular cron, plus at most the #200 one-off entry."""
+    if set(on) != {"schedule"}:
+        return False
+    crons = [entry.get("cron") for entry in on["schedule"]]
+    return crons in ([REGULAR_CRON], [REGULAR_CRON, ONE_OFF_CRON])
+
+
 @pytest.mark.integration
 @pytest.mark.covers("#205 AC1")
+@pytest.mark.covers("#200 AC1")
 def test_compaction_runs_on_its_own_schedule_and_nothing_else_triggers_it():
     on = load(COMPACTION)[True]  # PyYAML reads `on` as True
-    assert on == {"schedule": [{"cron": "30 1,13 * * *"}]}
+    assert triggers_allowed(on)
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC1")
+@pytest.mark.covers("#200 AC1")
+@pytest.mark.parametrize(("crons", "allowed"), [
+    ([REGULAR_CRON], True),
+    ([REGULAR_CRON, ONE_OFF_CRON], True),
+    ([ONE_OFF_CRON], False),
+    ([REGULAR_CRON, "45 2 * * *"], False),
+    (["45 7,19 * * *"], False),
+    ([REGULAR_CRON, ONE_OFF_CRON, "0 3 17 10 *"], False),
+], ids=["regular", "regular-and-one-off", "one-off-alone", "daily-extra", "build-slot",
+        "second-one-off"])
+def test_any_other_compaction_schedule_fails(crons, allowed):
+    on = {"schedule": [{"cron": c} for c in crons]}
+    assert triggers_allowed(on) is allowed
+    assert not triggers_allowed(on | {"workflow_dispatch": None})
 
 
 @pytest.mark.integration

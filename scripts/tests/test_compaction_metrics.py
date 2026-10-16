@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 import compaction_metrics
+from compaction_step import load_config
 from compaction_metrics import (
     COMPACTION_DAY_FIELDS,
     COMPACTION_FIELDS,
@@ -131,7 +132,7 @@ def test_a_run_whose_step_wrote_no_object_records_nulls_never_a_guess(tmp_path):
     out.mkdir()
     record = build_record(out, "failure")
     assert record["compaction"] == {
-        "budget_seconds": 0, "seconds": None, "days_selected": None, "days": [], "peak_rss_mib": None,
+        "budget_seconds": load_config().max_seconds_per_run, "seconds": None, "days_selected": None, "days": [], "peak_rss_mib": None,
     }
     assert schema_problems(record) == []
 
