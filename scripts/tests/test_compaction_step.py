@@ -256,3 +256,70 @@ def test_a_dry_run_from_a_dispatch_cannot_reach_the_production_prefix(tmp_path, 
     with pytest.raises(DestinationRefused):
         run_step(raw, "s3://fpl-data-safari/compacted", LATE, n=0, timeout=TIMEOUT,
                  days=[D1])
+
+
+# --- #203 F4: per-day progress ------------------------------------------------------
+
+PROGRESS = r"^compaction: day=(\S+) files=(\d+) seconds=\d+\.\d ok=(True|False)$"
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC4")
+def test_each_compacted_day_prints_a_progress_line(tmp_path, capsys):
+    import re
+
+    raw, dest = tree(tmp_path, [run(D1, "aaaaaa"), run(D2, "bbbbbb", index="none")])
+    run_step(raw, dest, LATE, n=0, timeout=TIMEOUT, days=[D1, D2])
+    lines = [re.match(PROGRESS, l) for l in capsys.readouterr().out.splitlines()]
+    assert [m.groups() for m in lines if m] == [(D1, "1", "True"), (D2, "1", "False")]
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC4")
+def test_a_run_killed_mid_day_has_already_printed_the_days_before_it(
+    tmp_path, capsys, monkeypatch
+):
+    import re
+
+    raw, dest = tree(tmp_path, [run(D1, "aaaaaa"), run(D2, "bbbbbb")])
+    real = step.compact_days
+
+    def killed_on_d2(days, **kwargs):
+        if days == [D2]:
+            raise RuntimeError("killed")
+        return real(days, **kwargs)
+
+    monkeypatch.setattr(step, "compact_days", killed_on_d2)
+    with pytest.raises(RuntimeError):
+        run_step(raw, dest, LATE, n=0, timeout=TIMEOUT, days=[D1, D2])
+    out = capsys.readouterr().out.splitlines()
+    assert [re.match(PROGRESS, l).group(1) for l in out if re.match(PROGRESS, l)] == [D1]
+
+
+# --- #203 F6: selection reads the index's real shape ---------------------------------
+
+REAL = Path(__file__).resolve().parent / "fixtures" / "compaction_real" / "raw"
+AFTER_REAL = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+def test_a_real_contract_1_0_0_day_is_selected_as_a_candidate(tmp_path):
+    selection = select_days(str(REAL), str(tmp_path / "compacted"), AFTER_REAL, n=5,
+                            timeout=TIMEOUT)
+    assert "2026-08-29" in selection.days
+    assert "2026-08-29" not in selection.skipped_empty
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#203 AC6")
+def test_a_real_captures_list_alone_makes_its_day_a_candidate(tmp_path):
+    raw = tmp_path / "raw"
+    path = "fpl/_manifests/2026-10-13/20261013T072947Z-8f09c4/manifest.json"
+    manifest = json.loads((REAL / path).read_text())
+    del manifest["objects"]
+    (raw / path).parent.mkdir(parents=True)
+    (raw / path).write_text(json.dumps(manifest))
+    selection = select_days(str(raw), str(tmp_path / "compacted"), AFTER_REAL, n=5,
+                            timeout=TIMEOUT)
+    assert selection.days == ["2026-10-13"]

@@ -58,7 +58,8 @@ def build_tree(raw_root: Path, runs: list[Run]) -> None:
                 {
                     "content_length": len(body),
                     "content_sha256": hashlib.sha256(body).hexdigest(),
-                    "endpoint": "element-summary",
+                    # As ingest records it: endpoint/id, as in every real index (#203).
+                    "endpoint": f"element-summary/{capture.fpl_id}",
                     "http_status": 200,
                     "key": f"raw/{rel}",
                     "received_at": capture.received_at,

@@ -34,12 +34,14 @@ scheduled run (GITHUB_EVENT_NAME == schedule). #198 reuses this gate.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shlex
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +51,11 @@ import yaml
 
 PROD_PREFIX = "s3://fpl-data-safari/compacted/"
 ENDPOINT = "element-summary"
+# Ingest records the endpoint as element-summary/<fpl_id>, so a capture is
+# element-summary by its key, never by endpoint equality (#203).
+KEY_PREFIX = f"raw/fpl/{ENDPOINT}/"
+# Concurrent GETs for sha256 verification; DuckDB's read_blob was serial (#203 F1).
+SHA_WORKERS = 32
 # Both run the writer: this module directly, and the compaction step (#198).
 WRITER_SCRIPTS = ("compact_element_summary", "compaction_step")
 MANIFEST_FIELDS = (
@@ -191,6 +198,35 @@ def _index(con, raw_root: str, run_id: str, manifest: dict) -> list[dict] | None
     return _read_json(con, catalog[0])["captures"] if catalog else None
 
 
+def list_payloads(raw_root: str) -> dict[str, list[str]]:
+    """Every element-summary payload file, by capture day: one listing (#203)."""
+    raw_root = raw_root.rstrip("/")
+    con = _connect(raw_root)
+    by_day: dict[str, list[str]] = {}
+    for f in _glob(con, f"{raw_root}/fpl/{ENDPOINT}/*/*/*/payload.json"):
+        by_day.setdefault(_key(raw_root, f).split("/")[4], []).append(f)
+    return by_day
+
+
+def _sha256_all(files: list[str]) -> dict[str, str]:
+    """Each file's sha256, read concurrently."""
+    if any(_is_s3(f) for f in files):
+        import boto3
+
+        client = boto3.client("s3")
+
+        def read(f: str) -> bytes:
+            bucket, key = f.removeprefix("s3://").split("/", 1)
+            return client.get_object(Bucket=bucket, Key=key)["Body"].read()
+    else:
+        def read(f: str) -> bytes:
+            return Path(f).read_bytes()
+
+    with ThreadPoolExecutor(SHA_WORKERS) as pool:
+        digests = pool.map(lambda f: hashlib.sha256(read(f)).hexdigest(), files)
+        return dict(zip(files, digests))
+
+
 def _git_sha() -> str:
     if os.environ.get("GITHUB_SHA"):
         return os.environ["GITHUB_SHA"]
@@ -198,10 +234,14 @@ def _git_sha() -> str:
     return out.stdout.strip()
 
 
-def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
+def compact_day(
+    day: str, raw_root: str, dest_root: str, files: list[str] | None = None
+) -> DayResult:
+    """`files` is the day's payload files from `list_payloads`; listed here if None."""
     raw_root = raw_root.rstrip("/")
     con = _connect(raw_root, dest_root)
-    files = _glob(con, f"{raw_root}/fpl/{ENDPOINT}/*/{day}/*/payload.json")
+    if files is None:
+        files = _glob(con, f"{raw_root}/fpl/{ENDPOINT}/*/{day}/*/payload.json")
     if not files:
         return DayResult(False, f"{day}: no payload files")
     read = len(files)
@@ -245,16 +285,11 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
                 rows,
             )
         for capture in index:
-            parts = capture["key"].split("/")
-            if capture.get("endpoint") == ENDPOINT and parts[4] == day:
+            key = capture["key"]
+            if key.startswith(KEY_PREFIX) and key.split("/")[4] == day:
                 expected[capture["key"]] = capture["content_sha256"]
 
-    actual = dict(
-        con.execute(
-            "select filename, sha256(content) from read_blob(?)", [files]
-        ).fetchall()
-    )
-    actual = {_key(raw_root, f): sha for f, sha in actual.items()}
+    actual = {_key(raw_root, f): sha for f, sha in _sha256_all(files).items()}
     if actual.keys() != expected.keys():
         unindexed = sorted(actual.keys() - expected.keys())
         unlisted = sorted(expected.keys() - actual.keys())
@@ -286,12 +321,21 @@ def compact_day(day: str, raw_root: str, dest_root: str) -> DayResult:
 
 
 def compact_days(
-    days: list[str], raw_root: str, dest_root: str, event_name: str | None = None
+    days: list[str],
+    raw_root: str,
+    dest_root: str,
+    event_name: str | None = None,
+    listing: dict[str, list[str]] | None = None,
 ) -> dict[str, DayResult]:
+    """`listing` is `list_payloads(raw_root)`, passed by a caller that lists once."""
     if event_name is None:
         event_name = os.environ.get("GITHUB_EVENT_NAME")
     check_destination(dest_root, event_name)
-    return {day: compact_day(day, raw_root, dest_root) for day in days}
+    if listing is None:
+        listing = list_payloads(raw_root)
+    return {
+        day: compact_day(day, raw_root, dest_root, listing.get(day, [])) for day in days
+    }
 
 
 def main() -> int:

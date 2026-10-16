@@ -39,8 +39,10 @@ import yaml
 
 from compact_element_summary import (
     ENDPOINT,
+    KEY_PREFIX,
     check_destination,
     compact_days,
+    list_payloads,
     manifest_path,
 )
 
@@ -108,7 +110,7 @@ def _writes_element_summary(manifest: dict) -> bool:
         for k, v in objects.items()
     ):
         return True
-    return any(c.get("endpoint") == ENDPOINT for c in manifest.get("captures") or [])
+    return any(c["key"].startswith(KEY_PREFIX) for c in manifest.get("captures") or [])
 
 
 def select_days(
@@ -199,16 +201,27 @@ def run_step(
         selection = select_days(raw_root, dest_root, now, n, timeout)
 
     entries = []
+    if selection.days:
+        check_destination(dest_root, _event(event_name))
+    listing = list_payloads(raw_root) if selection.days else {}
     for day in selection.days:
         day_started = time.monotonic()
         result = compact_days(
-            [day], raw_root=raw_root, dest_root=dest_root, event_name=event_name
+            [day], raw_root=raw_root, dest_root=dest_root, event_name=event_name,
+            listing=listing,
         )[day]
+        seconds = time.monotonic() - day_started
+        # F4: flushed per day, so a killed run still shows the days it finished.
+        print(
+            f"compaction: day={day} files={result.files_read} "
+            f"seconds={seconds:.1f} ok={result.ok}",
+            flush=True,
+        )
         entries.append({
             "capture_day": day,
             "ok": result.ok,
             "reason": result.reason,
-            "seconds": round(time.monotonic() - day_started, 3),
+            "seconds": round(seconds, 3),
             "files_read": result.files_read,
             "rows_written": result.rows_written,
         })
