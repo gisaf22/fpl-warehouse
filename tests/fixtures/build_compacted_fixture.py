@@ -21,8 +21,13 @@ SOURCES
 --source s3 (the default) trims production objects: it reads each day's production
 parquet and manifest from s3://fpl-data-safari/compacted, keeps only the rows whose
 capture key is one of the fixture tree's payloads, and keeps the production schema,
-types and `filename` URIs as they are. The manifest keeps production's fields, with
-its counts and run_ids set to the trimmed rows'. Needs an AWS session:
+types and `filename` URIs as they are. A payload build_fixtures.py edited
+(SYNTHETIC: 233's double) differs from its production object once parsed, apart
+from the `_fixture_note` key every fixture payload adds; its row is the fixture payload instead, read as the writer reads it and
+unioned by name, so the tree stays one capture history. The manifest keeps
+production's fields, with its counts and run_ids set to the trimmed rows'.
+Prints each source key and whether its row is production's or the fixture's.
+Needs an AWS session:
 
     eval "$(aws configure export-credentials --format env)"
     uv run python tests/fixtures/build_compacted_fixture.py
@@ -67,14 +72,38 @@ def prod_uri(local: str) -> str:
     return f"{PROD_RAW}/{Path(local).relative_to(RAW)}"
 
 
+def payload_of(text: str) -> dict:
+    """A payload as parsed, without the note build_fixtures.py adds to each one."""
+    body = json.loads(text)
+    body.pop("_fixture_note", None)
+    return body
+
+
 def trim_from_s3(day: str, parquet: Path, manifest: Path) -> None:
-    wanted = [prod_uri(f) for f in fixture_files(day)]
+    files = fixture_files(day)
+    wanted = [prod_uri(f) for f in files]
     con = writer._connect(PROD)
+    edited = [
+        f for f in files
+        if payload_of(Path(f).read_text())
+        != payload_of(con.execute("select content from read_text(?)", [prod_uri(f)]).fetchone()[0])
+    ]
+    for f in files:
+        print(f"  {writer.parquet_path(PROD, day)} :: {prod_uri(f)} -> "
+              f"{'fixture payload (edited)' if f in edited else 'production row'}")
+    fixture_rows = (
+        "union all by name select * replace (? || regexp_extract(filename, "
+        "'(fpl/element-summary/.*)$', 1) as filename) "
+        "from read_json(?, union_by_name = true, filename = true) "
+        if edited else ""
+    )
     con.execute(
         f"copy (select * from read_parquet(?, hive_partitioning = false) "
-        f"where filename in (select unnest(?::varchar[])) order by filename) "
-        f"to '{parquet}' (format parquet)",
-        [writer.parquet_path(PROD, day), wanted],
+        f"where filename in (select unnest(?::varchar[])) "
+        f"and filename not in (select unnest(?::varchar[])) {fixture_rows}"
+        f"order by filename) to '{parquet}' (format parquet)",
+        [writer.parquet_path(PROD, day), wanted, [prod_uri(f) for f in edited]]
+        + ([PROD_RAW + "/", edited] if edited else []),
     )
     record = json.loads(
         con.execute("select content from read_text(?)", [writer.manifest_path(PROD, day)])

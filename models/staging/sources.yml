@@ -70,11 +70,24 @@ sources:
           # live glob alone (#180). Project
           # macros are not available when dbt renders source YAML, so the list is
           # spelled out here rather than built by one.
+          #
+          # #194: by default the read is query(getvariable('element_summary_read')),
+          # the union of compacted parquet, the raw tail and the history seasons
+          # that the compacted_read pre-hook sets on the model's connection
+          # (macros/compacted_read.sql). `staging_read_mode: raw` renders the
+          # all-raw read below instead: allowed with GITHUB_EVENT_NAME unset (a
+          # local run) or workflow_dispatch, refused on any other event (D1).
           external_location: >-
             {%- set cutoff = var("capture_cutoff", "") | string -%}
+            {%- set mode = var("staging_read_mode", "") | string -%}
+            {%- set event = env_var("GITHUB_EVENT_NAME", "") -%}
+            {%- if mode not in ("", "raw") -%}{{ exceptions.raise_compiler_error("staging_read_mode must be raw or unset, got " ~ mode) }}{%- endif -%}
+            {%- if mode == "raw" and event not in ("", "workflow_dispatch") -%}{{ exceptions.raise_compiler_error("staging_read_mode: raw is allowed only on a local run or a workflow_dispatch, not on GITHUB_EVENT_NAME " ~ event) }}{%- endif -%}
             {%- if cutoff -%}
             {%- if not modules.re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", cutoff) -%}{{ exceptions.raise_compiler_error("capture_cutoff must be a YYYY-MM-DD date, got " ~ cutoff) }}{%- endif -%}
             read_json(getvariable('capture_cutoff_files_element_summary'), union_by_name = true, filename = true)
+            {%- elif mode != "raw" -%}
+            query(getvariable('element_summary_read'))
             {%- else -%}
             read_json(
               [

@@ -90,10 +90,18 @@ def built(result: subprocess.CompletedProcess) -> None:
 
 
 def typed_rows(db: Path, table: str) -> list[tuple]:
+    """Every column with its type, but stg_player_history_capture's raw `history`.
+
+    That list keeps the types the source read inferred (docs/compacted.md: the
+    schema follows the source). A production day's parquet infers them over the
+    whole day, so a trimmed fixture day can be wider than the same payloads read
+    alone (`bps` 17.0, not 17: #78 W8's residual risk). stg_player_fixture casts
+    every field of it, and is compared typed.
+    """
     con = duckdb.connect(str(db), read_only=True)
     columns = [c for (c,) in con.sql(
         f"select column_name from information_schema.columns "
-        f"where table_name = '{table}' order by ordinal_position"
+        f"where table_name = '{table}' and column_name <> 'history' order by ordinal_position"
     ).fetchall()]
     select = ", ".join(f"{c}::varchar, typeof({c})" for c in columns)
     return sorted(con.sql(f"select {select} from {table}").fetchall(), key=repr)
@@ -179,7 +187,7 @@ def test_the_raw_override_on_a_manual_dispatch_renders_todays_globs(tmp_path, ta
 
 @pytest.mark.integration
 @pytest.mark.covers("#194 AC1")
-@pytest.mark.parametrize("event", ["schedule", "push", "pull_request", ""])
+@pytest.mark.parametrize("event", ["schedule", "push", "pull_request"])
 def test_the_raw_override_is_refused_off_a_manual_dispatch(tmp_path, event):
     result = element_summary_location(tmp_path, "fixtures", {"staging_read_mode": "raw"}, event=event)
 
@@ -187,6 +195,22 @@ def test_the_raw_override_is_refused_off_a_manual_dispatch(tmp_path, event):
     assert result.returncode != 0
     assert "staging_read_mode" in result.stdout + result.stderr
     assert "workflow_dispatch" in result.stdout + result.stderr
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#194 AC1")
+def test_the_raw_override_is_allowed_on_a_local_run(tmp_path):
+    env = {k: v for k, v in os.environ.items() if k != "GITHUB_EVENT_NAME"}
+    result = subprocess.run(
+        ["dbt", "--no-use-colors", "parse", "--target", "fixtures", "--target-path", str(tmp_path),
+         "--vars", json.dumps({"staging_read_mode": "raw"})],
+        cwd=REPO, capture_output=True, text=True, env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    sources = json.loads((tmp_path / "manifest.json").read_text())["sources"]
+    location = next(s["meta"]["external_location"] for s in sources.values() if s["name"] == "element_summary")
+
+    assert GLOB.findall(location) == UNCUT["fixtures"]["element_summary"]
 
 
 @pytest.mark.integration
