@@ -19,7 +19,7 @@ Per day, in order (#78 W11):
    listed files = the index keys of D's runs, sha256 matching. A run's index is
    its finalized manifest's captures[] when present, otherwise its backfill
    catalog entry: base_capture_index's precedence, read from raw because this
-   runs before dbt.
+   runs outside dbt.
 4. Write the compaction manifest, last, so a manifest never names a missing or
    unreconciled parquet.
 
@@ -114,6 +114,29 @@ def runs_writer(workflow_text: str) -> bool:
             if any(s in command for s in WRITER_SCRIPTS) and not _local_destination(command):
                 return True
     return False
+
+
+# The one workflow that may run the writer against the production prefix
+# (#205 G4, W16), and only on its schedule: #193 A6 refuses any other trigger.
+PRODUCTION_WORKFLOW = "scheduled_compaction.yml"
+
+
+def workflow_problems(workflows: dict[str, str]) -> list[str]:
+    """One message per workflow, by file name, that breaks the production rule."""
+    problems = []
+    for name, text in sorted(workflows.items()):
+        if not runs_writer(text):
+            continue
+        if name != PRODUCTION_WORKFLOW:
+            problems.append(
+                f"{name} runs the compaction writer without a local destination; "
+                f"only {PRODUCTION_WORKFLOW} may"
+            )
+            continue
+        triggers = (yaml.safe_load(text) or {}).get(True)  # PyYAML reads `on` as True
+        if not isinstance(triggers, dict) or set(triggers) != {"schedule"}:
+            problems.append(f"{name} may only be triggered by its schedule")
+    return problems
 
 
 def manifest_problems(record: dict) -> list[str]:

@@ -15,8 +15,6 @@ import duckdb
 import pytest
 
 from build_metrics import (
-    COMPACTION_DAY_FIELDS,
-    COMPACTION_FIELDS,
     FIELDS,
     MODEL_FIELDS,
     build_record,
@@ -49,20 +47,6 @@ def valid_record() -> dict:
         "models": [
             {"name": "stg_player_history_capture", "model_seconds": 412.5, "status": "success"},
         ],
-        "compaction": valid_compaction(),
-    }
-
-
-def valid_compaction() -> dict:
-    return {
-        "n": 2,
-        "seconds": 41.0,
-        "days_selected": 1,
-        "days": [
-            {"capture_day": "2026-09-20", "ok": True, "reason": "", "seconds": 40.5,
-             "files_read": 651, "rows_written": 651},
-        ],
-        "peak_rss_mib": 900.0,
     }
 
 
@@ -100,7 +84,7 @@ def test_the_record_fields_are_exactly_the_agreed_set():
     assert FIELDS == (
         "run_id", "git_sha", "built_at", "trigger", "status", "exit_code",
         "build_seconds", "capture_count", "peak_rss_mib", "runner_total_mem_mib",
-        "cpu_count", "models", "compaction",
+        "cpu_count", "models",
     )
     assert MODEL_FIELDS == ("name", "model_seconds", "status")
 
@@ -176,84 +160,41 @@ def test_an_unknown_job_status_is_refused():
         job_outcome("skipped", "0")
 
 
-# --- #198 D4: the W13 compaction object --------------------------------------------
+# --- #205 G5: the build record no longer carries compaction ----------------------------
 
 
 @pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-def test_the_compaction_object_fields_are_exactly_w13s():
-    assert COMPACTION_FIELDS == ("n", "seconds", "days_selected", "days", "peak_rss_mib")
-    assert COMPACTION_DAY_FIELDS == (
-        "capture_day", "ok", "reason", "seconds", "files_read", "rows_written",
-    )
-
-
-@pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-@pytest.mark.parametrize("field", COMPACTION_FIELDS)
-def test_a_compaction_object_missing_one_field_fails_naming_it(field):
+@pytest.mark.covers("#205 AC5")
+def test_a_build_record_still_carrying_compaction_fails_naming_it():
     record = valid_record()
-    del record["compaction"][field]
-    assert any(f"compaction missing field {field}" in p for p in schema_problems(record))
+    record["compaction"] = {"n": 0, "seconds": None, "days_selected": None, "days": [],
+                            "peak_rss_mib": None}
+    assert any("extra field compaction" in p for p in schema_problems(record))
 
 
 @pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-def test_a_compaction_object_with_an_extra_field_fails_naming_it():
-    record = valid_record()
-    record["compaction"]["days_compacted"] = 1
-    assert any("days_compacted" in p for p in schema_problems(record))
-
-
-@pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-@pytest.mark.parametrize("field", COMPACTION_DAY_FIELDS)
-def test_a_compaction_day_missing_one_field_fails_naming_it(field):
-    record = valid_record()
-    del record["compaction"]["days"][0][field]
-    assert any(f"days[0] missing field {field}" in p for p in schema_problems(record))
-
-
-@pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-def test_a_compaction_day_with_an_extra_field_fails_naming_it():
-    record = valid_record()
-    record["compaction"]["days"][0]["parquet_bytes"] = 1
-    assert any("parquet_bytes" in p for p in schema_problems(record))
-
-
-@pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
-def test_an_n_zero_build_records_the_object_with_no_days(tmp_path):
+@pytest.mark.covers("#205 AC5")
+def test_a_build_record_ignores_a_compaction_object_left_in_its_directory(tmp_path):
     out = tmp_path / "metrics"
     out.mkdir()
     (out / "compaction.json").write_text(json.dumps(
         {"n": 0, "seconds": 0.1, "days_selected": 0, "days": [], "peak_rss_mib": 80.0}
     ))
     record = build_record(out, "success")
-    assert record["compaction"]["n"] == 0 and record["compaction"]["days"] == []
+    assert "compaction" not in record
     assert schema_problems(record) == []
 
 
 @pytest.mark.unit
 @pytest.mark.covers("#198 AC4")
-def test_a_build_whose_compaction_step_did_not_run_records_nulls_never_a_guess(tmp_path):
-    out = tmp_path / "metrics"
-    out.mkdir()
-    record = build_record(out, "success")
-    assert record["compaction"] == {
-        "n": 0, "seconds": None, "days_selected": None, "days": [], "peak_rss_mib": None,
-    }
-    assert schema_problems(record) == []
-
-
-@pytest.mark.unit
-@pytest.mark.covers("#198 AC4")
+@pytest.mark.covers("#205 AC5")
 def test_the_191_extraction_query_reads_records_with_and_without_the_object(tmp_path):
-    old = valid_record()
-    del old["compaction"]
+    old = valid_record()  # as #198 wrote it, with the W13 object
+    old["compaction"] = {
+        "n": 0, "seconds": 0.1, "days_selected": 0, "days": [], "peak_rss_mib": 80.0,
+    }
     old["run_id"] = "1"
-    new = valid_record()
+    new = valid_record()  # as #205 writes it, without
     new["run_id"] = "2"
     for record in (old, new):
         (tmp_path / f"{record['run_id']}.json").write_text(json.dumps(record))

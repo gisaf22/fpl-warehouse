@@ -1,0 +1,11 @@
+{
+  "budget_seconds": 0,
+  "seconds": 1444.0,
+  "days_selected": 3,
+  "days": [
+    {"capture_day": "2026-08-30", "ok": true, "reason": "", "seconds": 1084.4, "files_read": 7479, "rows_written": 7479},
+    {"capture_day": "2026-09-20", "ok": true, "reason": "", "seconds": 131.6, "files_read": 1334, "rows_written": 1334},
+    {"capture_day": "2026-10-13", "ok": true, "reason": "", "seconds": 128.7, "files_read": 1334, "rows_written": 1334}
+  ],
+  "peak_rss_mib": null
+}

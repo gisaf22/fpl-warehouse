@@ -1,9 +1,10 @@
-"""Compaction's wiring: before dbt, unable to change the build outcome (#198 D3, D6).
+"""Compaction's wiring: its own scheduled workflow, out of the build (#198, #205 W16).
 
-The scheduled build runs `scripts/compaction_step.py` before `dbt build`, with
-continue-on-error, so a compaction failure marks its own step and summary but
-never the job, the publish or the healthchecks.io ping (#191 AC7's pattern).
-live-tests' `compaction_dry_run` input runs the step with a local destination.
+`scheduled_compaction.yml` runs `scripts/compaction_step.py` at 01:30 and 13:30
+UTC, away from the 07:45/19:45 builds, with OIDC credentials, a 50-minute
+timeout, runs that never overlap, and its own job summary and metrics record.
+`scheduled_build.yml` no longer runs it. live-tests' `compaction_dry_run` input
+still runs the step with a local destination, so the budget can be re-measured.
 """
 
 from __future__ import annotations
@@ -14,12 +15,23 @@ import pytest
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-SCHEDULED = REPO / ".github/workflows/scheduled_build.yml"
-CI = REPO / ".github/workflows/ci.yml"
+WORKFLOWS = REPO / ".github/workflows"
+SCHEDULED = WORKFLOWS / "scheduled_build.yml"
+COMPACTION = WORKFLOWS / "scheduled_compaction.yml"
+CI = WORKFLOWS / "ci.yml"
+
+
+def load(workflow: Path) -> dict:
+    return yaml.safe_load(workflow.read_text())
 
 
 def steps(workflow: Path, job: str) -> list[dict]:
-    return yaml.safe_load(workflow.read_text())["jobs"][job]["steps"]
+    return load(workflow)["jobs"][job]["steps"]
+
+
+def only_job(workflow: Path) -> tuple[str, dict]:
+    (item,) = load(workflow)["jobs"].items()
+    return item
 
 
 def index_of(steps_: list[dict], name: str) -> int:
@@ -28,60 +40,136 @@ def index_of(steps_: list[dict], name: str) -> int:
     return names.index(name)
 
 
+def index_using(steps_: list[dict], action: str) -> int:
+    (i,) = [i for i, s in enumerate(steps_) if str(s.get("uses", "")).startswith(action)]
+    return i
+
+
 def compaction_steps(steps_: list[dict]) -> list[int]:
     return [i for i, s in enumerate(steps_) if "compaction_step.py" in str(s.get("run", ""))]
 
 
+# --- G1: the new workflow -------------------------------------------------------------
+
+
 @pytest.mark.integration
-@pytest.mark.covers("#198 AC3")
-def test_the_scheduled_compaction_step_runs_before_dbt_and_cannot_fail_the_job():
-    s = steps(SCHEDULED, "build")
+@pytest.mark.covers("#205 AC1")
+def test_compaction_runs_on_its_own_schedule_and_nothing_else_triggers_it():
+    on = load(COMPACTION)[True]  # PyYAML reads `on` as True
+    assert on == {"schedule": [{"cron": "30 1,13 * * *"}]}
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+def test_compaction_runs_never_overlap_and_are_never_cancelled():
+    concurrency = load(COMPACTION)["concurrency"]
+    assert concurrency["group"]
+    assert concurrency["cancel-in-progress"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+def test_the_compaction_job_times_out_at_fifty_minutes():
+    _, job = only_job(COMPACTION)
+    assert job["timeout-minutes"] == 50
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+def test_the_compaction_job_assumes_the_role_by_oidc_before_compacting():
+    assert load(COMPACTION)["permissions"]["id-token"] == "write"
+    name, job = only_job(COMPACTION)
+    s = job["steps"]
+    creds = index_using(s, "aws-actions/configure-aws-credentials@")
+    assert s[creds]["with"]["role-to-assume"] == "${{ vars.AWS_ROLE_ARN }}"
     (i,) = compaction_steps(s)
-    assert s[i].get("continue-on-error") is True
-    assert i < index_of(s, "Build and test against live S3")
-    assert i > index_of(s, "Configure AWS credentials (OIDC)")
+    assert creds < i
 
 
 @pytest.mark.integration
-@pytest.mark.covers("#198 AC3")
-def test_nothing_downstream_reads_the_compaction_steps_outcome_except_its_summary():
-    s = steps(SCHEDULED, "build")
-    (i,) = compaction_steps(s)
-    step_id = s[i].get("id")
-    assert step_id, "the compaction step needs an id for its failure summary"
-    readers = [
-        t.get("name") for t in s
-        if f"steps.{step_id}." in yaml.safe_dump(t)
-    ]
-    assert readers == ["Mark compaction failed in the summary"]
-    marker = s[index_of(s, "Mark compaction failed in the summary")]
-    assert f"steps.{step_id}.outcome == 'failure'" in marker["if"]
-    assert marker.get("continue-on-error") is True
-    for name in ("Build and test against live S3", "Publish served tables to S3",
-                 "Capture build outcome", "Ping healthchecks.io"):
-        assert "compaction" not in yaml.safe_dump(s[index_of(s, name)]).lower()
-
-
-@pytest.mark.integration
-@pytest.mark.covers("#198 AC3")
-def test_the_scheduled_step_writes_to_the_production_prefix_with_the_config_n():
-    s = steps(SCHEDULED, "build")
+@pytest.mark.covers("#205 AC1")
+def test_the_compaction_step_writes_production_with_the_config_budget_and_its_own_summary():
+    _, job = only_job(COMPACTION)
+    s = job["steps"]
     (i,) = compaction_steps(s)
     run = s[i]["run"]
     assert "--dest-root s3://fpl-data-safari/compacted" in run
-    assert "--days" not in run and "--n" not in run  # N comes from compaction.yml only
+    assert "--days" not in run  # the budget comes from compaction.yml only
+    assert '--summary "$GITHUB_STEP_SUMMARY"' in run
     assert "--out .local/metrics/compaction.json" in run
 
 
 @pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+@pytest.mark.covers("#205 AC5")
+def test_the_compaction_record_is_written_after_the_step_whatever_its_outcome():
+    _, job = only_job(COMPACTION)
+    s = job["steps"]
+    (i,) = compaction_steps(s)
+    j = index_of(s, "Record compaction metrics")
+    assert i < j
+    assert s[j]["if"].startswith("always()")
+    assert "scripts/compaction_metrics.py" in s[j]["run"]
+    assert "--out .local/metrics" in s[j]["run"]
+    assert '--summary "$GITHUB_STEP_SUMMARY"' in s[j]["run"]
+
+
+# --- G1: out of the build -------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+def test_the_scheduled_build_no_longer_runs_or_mentions_compaction():
+    s = steps(SCHEDULED, "build")
+    assert compaction_steps(s) == []
+    assert not [t.get("name") for t in s if "compaction" in yaml.safe_dump(t).lower()]
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC1")
+def test_the_scheduled_build_ping_and_outcome_steps_are_unchanged():
+    s = steps(SCHEDULED, "build")
+    assert s[index_of(s, "Capture build outcome")] == {
+        "name": "Capture build outcome",
+        "id": "build_outcome",
+        "if": "always()",
+        "run": 'echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"',
+    }
+    assert s[index_of(s, "Ping healthchecks.io")] == {
+        "name": "Ping healthchecks.io",
+        "if": "always() && github.event_name == 'schedule'",
+        "continue-on-error": True,
+        "timeout-minutes": 2,
+        "env": {
+            "HEALTHCHECKS_PING_URL": "${{ secrets.HEALTHCHECKS_PING_URL_SCHEDULED_BUILD }}",
+            "JOB_STATUS": "${{ steps.build_outcome.outputs.status }}",
+        },
+        "run": 'bash scripts/healthchecks_ping.sh "$JOB_STATUS"',
+    }
+
+
+# --- #198 D6: the dry run stays -------------------------------------------------------
+
+
+@pytest.mark.integration
 @pytest.mark.covers("#198 AC6")
+@pytest.mark.covers("#205 AC1")
 def test_live_tests_has_a_compaction_dry_run_input_that_runs_the_step_locally():
-    workflow = yaml.safe_load(CI.read_text())
-    inputs = workflow[True]["workflow_dispatch"]["inputs"]  # PyYAML reads `on` as True
+    inputs = load(CI)[True]["workflow_dispatch"]["inputs"]
     assert "compaction_dry_run" in inputs
     s = steps(CI, "live-tests")
     (i,) = compaction_steps(s)
     assert "inputs.compaction_dry_run" in s[i]["if"]
     assert "--days" in s[i]["run"] and "--dest-root .local/" in s[i]["run"]
     assert "--out .local/metrics/compaction.json" in s[i]["run"]
-    assert i < index_of(s, "Record build metrics")
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#205 AC5")
+def test_live_tests_reports_the_dry_runs_compaction_record_in_its_summary():
+    s = steps(CI, "live-tests")
+    (i,) = compaction_steps(s)
+    j = index_of(s, "Record compaction metrics")
+    assert i < j
+    assert "inputs.compaction_dry_run" in s[j]["if"]
+    assert "scripts/compaction_metrics.py" in s[j]["run"]

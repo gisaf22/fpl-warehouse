@@ -1337,13 +1337,16 @@ fpl-ingest's two checks are documented in that repo.
 
 ### Compaction
 
-Before `dbt build`, the scheduled build runs `scripts/compaction_step.py` with
-`continue-on-error` (#198). It compacts closed element-summary days to
-`s3://fpl-data-safari/compacted/`, at most `max_days_per_run` per run. `compaction.yml`
-ships it at 0, so it lists and writes nothing until #200. A failure marks the step's summary,
-never the build, the publish or the ping. `live-tests`' `compaction_dry_run` input runs it to a
-local destination for measurement. Selection, config, the W14 sizing rule and the runbook:
-`docs/compacted.md`.
+The scheduled build does not compact (#205, #78 W16). `scheduled_compaction.yml` runs
+`scripts/compaction_step.py` on its own, at 01:30 and 13:30 UTC, and is the only workflow
+allowed to write `s3://fpl-data-safari/compacted/`. It compacts closed element-summary days
+oldest first until `max_seconds_per_run` in `compaction.yml` is spent; a started day runs to
+completion. The budget ships at 0, so it makes no S3 call until #200. Its record goes to
+`s3://fpl-data-safari/metrics/compaction/<run_id>.json` on scheduled runs with a budget
+above 0. A failure alerts
+through GitHub's failed-run email only; it never touches a build. `live-tests`'
+`compaction_dry_run` input runs it to a local destination for measurement. Selection,
+config, the record, the sizing rule and the runbook: `docs/compacted.md`.
 
 ### Build metrics
 
@@ -1386,7 +1389,10 @@ before it could be measured, never a guess.
 | `runner_total_mem_mib` | float or null | the runner's `MemTotal` |
 | `cpu_count` | int | the runner's CPUs |
 | `models` | list | one `{name, model_seconds, status}` per model in `run_results.json`: dbt's `execution_time` and status (`success`, `error`, `skipped`) |
-| `compaction` | object | the compaction step's W13 object (#198): `n`, `seconds`, `days_selected`, `days` (each `{capture_day, ok, reason, seconds, files_read, rows_written}`) and `peak_rss_mib`. Always present: with N = 0, `days_selected` 0 and `days` `[]`; if the step wrote nothing (killed, or a dispatch without the dry run), `n` from `compaction.yml`, `days` `[]`, the rest `null`. Totals are derived from `days`. Added 2026-10-15, Fred-approved; the query below is unchanged |
+
+Records from 2026-10-15 until #205 also carry `compaction`, #198's W13 object. #205 moved
+it to its own record (`docs/compacted.md`); the query below reads records with or without
+it.
 
 `stg_player_history_capture`'s `model_seconds` across scheduled builds, oldest first:
 
@@ -1494,10 +1500,13 @@ policy `fpl-warehouse-s3-read`, five statements:
   (2026-09-28, dispatched from `main` with default inputs) read the manifest with no
   override and published.
 
-A second inline policy, `fpl-warehouse-metrics-write`, grants `s3:PutObject` on
-`arn:aws:s3:::fpl-data-safari/metrics/build/*` only, for the build metrics record (#191).
+A second inline policy, `fpl-warehouse-metrics-write`, has two statements:
+`WriteBuildMetrics`, `s3:PutObject` on `arn:aws:s3:::fpl-data-safari/metrics/build/*`, for
+the build metrics record (#191), and `WriteCompactionMetrics`, `s3:PutObject` on
+`arn:aws:s3:::fpl-data-safari/metrics/compaction/*`, for the compaction record (#205 G5).
 Verified live on 2026-10-15 by the maintainer with `simulate-principal-policy`:
-`metrics/build/` allowed, `served/` allowed, `raw/` implicitly denied.
+`metrics/build/` allowed, `served/` allowed, `raw/` implicitly denied; and, after the second
+statement was added, `metrics/build/` and `metrics/compaction/` allowed (#205 G0).
 
 A third inline policy, `fpl-warehouse-compacted-rw`, grants `s3:PutObject` and
 `s3:GetObject` on `arn:aws:s3:::fpl-data-safari/compacted/*`, for the element-summary
@@ -1506,7 +1515,8 @@ compaction writer (#193; layout and manifest in `docs/compacted.md`, ADR 0004). 
 by the maintainer with `simulate-principal-policy`: `compacted/fpl/element-summary/*` put
 and get allowed and delete implicitly denied; `ListBucket` with prefix `compacted/`
 allowed; get on `raw/fpl/element-summary/*`, `raw/fpl/_manifests/*` and
-`raw/fpl/_catalog/*` allowed. The writer is not wired into any workflow yet (#198).
+`raw/fpl/_catalog/*` allowed. `scheduled_compaction.yml` is the one workflow that writes
+there (#205).
 
 Note the first policy's *name* predates the write grant and is now a misnomer: `-s3-read` describes
 what the role originally did, not what it does. The statement names are the accurate

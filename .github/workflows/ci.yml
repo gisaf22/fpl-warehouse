@@ -39,7 +39,7 @@ on:
           Measurement only (#198 D6, W12). Comma-separated YYYY-MM-DD capture
           days: compact them from live raw to .local/compacted on the runner,
           never to S3, and report the W13 compaction object (seconds per day,
-          peak RSS) in the job summary. #200 sizes N from it by the W14 rule.
+          peak RSS) in the job summary. #200 sizes the time budget from it (W16).
           Empty, the default, skips it.
         required: false
         default: ""
@@ -469,7 +469,8 @@ jobs:
       # compaction_dry_run (#198 D6): the writer on real raw for the given
       # days, to a local destination only, so #193 A6's gate allows it from a
       # dispatch. Before the build so its peak RSS is its own. Its W13 object
-      # reaches the job summary only: a dispatch writes no S3 metrics record.
+      # reaches the job summary only, through the step below: a dispatch writes
+      # no S3 metrics record.
       # continue-on-error, so a failed day still lets the build measure.
       - name: Compaction dry run
         if: inputs.compaction_dry_run != ''
@@ -483,6 +484,19 @@ jobs:
           --dest-root .local/compacted
           --out .local/metrics/compaction.json
           --summary "$GITHUB_STEP_SUMMARY"
+
+      # The dry run's compaction record (#205 G5), with its peak RSS and
+      # seconds per day, for re-measuring the budget. Summary only: a dispatch
+      # never writes metrics/compaction/. always(), so a failed day still
+      # reports.
+      - name: Record compaction metrics
+        if: always() && inputs.compaction_dry_run != ''
+        continue-on-error: true
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: >-
+          uv run python scripts/compaction_metrics.py --out .local/metrics
+          --job-status "$JOB_STATUS" --summary "$GITHUB_STEP_SUMMARY"
 
       # LIST-only: glob() returns key names and opens no payload, so this
       # isolates S3 listing from the ~50k object GETs that dominate the build
