@@ -25,6 +25,7 @@ from compact_element_summary import (
     manifest_problems,
     parquet_path,
     runs_writer,
+    workflow_problems,
 )
 from compaction_tree import Capture, Run, build_tree, history_row
 
@@ -352,9 +353,87 @@ def test_a_dispatch_calling_the_writer_for_production_is_refused_before_any_writ
 @pytest.mark.unit
 @pytest.mark.covers("#193 AC6")
 @pytest.mark.covers("#198 AC3")
-@pytest.mark.parametrize("workflow", ["ci.yml", "served_diff.yml"])
-def test_no_dispatch_workflow_runs_the_writer(workflow):
+@pytest.mark.covers("#205 AC4")
+@pytest.mark.parametrize("workflow", ["ci.yml", "served_diff.yml", "scheduled_build.yml"])
+def test_no_other_workflow_runs_the_writer(workflow):
     assert not runs_writer((REPO / ".github" / "workflows" / workflow).read_text())
+
+
+def repo_workflows() -> dict[str, str]:
+    return {
+        p.name: p.read_text()
+        for p in sorted((REPO / ".github" / "workflows").glob("*.y*ml"))
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC4")
+def test_the_scheduled_compaction_workflow_is_the_only_one_with_a_production_destination():
+    workflows = repo_workflows()
+    assert [n for n, text in workflows.items() if runs_writer(text)] == [
+        "scheduled_compaction.yml"
+    ]
+    assert workflow_problems(workflows) == []
+
+
+PRODUCTION_RUN = (
+    "uv run python scripts/compaction_step.py"
+    " --raw-root s3://fpl-data-safari/raw --dest-root s3://fpl-data-safari/compacted"
+)
+
+
+def workflow_text(on: str, run: str = PRODUCTION_RUN) -> str:
+    return f"""
+name: synthetic
+on:
+{on}
+jobs:
+  compact:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Compact
+        run: {run}
+"""
+
+
+SCHEDULE_ONLY = '  schedule:\n    - cron: "30 1,13 * * *"'
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC4")
+def test_the_scan_passes_the_allowed_workflow_on_a_schedule_alone():
+    assert workflow_problems({"scheduled_compaction.yml": workflow_text(SCHEDULE_ONLY)}) == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC4")
+@pytest.mark.parametrize("name", ["scheduled_build.yml", "ci.yml", "compaction_v2.yml"])
+def test_the_scan_flags_any_other_workflow_with_a_production_destination(name):
+    problems = workflow_problems({
+        "scheduled_compaction.yml": workflow_text(SCHEDULE_ONLY),
+        name: workflow_text(SCHEDULE_ONLY),
+    })
+    assert len(problems) == 1 and name in problems[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC4")
+@pytest.mark.parametrize("on", [
+    SCHEDULE_ONLY + "\n  workflow_dispatch:",
+    "  workflow_dispatch:",
+    "  push:\n    branches: [main]",
+], ids=["schedule-and-dispatch", "dispatch", "push"])
+def test_the_scan_flags_the_allowed_workflow_with_any_trigger_but_a_schedule(on):
+    problems = workflow_problems({"scheduled_compaction.yml": workflow_text(on)})
+    assert len(problems) == 1 and "scheduled_compaction.yml" in problems[0]
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC4")
+def test_the_scan_passes_another_workflow_with_a_local_destination():
+    local = workflow_text("  workflow_dispatch:", PRODUCTION_RUN.replace(
+        "s3://fpl-data-safari/compacted", ".local/compacted"))
+    assert workflow_problems({"ci.yml": local}) == []
 
 
 def synthetic_workflow(run: str) -> str:
