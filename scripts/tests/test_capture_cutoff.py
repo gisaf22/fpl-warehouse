@@ -90,7 +90,9 @@ def payload_globs(target_path: Path, target: str, *extra: str) -> dict[str, list
 def test_without_a_cutoff_every_payload_source_renders_its_globs_unchanged(
     tmp_path, target, unset
 ):
-    assert payload_globs(tmp_path, target, *unset) == UNCUT[target]
+    # Element-summary reads the compacted union by default, and its globs only
+    # under the all-raw override (#194); test_staging_reads_compacted.py pins those.
+    assert payload_globs(tmp_path, target, *unset) == {**UNCUT[target], "element_summary": []}
 
 
 @pytest.mark.integration

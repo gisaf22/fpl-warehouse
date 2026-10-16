@@ -6,6 +6,10 @@
 --         source switches its own path on the target. This keeps the PR path
 --         credential-free for all of them, not only the ones that existed when
 --         the switch was written. CI's no-AWS_* guard is the other half.
+--         element_summary is checked in scripts/tests/test_staging_reads_compacted.py
+--         since #194: its source is built by a pre-hook on the model's own
+--         connection, and its compacted rows carry production s3:// filenames
+--         that were recorded, not read.
 -- Tier: integration
 {{ config(tags=['integration'], meta={'covers': '#36 AC4'}) }}
 
@@ -17,10 +21,7 @@ select null as failure where false
 
 with read_objects as (
 
-    select 'element_summary' as source_name, filename
-    from {{ source('fpl_raw', 'element_summary') }}
-    union all
-    select 'bootstrap_static', filename
+    select 'bootstrap_static' as source_name, filename
     from {{ source('fpl_raw', 'bootstrap_static') }}
     union all
     select 'event_status', filename
