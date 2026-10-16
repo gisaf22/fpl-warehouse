@@ -290,7 +290,7 @@ def test_a_compacting_run_reports_each_day_with_its_files_and_rows(tmp_path):
         run(D2, "bbbbbb", index="none"),
     ])
     obj = run_step(raw, dest, LATE, budget_seconds=HOUR, timeout=TIMEOUT).compaction
-    assert obj["n"] == HOUR  # the run's budget (#205 AC5: the W13 shape is unchanged)
+    assert obj["budget_seconds"] == HOUR  # W13 as amended by #205
     assert obj["days_selected"] == 2
     assert obj["seconds"] >= 0
     assert obj["peak_rss_mib"] > 0

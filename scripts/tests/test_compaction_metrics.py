@@ -54,7 +54,7 @@ def valid_record(tmp_path: Path) -> dict:
 @pytest.mark.covers("#205 AC5")
 def test_the_record_fields_are_exactly_the_agreed_set():
     assert FIELDS == ("run_id", "git_sha", "built_at", "status", "compaction")
-    assert COMPACTION_FIELDS == ("n", "seconds", "days_selected", "days", "peak_rss_mib")
+    assert COMPACTION_FIELDS == ("budget_seconds", "seconds", "days_selected", "days", "peak_rss_mib")
     assert COMPACTION_DAY_FIELDS == (
         "capture_day", "ok", "reason", "seconds", "files_read", "rows_written",
     )
@@ -100,10 +100,11 @@ def test_a_compaction_object_missing_one_field_fails_naming_it(tmp_path, field):
 
 @pytest.mark.unit
 @pytest.mark.covers("#205 AC5")
-def test_a_compaction_object_with_an_extra_field_fails_naming_it(tmp_path):
+@pytest.mark.parametrize("field", ["n", "max_days_per_run"])
+def test_a_compaction_object_with_an_extra_field_fails_naming_it(tmp_path, field):
     record = valid_record(tmp_path)
-    record["compaction"]["max_days_per_run"] = 0
-    assert "compaction extra field max_days_per_run" in schema_problems(record)
+    record["compaction"][field] = 0  # `n` is W13's name before the budget_seconds rename
+    assert f"compaction extra field {field}" in schema_problems(record)
 
 
 @pytest.mark.unit
@@ -130,7 +131,7 @@ def test_a_run_whose_step_wrote_no_object_records_nulls_never_a_guess(tmp_path):
     out.mkdir()
     record = build_record(out, "failure")
     assert record["compaction"] == {
-        "n": 0, "seconds": None, "days_selected": None, "days": [], "peak_rss_mib": None,
+        "budget_seconds": 0, "seconds": None, "days_selected": None, "days": [], "peak_rss_mib": None,
     }
     assert schema_problems(record) == []
 
