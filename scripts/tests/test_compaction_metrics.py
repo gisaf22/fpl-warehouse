@@ -180,9 +180,12 @@ def run_main(monkeypatch, out: Path, summary: Path, event: str, puts: list) -> i
 @pytest.mark.unit
 @pytest.mark.covers("#205 AC5")
 def test_a_scheduled_run_puts_the_record_and_summarises_it(tmp_path, monkeypatch):
+    out = step_output(tmp_path)
+    enabled = json.loads(FIXTURE.read_text()) | {"budget_seconds": 1800}
+    (out / "compaction.json").write_text(json.dumps(enabled))
     puts: list = []
     summary = tmp_path / "summary.md"
-    assert run_main(monkeypatch, step_output(tmp_path), summary, "schedule", puts) == 0
+    assert run_main(monkeypatch, out, summary, "schedule", puts) == 0
     (put,) = puts
     assert put["Bucket"] == "fpl-data-safari"
     assert put["Key"] == "metrics/compaction/18000000000.json"
@@ -199,3 +202,21 @@ def test_a_dispatched_run_summarises_the_record_and_puts_nothing(tmp_path, monke
     assert run_main(monkeypatch, step_output(tmp_path), summary, "workflow_dispatch", puts) == 0
     assert puts == []
     assert "2026-08-30" in summary.read_text()
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#205 AC5")
+def test_a_scheduled_run_with_a_zero_budget_summarises_the_record_and_puts_nothing(
+    tmp_path, monkeypatch
+):
+    # Proposed: compaction ships disabled, and a disabled run writes nothing to
+    # production, metrics/compaction/ included (#205 constraints).
+    out = tmp_path / "metrics"
+    out.mkdir()
+    disabled = json.loads(FIXTURE.read_text()) | {"days_selected": 0, "days": []}
+    (out / "compaction.json").write_text(json.dumps(disabled))
+    puts: list = []
+    summary = tmp_path / "summary.md"
+    assert run_main(monkeypatch, out, summary, "schedule", puts) == 0
+    assert puts == []
+    assert "not written" in summary.read_text()
