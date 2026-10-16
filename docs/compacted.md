@@ -66,6 +66,42 @@ overwritten next time, and the other days go on.
    otherwise `raw/fpl/_catalog/backfill/<run_id>.json`: `base_capture_index`'s precedence.
    A run with neither fails the day.
 
+## Staging's read (#194)
+
+Staging reads element-summary as the compacted days plus the rest from raw (#78 W8,
+W10). The `compacted_read` pre-hook (`macros/compacted_read.sql`) runs on
+`stg_player_history_capture`, the one model that reads the source. It sets the read the
+source runs, `query(getvariable('element_summary_read'))`:
+
+```
+read_parquet(<each manifest day's part.parquet>, union_by_name = true, hive_partitioning = false)
+union all by name read_json(<raw tail>, union_by_name = true, filename = true)
+union all by name read_json(<history seasons' glob>, union_by_name = true, filename = true)
+```
+
+- **Which days come from parquet:** exactly the days with a manifest. A parquet with no
+  manifest (a failed day) is never read.
+- **The raw tail:** every live payload whose capture day has no manifest: unclosed days,
+  days not yet compacted, failed days and gaps. It is derived from one listing of the raw
+  tree each build, never from hard-coded dates. The 2025-26 history-port captures are
+  never compacted and are read as before.
+- **Fails, never falls back (D1).** A manifest that cannot be read, or that does not
+  name its own day, fails the build naming the file. So does a manifest day with no
+  `part.parquet`. A listing that S3 refuses fails with DuckDB's error. A compacted root
+  with no manifests at all is a fresh start: every day is read from raw.
+- **No capture is read twice.** `stg_player_history_capture.capture_key` is unique (B2).
+  A filename in both a parquet and the raw tail fails the build.
+- **Types follow each read.** A day's parquet keeps the types inferred over that day.
+  So the raw `history` struct in `stg_player_history_capture` can be wider than one
+  all-raw read would give (`bps` `17.0`, not `17`). `stg_player_fixture` casts every
+  field, so nothing downstream sees it (#78 W8's residual risk).
+- **Roots:** `compacted_root`. It defaults to `dev_compacted_root`
+  (`s3://fpl-data-safari/compacted`), or `tests/fixtures/compacted` under `fixtures`.
+- **Not used with `capture_cutoff`:** a cutoff build reads raw and history only.
+- **Fixture:** `tests/fixtures/compacted` holds trimmed production objects, built by
+  `tests/fixtures/build_compacted_fixture.py`. Compacted days are 2026-08-29 and
+  2026-09-02. 2026-08-31 has a parquet but no manifest.
+
 ## Who writes
 
 A destination under `s3://fpl-data-safari/compacted/` is written only when
@@ -145,6 +181,17 @@ from those runs still carry it; the #191 extraction query reads both.
   `continue-on-error` in its own workflow, and there is no healthchecks.io check for it.
   The impact of a failed or missed run is a longer raw tail for staging to read, never
   wrong data: an uncompacted day is read from raw.
+- **Reading every day from raw (emergency, #194 D1, an R6 exception).** Use it when a
+  build fails on the compacted read and `served/` must still be rebuilt before the
+  cause is fixed. That means a manifest is unreadable, a listed day's parquet is
+  missing, or `compacted/` cannot be listed. The repository owner dispatches
+  `gh workflow run scheduled_build.yml -f staging_read_mode=raw`. The run is flagged
+  in its job summary and an annotation; any other dispatcher fails at the check step.
+  dbt refuses `staging_read_mode: raw` on a schedule, push or pull_request event and
+  allows it on `workflow_dispatch` or a local run (`GITHUB_EVENT_NAME` unset). The
+  read costs what it did before #194 (the full raw tree). Then fix the cause: rewrite
+  the day's parquet and manifest by recompacting it, or delete its manifest so the day
+  falls back to the raw tail.
 - **A day failing every run:** its reason is in each run's summary. Fix the cause in raw
   or the index (or recompact by hand). It is retried, and spends budget, until it
   succeeds.

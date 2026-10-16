@@ -72,6 +72,20 @@ on:
           unreadable.
         type: boolean
         default: false
+      # Emergency only (#194 D1, an R6 exception): read every element-summary
+      # day from raw, skipping compacted/. For when compacted/ is unreadable or
+      # a listed day's parquet is missing and served/ must still be rebuilt.
+      # The repository owner only; flagged in the job summary. Runbook:
+      # docs/compacted.md, "Reading every day from raw". A scheduled run has
+      # no inputs, and dbt refuses the var on a schedule event regardless.
+      #   gh workflow run scheduled_build.yml -f staging_read_mode=raw
+      staging_read_mode:
+        description: >-
+          EMERGENCY ONLY. "raw" reads every element-summary day from raw JSON
+          instead of compacted parquet. Leave "compacted" normally.
+        type: choice
+        options: [compacted, raw]
+        default: compacted
 
 permissions:
   id-token: write
@@ -252,10 +266,27 @@ jobs:
       # metrics below (#191): peak RSS, wall time, dbt's exit code and this
       # build's run_results.json, kept in .local/metrics. It exits with dbt's
       # own code, so a failed build still fails this step.
+      # The all-raw override (#194 D1): the repository owner only, and named
+      # in the job summary and an annotation whenever it is used.
+      - name: Check the staging read mode
+        if: inputs.staging_read_mode == 'raw'
+        env:
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ "$ACTOR" != "$OWNER" ]; then
+            echo "::error::staging_read_mode=raw may be dispatched only by $OWNER, not $ACTOR (#194 D1)."
+            exit 1
+          fi
+          echo "::warning::staging_read_mode=raw: every element-summary day is read from raw, not compacted/ (#194 D1 emergency override)."
+          echo "**staging_read_mode: raw** — emergency all-raw read, compacted/ skipped (#194 D1). Dispatched by $ACTOR." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build and test against live S3
+        env:
+          STAGING_READ_MODE: ${{ inputs.staging_read_mode == 'raw' && 'raw' || '' }}
         run: >-
           bash scripts/timed_build.sh .local/metrics uv run dbt build
-          --vars "{history_root: '$HISTORY_ROOT'}"
+          --vars "{history_root: '$HISTORY_ROOT', staging_read_mode: '$STAGING_READ_MODE'}"
 
       # Missed pre-deadline captures (#111): the warn test in the build above
       # names each miss only in the dbt log. This puts them in the job summary

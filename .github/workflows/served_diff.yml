@@ -15,6 +15,11 @@
 #
 #   gh workflow run served_diff.yml --ref main -f head_ref=<branch>
 #
+# It also runs on a pull request that touches what a build reads or runs
+# (#194 D2): `before` is main, `after` the PR's head commit. The deploy role
+# trusts the pull_request OIDC subject. It still never publishes. A fork's PR
+# gets no OIDC token, so its run fails at the credentials step.
+#
 # Dispatching from main keeps the OIDC subject at the ref form the deploy
 # role's trust policy already admits, so no IAM change is needed. Accepted
 # risk, as with ci.yml's live-tests: the head code runs holding the role,
@@ -33,6 +38,22 @@ on:
         description: Branch, tag or SHA whose served output is compared with main's.
         type: string
         required: true
+  pull_request:
+    paths:
+      - "models/**"
+      - "macros/**"
+      - "tests/**"
+      - "seeds/**"
+      - dbt_project.yml
+      - profiles.yml
+      - packages.yml
+      - .github/workflows/scheduled_build.yml
+      - .github/workflows/served_diff.yml
+
+# A newer push to the same PR supersedes a running diff.
+concurrency:
+  group: served-diff-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -53,7 +74,7 @@ jobs:
           - side: before
             ref: main
           - side: after
-            ref: ${{ inputs.head_ref }}
+            ref: ${{ inputs.head_ref || github.event.pull_request.head.sha }}
     name: build (${{ matrix.side }})
     runs-on: ubuntu-24.04
     # Same budget and reasoning as scheduled_build.yml: sized against the worst
@@ -145,7 +166,7 @@ jobs:
 
       - name: Diff served output
         env:
-          HEAD_REF: ${{ inputs.head_ref }}
+          HEAD_REF: ${{ inputs.head_ref || github.head_ref }}
         run: |
           echo "main vs \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
           mkdir -p .local
