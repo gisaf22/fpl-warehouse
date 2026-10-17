@@ -331,6 +331,13 @@ not silently corrected.
   identified by `resource_type`, does the macro pass the mock's columns through; an empty
   graph anywhere else fails compilation naming the macro. The `*_matches_direct_read`
   tests that proved each conversion unchanged run on the fixtures target only.
+- **Element-summary is read from compacted parquet plus the raw tail** (#194). The
+  `compacted_read` pre-hook sets the source's read on its model's connection, from the
+  compaction manifest. An unreadable manifest or a listed day without its parquet fails
+  the build. `staging_read_mode: raw` reads every day from raw on a local run or a
+  manual dispatch only. The source is therefore readable only by
+  `stg_player_history_capture`, and a test that needs the payloads directly reads
+  `element_summary_raw_read()`. Details: `docs/compacted.md`, "Staging's read".
 - **A payload with no index entry is excluded silently** (#88 E7). That is normally one
   whose run was still in progress when the build started. It has no finalized manifest
   yet, and the next build picks it up. Counting such payloads would need a second read of
@@ -702,6 +709,11 @@ Two overrides, both recorded in the manifest and the log, and both exposed as
   cannot be read. If it can be read, the comparison still runs. Recorded in
   `published_without_baseline`.
 
+`scheduled_build.yml` has one more dispatch input, which is not a publish override:
+`staging_read_mode=raw` reads every element-summary day from raw JSON. It is an emergency
+exception to R6 (#194 D1), for the repository owner only, and is flagged in the job
+summary. Runbook: `docs/compacted.md`, "Reading every day from raw".
+
 One legitimate shrink is known: FPL retracting a history row (see "Retracted history
 rows") on a day no new fixture is played drops one `fct_player_fixture` row from the live
 season. That build is refused; rerun it with `restate` set to the live season.
@@ -1015,7 +1027,10 @@ which is what the fast tiers do). For an ad-hoc build against some other local t
 but note that a single-capture tree passes every dedup assertion vacuously, which is what
 the fixture tree exists to avoid.
 
-**Build cost — staging reads every raw S3 object, and the tree grows with every capture.**
+**Build cost — staging read every raw S3 object until #194.** Element-summary, most of the
+read, now comes from compacted parquet for every compacted day, with only the raw tail as
+JSON (`docs/compacted.md`, "Staging's read"). The other payload sources still read every raw
+object, and the history seasons are read as before. The history below is kept as measured.
 Because `stg_player_fixture` was once
 materialized as a view, *every* consumer re-read it: the fact model, then each test that
 references staging. A full `dbt build` on 2026-09-03 exceeded the exported credential's
@@ -1142,7 +1157,10 @@ failure instead of an opaque credentials error.
 
 `.github/workflows/served_diff.yml` (#102) shows how a change affects served data, against live S3.
 Dispatch it from `main` with `head_ref`:
-`gh workflow run served_diff.yml --ref main -f head_ref=<branch>`.
+`gh workflow run served_diff.yml --ref main -f head_ref=<branch>`. It also runs on every pull
+request that touches `models/`, `macros/`, `tests/`, `seeds/`, `dbt_project.yml`,
+`profiles.yml`, `packages.yml`, `scheduled_build.yml` or `served_diff.yml`, comparing main
+with the PR's head commit (#194 D2). A newer push cancels a running diff.
 
 - **Two builds, neither publishes.** Two parallel jobs build `main` and `head_ref` with a full
   `dbt build`. Each exports the nine served tables and a `build.json` (build seconds, and the
@@ -1183,10 +1201,12 @@ Dispatch it from `main` with `head_ref`:
     --args "{before: $dir/served-before, after: $dir/served-after}"
   ```
 - **Both refs need the macro**, so a `head_ref` older than #102 cannot be compared.
-- **It is dispatched from `main` on purpose.** The OIDC subject stays the `main` ref form the
-  role already trusts. The head code still runs holding the role, including its served write
-  grant. That risk is accepted, as for `live-tests`.
-- **It is not a PR check**, for the same reason `live-tests` is not.
+- **Dispatch runs from `main`; PR runs use the pull_request subject.** The role trusts both
+  (see "CI"). Either way the head code runs holding the role, including its served write
+  grant. That risk is accepted, as for `live-tests`. A fork's PR gets no OIDC token, so its
+  run fails at the credentials step.
+- **It is not a required check**, for the same reason `live-tests` is not. It runs on PRs to
+  give the before-merge evidence, never to gate a merge.
 
 audit_helper (with dbt_utils, its dependency) is the project's only dbt package, pinned in
 `packages.yml` and `package-lock.yml`. Nothing in the model DAG uses it, but dbt will not

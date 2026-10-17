@@ -67,6 +67,13 @@ vars:
   # the checked-in tree under tests/fixtures/history instead.
   dev_history_root: "s3://fpl-data-safari/history"
 
+  # Root of the compacted element-summary tree (#194, docs/compacted.md) that
+  # the compacted_read pre-hook reads under every target but `fixtures`, which
+  # reads tests/fixtures/compacted. Override with `compacted_root`.
+  # `staging_read_mode: raw` skips it and reads every day from raw: allowed on
+  # a local run and a manual dispatch, refused on any other event (D1).
+  dev_compacted_root: "s3://fpl-data-safari/compacted"
+
   # Seasons that are over and fully settled. Every fct_player_fixture row of a
   # closed season reads is_ratified = true: event-status only ever serves the
   # current gameweek, so there is no per-gameweek verdict to read for them. The claim
@@ -94,7 +101,11 @@ models:
       # tree is read once.
       +materialized: table
       # Test-only (#190): renders nothing unless the capture_cutoff var is set.
-      +pre-hook: "{{ capture_cutoff_files() }}"
+      # compacted_read (#194) sets the element-summary source's read on the
+      # model that reads it, and renders nothing on any other.
+      +pre-hook:
+        - "{{ capture_cutoff_files() }}"
+        - "{{ compacted_read() }}"
     intermediate:
       +materialized: view
     marts:

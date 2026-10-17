@@ -34,7 +34,9 @@ where not exists (
     select 1
     from (
         select {{ capture_key_from_filename() }} as capture_key
-        from {{ source('fpl_raw', 'element_summary') }}
+        -- Every payload in the trees, read directly: the source is set by a
+        -- pre-hook on the model's own connection since #194.
+        from {{ element_summary_raw_read() }}
     ) as payloads
     inner join {{ ref('int_capture_admission') }} as admission
         on admission.capture_key = payloads.capture_key

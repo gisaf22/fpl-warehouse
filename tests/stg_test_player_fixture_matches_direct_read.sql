@@ -15,13 +15,19 @@
 -- verbatim so the comparison is against the old behaviour, not a second copy
 -- of the new. Each column is compared with its type, and `except all` keeps
 -- duplicates. See stg_test_gameweek_status_matches_direct_read for the pattern.
+--
+-- Since #194 the direct read is today's all-raw read of the fixture trees,
+-- element_summary_raw_read(), not the source: the source is the compacted
+-- union its pre-hook builds on the model's own connection, which a test's
+-- connection cannot see. So this also checks the compacted read stages what
+-- reading every payload from raw stages.
 
 with raw as (
 
     select
         {{ capture_key_from_filename() }} as capture_key,
         unnest(history) as h
-    from {{ source('fpl_raw', 'element_summary') }}
+    from {{ element_summary_raw_read() }}
 
 ),
 

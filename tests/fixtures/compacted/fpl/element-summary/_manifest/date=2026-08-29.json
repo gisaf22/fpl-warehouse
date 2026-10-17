@@ -1,0 +1,11 @@
+{
+  "capture_day": "2026-08-29",
+  "payload_files": 6,
+  "parquet_rows": 6,
+  "distinct_filenames": 6,
+  "run_ids": [
+    "20260829T191108Z-b12d19"
+  ],
+  "compacted_at": "2026-10-16T03:07:28Z",
+  "git_sha": "1015cbd154eb9424074cd86cf4655857495c8f0c"
+}

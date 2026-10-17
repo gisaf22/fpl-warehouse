@@ -15,6 +15,11 @@
 #
 #   gh workflow run served_diff.yml --ref main -f head_ref=<branch>
 #
+# It also runs on a pull request that touches what a build reads or runs
+# (#194 D2): `before` is main, `after` the PR's head commit. The deploy role
+# trusts the pull_request OIDC subject. It still never publishes. A fork's PR
+# gets no OIDC token, so its run fails at the credentials step.
+#
 # Dispatching from main keeps the OIDC subject at the ref form the deploy
 # role's trust policy already admits, so no IAM change is needed. Accepted
 # risk, as with ci.yml's live-tests: the head code runs holding the role,
@@ -33,6 +38,22 @@ on:
         description: Branch, tag or SHA whose served output is compared with main's.
         type: string
         required: true
+  pull_request:
+    paths:
+      - "models/**"
+      - "macros/**"
+      - "tests/**"
+      - "seeds/**"
+      - dbt_project.yml
+      - profiles.yml
+      - packages.yml
+      - .github/workflows/scheduled_build.yml
+      - .github/workflows/served_diff.yml
+
+# A newer push to the same PR supersedes a running diff.
+concurrency:
+  group: served-diff-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -53,7 +74,7 @@ jobs:
           - side: before
             ref: main
           - side: after
-            ref: ${{ inputs.head_ref }}
+            ref: ${{ inputs.head_ref || github.event.pull_request.head.sha }}
     name: build (${{ matrix.side }})
     runs-on: ubuntu-24.04
     # Same budget and reasoning as scheduled_build.yml: sized against the worst
@@ -102,6 +123,17 @@ jobs:
           uv run dbt build --vars "{history_root: '$HISTORY_ROOT'}"
           echo "BUILD_SECONDS=$((SECONDS - start))" >> "$GITHUB_ENV"
 
+      # stg_player_history_capture's model_seconds, the element-summary read
+      # (#194, W17 on #78). A workflow step, not the macro, because the diff
+      # job runs main's macro. Before the export: its run-operation overwrites
+      # run_results.json.
+      - name: Record staging read seconds
+        run: |
+          mkdir -p ".local/served-diff/${{ matrix.side }}"
+          jq -r '[.results[] | select(.unique_id == "model.fpl_warehouse.stg_player_history_capture")
+                  | .execution_time][0] // "null"' target/run_results.json \
+            > ".local/served-diff/${{ matrix.side }}/stg_player_history_capture_seconds.txt"
+
       # The head ref's own macros/served_diff.sql, so a head_ref must contain
       # it: one older than #102 cannot be compared.
       - name: Export served tables
@@ -145,9 +177,18 @@ jobs:
 
       - name: Diff served output
         env:
-          HEAD_REF: ${{ inputs.head_ref }}
+          HEAD_REF: ${{ inputs.head_ref || github.head_ref }}
         run: |
           echo "main vs \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            echo "| | before | after |"
+            echo "|---|---|---|"
+            echo "| \`stg_player_history_capture\` model_seconds" \
+              "| $(cat served/served-before/stg_player_history_capture_seconds.txt 2>/dev/null || echo missing)" \
+              "| $(cat served/served-after/stg_player_history_capture_seconds.txt 2>/dev/null || echo missing) |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           mkdir -p .local
           uv run dbt -q --no-use-colors run-operation served_diff --target served_diff \
             --args "{before: served/served-before, after: served/served-after}" \

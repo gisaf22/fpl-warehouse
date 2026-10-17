@@ -21,12 +21,8 @@
 {% macro capture_cutoff_files() %}
     {%- set cutoff = var("capture_cutoff", "") | string -%}
     {%- if cutoff and execute -%}
-        {%- if target.name == "fixtures" -%}
-            {%- set roots = ["tests/fixtures/raw", "tests/fixtures/history/*"] -%}
-        {%- else -%}
-            {%- set history_root = var("history_root", var("dev_history_root") if target.name == "dev" else "") -%}
-            {%- set roots = [var("raw_root")] + ([history_root ~ "/*"] if history_root else []) -%}
-        {%- endif -%}
+        {%- set trees = payload_roots() -%}
+        {%- set roots = [trees.raw] + ([trees.history] if trees.history else []) -%}
         {%- for uid in model.depends_on.nodes if uid.startswith("source.fpl_warehouse.fpl_raw.") -%}
             {%- set source_node = graph.sources[uid] -%}
             {%- set glob = source_node.meta.get("capture_glob") -%}

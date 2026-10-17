@@ -14,6 +14,8 @@ models:
         description: >
           The capture's key in the capture index. Must exist in
           int_admitted_capture: staging holds admitted captures only (#104).
+          Unique: a capture read both from compacted parquet and from the raw
+          tail would stage twice (#194 B2).
         data_tests:
           - relationships:
               arguments:
@@ -21,6 +23,11 @@ models:
                 field: capture_key
               config:
                 tags: [integration]
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: '#194 AC2'
 
   - name: stg_player_fixture
     description: >
