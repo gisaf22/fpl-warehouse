@@ -123,6 +123,17 @@ jobs:
           uv run dbt build --vars "{history_root: '$HISTORY_ROOT'}"
           echo "BUILD_SECONDS=$((SECONDS - start))" >> "$GITHUB_ENV"
 
+      # stg_player_history_capture's model_seconds, the element-summary read
+      # (#194, W17 on #78). A workflow step, not the macro, because the diff
+      # job runs main's macro. Before the export: its run-operation overwrites
+      # run_results.json.
+      - name: Record staging read seconds
+        run: |
+          mkdir -p ".local/served-diff/${{ matrix.side }}"
+          jq -r '[.results[] | select(.unique_id == "model.fpl_warehouse.stg_player_history_capture")
+                  | .execution_time][0] // "null"' target/run_results.json \
+            > ".local/served-diff/${{ matrix.side }}/stg_player_history_capture_seconds.txt"
+
       # The head ref's own macros/served_diff.sql, so a head_ref must contain
       # it: one older than #102 cannot be compared.
       - name: Export served tables
@@ -130,15 +141,6 @@ jobs:
           mkdir -p ".local/served-diff/${{ matrix.side }}"
           uv run dbt run-operation served_diff_export --args \
             "{out_dir: .local/served-diff/${{ matrix.side }}, seconds: $BUILD_SECONDS}"
-
-      # stg_player_history_capture's model_seconds, the element-summary read
-      # (#194, W17 on #78). A workflow step, not the macro, because the diff
-      # job runs main's macro.
-      - name: Record staging read seconds
-        run: |
-          jq -r '[.results[] | select(.unique_id == "model.fpl_warehouse.stg_player_history_capture")
-                  | .execution_time][0] // "null"' target/run_results.json \
-            > ".local/served-diff/${{ matrix.side }}/stg_player_history_capture_seconds.txt"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
