@@ -131,6 +131,15 @@ jobs:
           uv run dbt run-operation served_diff_export --args \
             "{out_dir: .local/served-diff/${{ matrix.side }}, seconds: $BUILD_SECONDS}"
 
+      # stg_player_history_capture's model_seconds, the element-summary read
+      # (#194, W17 on #78). A workflow step, not the macro, because the diff
+      # job runs main's macro.
+      - name: Record staging read seconds
+        run: |
+          jq -r '[.results[] | select(.unique_id == "model.fpl_warehouse.stg_player_history_capture")
+                  | .execution_time][0] // "null"' target/run_results.json \
+            > ".local/served-diff/${{ matrix.side }}/stg_player_history_capture_seconds.txt"
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: served-${{ matrix.side }}
@@ -169,6 +178,15 @@ jobs:
           HEAD_REF: ${{ inputs.head_ref || github.head_ref }}
         run: |
           echo "main vs \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            echo "| | before | after |"
+            echo "|---|---|---|"
+            echo "| \`stg_player_history_capture\` model_seconds" \
+              "| $(cat served/served-before/stg_player_history_capture_seconds.txt 2>/dev/null || echo missing)" \
+              "| $(cat served/served-after/stg_player_history_capture_seconds.txt 2>/dev/null || echo missing) |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           mkdir -p .local
           uv run dbt -q --no-use-colors run-operation served_diff --target served_diff \
             --args "{before: served/served-before, after: served/served-after}" \
