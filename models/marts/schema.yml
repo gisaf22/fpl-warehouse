@@ -1101,9 +1101,13 @@ models:
     description: >
       One row per (season, entry_id, gameweek, slot): a panel manager's pick in
       one slot of a marked gameweek, as FPL returned it (#216 D9). A slot is
-      after automatic substitutions (GLOSSARY.md): slots 1-11 are the eleven FPL
-      scored. The eleven the manager chose are the slot 1-11 rows not flagged
-      is_auto_sub_in, plus the rows flagged is_auto_sub_out. No points are
+      after automatic substitutions (GLOSSARY.md): slots 1-11 are the scored
+      eleven. The chosen eleven, which #216 D7's metric sums, is the slot 1-11
+      rows not flagged is_auto_sub_in plus the rows flagged is_auto_sub_out.
+      The original bench order is exact only in a week with no automatic
+      substitution (about half of manager-weeks): FPL does not say which bench
+      slot a replaced starter came from, so slots 12-15 in a substituted week
+      are FPL's order, not the manager's. No points are
       carried: join fct_player_gameweek on (season, fpl_id, gameweek). Only
       marked gameweeks from the manager's join week on appear (D4, D5). Part of
       the served contract, published to served/fct_manager_pick.parquet; the
