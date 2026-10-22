@@ -212,3 +212,31 @@ def test_reading_an_undeclared_root_field_fails_naming_the_field():
 
     assert result.returncode != 0
     assert "_fixture_note" in result.stdout + result.stderr
+
+
+# #216 AC22 (proposed) -----------------------------------------------------------
+# A root object, entry-picks' `entry_history`, is read as a struct of its
+# declared fields only: a field declared with record_path '$.entry_history' is
+# readable, and an undeclared one fails naming it.
+
+PICKS_ROOT = "with r as ({{ declared_records('entry_picks', '$') }}) "
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#216 AC22")
+def test_a_declared_field_of_a_root_object_is_read():
+    result = show(PICKS_ROOT + "select r.capture_key, r.entry_history.points as points from r")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert '"points"' in result.stdout
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#216 AC22")
+def test_reading_an_undeclared_field_of_a_root_object_fails_naming_it():
+    # `rank_sort` is in every entry-picks payload's entry_history but is not
+    # declared in sources.yml.
+    result = show(PICKS_ROOT + "select r.entry_history.rank_sort from r")
+
+    assert result.returncode != 0
+    assert "rank_sort" in result.stdout + result.stderr
