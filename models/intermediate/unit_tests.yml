@@ -505,3 +505,133 @@ unit_tests:
     expect:
       rows:
         - {capture_key: "partial", season: "2026-27", run_id: "20260914T190000Z-aaaa", expected_rows: 3, staged_rows: 2}
+
+  # --- int_manager_gameweek_status: the audit grid (#216 D1, D4, D5) --------
+  # Rows: every panel manager x every marked gameweek of the season. Status from
+  # the join week, an admitted picks capture, and the marker.
+
+  - name: manager_gameweek_status_follows_join_week_capture_and_marker
+    description: >
+      Manager 10187394 joined in gameweek 3, so gameweeks 1 and 2 are
+      not_yet_joined though ingest stored a pre-join 404 for them (never
+      staged). Manager 8450051 joined in gameweek 1 and has no capture for
+      gameweek 2: missing_after_join. Gameweek 4 has captures but no marker, so
+      it has no row at all.
+    model: int_manager_gameweek_status
+    config:
+      tags: [unit]
+      meta:
+        covers: "#216 AC1"
+    given:
+      - input: ref('dim_manager_panel')
+        rows:
+          - {season: "2026-27", entry_id: 10187394, cohort: random, first_active_gw: 3}
+          - {season: "2026-27", entry_id: 8450051, cohort: self, first_active_gw: 1}
+      - input: ref('stg_entry_picks_settlement')
+        rows:
+          - {season: "2026-27", gameweek: 1, entries: 2}
+          - {season: "2026-27", gameweek: 2, entries: 2}
+          - {season: "2026-27", gameweek: 3, entries: 2}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "k-8450051-1", season: "2026-27", entry_id: 8450051, gameweek: 1, observed_at: "2026-10-21 05:58:00", run_id: "20261021T055756Z-5b39a4"}
+          - {capture_key: "k-8450051-3", season: "2026-27", entry_id: 8450051, gameweek: 3, observed_at: "2026-10-21 17:35:00", run_id: "20261021T173314Z-d6b07d"}
+          - {capture_key: "k-10187394-3", season: "2026-27", entry_id: 10187394, gameweek: 3, observed_at: "2026-10-21 17:35:00", run_id: "20261021T173314Z-d6b07d"}
+          - {capture_key: "k-10187394-4", season: "2026-27", entry_id: 10187394, gameweek: 4, observed_at: "2026-10-21 17:38:00", run_id: "20261021T173314Z-d6b07d"}
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 10187394, gameweek: 1, first_active_gw: 3, capture_key: null, status: not_yet_joined}
+        - {season: "2026-27", entry_id: 10187394, gameweek: 2, first_active_gw: 3, capture_key: null, status: not_yet_joined}
+        - {season: "2026-27", entry_id: 10187394, gameweek: 3, first_active_gw: 3, capture_key: "k-10187394-3", status: captured}
+        - {season: "2026-27", entry_id: 8450051, gameweek: 1, first_active_gw: 1, capture_key: "k-8450051-1", status: captured}
+        - {season: "2026-27", entry_id: 8450051, gameweek: 2, first_active_gw: 1, capture_key: null, status: missing_after_join}
+        - {season: "2026-27", entry_id: 8450051, gameweek: 3, first_active_gw: 1, capture_key: "k-8450051-3", status: captured}
+
+  - name: manager_gameweek_status_takes_the_latest_capture
+    description: >
+      Two admitted captures of the same manager-gameweek: the later observed_at
+      wins, and run_id breaks a tie, as for element-summary.
+    model: int_manager_gameweek_status
+    config:
+      tags: [unit]
+      meta:
+        covers: "#216 AC1"
+    given:
+      - input: ref('dim_manager_panel')
+        rows:
+          - {season: "2026-27", entry_id: 8450051, cohort: self, first_active_gw: 1}
+      - input: ref('stg_entry_picks_settlement')
+        rows:
+          - {season: "2026-27", gameweek: 1, entries: 1}
+          - {season: "2026-27", gameweek: 2, entries: 1}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "older", season: "2026-27", entry_id: 8450051, gameweek: 1, observed_at: "2026-10-21 05:58:00", run_id: "20261021T055756Z-5b39a4"}
+          - {capture_key: "newer", season: "2026-27", entry_id: 8450051, gameweek: 1, observed_at: "2026-10-22 05:58:00", run_id: "20261022T055756Z-aaaaaa"}
+          - {capture_key: "tie-a", season: "2026-27", entry_id: 8450051, gameweek: 2, observed_at: "2026-10-21 06:00:00", run_id: "20261021T055756Z-5b39a4"}
+          - {capture_key: "tie-b", season: "2026-27", entry_id: 8450051, gameweek: 2, observed_at: "2026-10-21 06:00:00", run_id: "20261021T173314Z-d6b07d"}
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 8450051, gameweek: 1, capture_key: "newer", status: captured}
+        - {season: "2026-27", entry_id: 8450051, gameweek: 2, capture_key: "tie-b", status: captured}
+
+  # --- int_manager_gameweek_points: the reconciliation (#216 D7) ------------
+
+  - name: fpl_points_rebuild_from_multiplier_and_player_points
+    description: >
+      The real sample: manager 10187394, gameweek 4 of 2026-27, chip-free,
+      with one automatic sub (498 out, 41 in) and a transfer cost of 8. FPL's
+      payload already applies the substitution: 41 sits in slot 5 with
+      multiplier 1, 498 on the bench with multiplier 0. The captain (165, 12
+      points) carries multiplier 2. The sum of multiplier x points is 56, which
+      is FPL's entry_history.points: the transfer cost is not taken out of it.
+      Player points are fct_player_gameweek's, as served on 2026-10-22.
+    model: int_manager_gameweek_points
+    config:
+      tags: [unit]
+      meta:
+        covers: "#216 AC13"
+    given:
+      - input: ref('int_manager_gameweek_status')
+        rows:
+          - {season: "2026-27", entry_id: 10187394, gameweek: 4, capture_key: "k", status: captured}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "k", season: "2026-27", entry_id: 10187394, gameweek: 4, active_chip: null, points: 56, event_transfers_cost: 8}
+      - input: ref('stg_entry_picks')
+        rows:
+          - {capture_key: "k", slot: 1, fpl_id: 28, multiplier: 1}
+          - {capture_key: "k", slot: 2, fpl_id: 356, multiplier: 1}
+          - {capture_key: "k", slot: 3, fpl_id: 36, multiplier: 1}
+          - {capture_key: "k", slot: 4, fpl_id: 502, multiplier: 1}
+          - {capture_key: "k", slot: 5, fpl_id: 41, multiplier: 1}
+          - {capture_key: "k", slot: 6, fpl_id: 399, multiplier: 1}
+          - {capture_key: "k", slot: 7, fpl_id: 368, multiplier: 1}
+          - {capture_key: "k", slot: 8, fpl_id: 426, multiplier: 1}
+          - {capture_key: "k", slot: 9, fpl_id: 154, multiplier: 1}
+          - {capture_key: "k", slot: 10, fpl_id: 26, multiplier: 1}
+          - {capture_key: "k", slot: 11, fpl_id: 165, multiplier: 2}
+          - {capture_key: "k", slot: 12, fpl_id: 555, multiplier: 0}
+          - {capture_key: "k", slot: 13, fpl_id: 420, multiplier: 0}
+          - {capture_key: "k", slot: 14, fpl_id: 498, multiplier: 0}
+          - {capture_key: "k", slot: 15, fpl_id: 401, multiplier: 0}
+      - input: ref('fct_player_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 4, fpl_id: 28, total_points: 2}
+          - {season: "2026-27", gameweek: 4, fpl_id: 356, total_points: 8}
+          - {season: "2026-27", gameweek: 4, fpl_id: 36, total_points: 1}
+          - {season: "2026-27", gameweek: 4, fpl_id: 502, total_points: 7}
+          - {season: "2026-27", gameweek: 4, fpl_id: 41, total_points: 2}
+          - {season: "2026-27", gameweek: 4, fpl_id: 399, total_points: 1}
+          - {season: "2026-27", gameweek: 4, fpl_id: 368, total_points: 3}
+          - {season: "2026-27", gameweek: 4, fpl_id: 426, total_points: 2}
+          - {season: "2026-27", gameweek: 4, fpl_id: 154, total_points: 5}
+          - {season: "2026-27", gameweek: 4, fpl_id: 26, total_points: 1}
+          - {season: "2026-27", gameweek: 4, fpl_id: 165, total_points: 12}
+          - {season: "2026-27", gameweek: 4, fpl_id: 555, total_points: 0}
+          - {season: "2026-27", gameweek: 4, fpl_id: 420, total_points: 0}
+          - {season: "2026-27", gameweek: 4, fpl_id: 498, total_points: 0}
+          - {season: "2026-27", gameweek: 4, fpl_id: 401, total_points: 2}
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 10187394, gameweek: 4, active_chip: null, fpl_points: 56, rebuilt_points: 56}

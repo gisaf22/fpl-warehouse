@@ -77,6 +77,14 @@ ROWS = {
             ("2026-27", 2, "2026-08-29 10:00:00"),
         ],
     ),
+    "fct_manager_pick": (
+        "season, entry_id, gameweek, slot, fpl_id",
+        [("2026-27", 8450051, 1, 1, 1), ("2026-27", 8450051, 1, 2, 115)],
+    ),
+    "fct_manager_gameweek": (
+        "season, entry_id, gameweek, cohort",
+        [("2026-27", 8450051, 1, "self"), ("2026-27", 10187394, 3, "random")],
+    ),
 }
 
 
@@ -182,6 +190,7 @@ def test_builds_that_read_different_newest_runs_are_inconclusive_and_fail(tmp_pa
 @pytest.mark.covers("#143 AC6")
 @pytest.mark.covers("#154 AC4")
 @pytest.mark.covers("#170 AC5")
+@pytest.mark.covers("#216 AC18")
 def test_identical_builds_compare_every_served_table_in_every_season(tmp_path):
     # The fixture is checked against what is actually published, so a table
     # served but left out of it fails here instead of going uncompared.

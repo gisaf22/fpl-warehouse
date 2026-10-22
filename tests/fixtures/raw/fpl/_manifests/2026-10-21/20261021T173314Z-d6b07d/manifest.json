@@ -1,0 +1,182 @@
+{
+ "captures": [
+  {
+   "content_length": 1996,
+   "content_sha256": "cd7c22c8a10103582313d9307aabab06f549f70fcf6e8d422c41e1ae1bdfcdb8",
+   "endpoint": "entry-picks/2026-27/3/10187394",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/3/10187394/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:34:54.435782Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 1869,
+   "content_sha256": "c1c5fea5e79021fb13e4d93a50beaf5d174256dda8eac82d39c968acdc043bf2",
+   "endpoint": "entry-picks/2026-27/3/8450051",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/3/8450051/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:35:11.736033Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 1928,
+   "content_sha256": "f9c446752f910cc52ee49cbd1de1003fc4d76b585b181006a33224df0db1ebfd",
+   "endpoint": "entry-picks/2026-27/4/10187394",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/4/10187394/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:38:13.278961Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 1869,
+   "content_sha256": "2ff5d43a962a890b73e38cf9efd5bbe976b7b6c28fb9fe2448ff289d4cc76982",
+   "endpoint": "entry-picks/2026-27/4/8450051",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/4/8450051/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:38:31.670235Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 1998,
+   "content_sha256": "e0e8ab303e6407eb024f1a90e00ed5d185f4aae2a7c48c14904b31f59236eba5",
+   "endpoint": "entry-picks/2026-27/5/10187394",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/5/10187394/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:41:33.137084Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  }
+ ],
+ "config": {
+  "max_seconds": 2700.0,
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 918.129,
+ "ended_at": "2026-10-21T17:48:32.552251Z",
+ "endpoints": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "drift": {
+    "checked": 1,
+    "entries": [],
+    "reasons": [],
+    "status": "ok"
+   },
+   "failed": 0,
+   "failures": [],
+   "outcome": "SUCCESS",
+   "usable": 1
+  },
+  "entry-picks": {
+   "attempted": 9112,
+   "drift": {
+    "checked": 8844,
+    "entries": [],
+    "reasons": [],
+    "status": "ok"
+   },
+   "expected": 268,
+   "failed": 0,
+   "failures": [],
+   "non_2xx_by_gameweek": {
+    "3": 130,
+    "4": 78,
+    "5": 49,
+    "6": 11,
+    "7": 0
+   },
+   "outcome": "SUCCESS",
+   "throughput": {
+    "gameweeks_completed": [
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "requests": 9112,
+    "requests_per_second": 9.945,
+    "total_seconds": 916.229
+   },
+   "usable": 8844
+  }
+ },
+ "extraction_date": "2026-10-21",
+ "failures": [],
+ "git_sha": "095a4c719b70907675388f889e30b3956a10818f",
+ "ingest_version": "1.0.0",
+ "invalid_counts": {
+  "http_error": 0,
+  "not_found": 268,
+  "shape_invalid": 0
+ },
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1785640,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/3/10187394": {
+   "attempted": 1,
+   "bytes": 1996,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/3/8450051": {
+   "attempted": 1,
+   "bytes": 1869,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/4/10187394": {
+   "attempted": 1,
+   "bytes": 1928,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/4/8450051": {
+   "attempted": 1,
+   "bytes": 1869,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/5/10187394": {
+   "attempted": 1,
+   "bytes": 1998,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "origin": {
+  "aws_principal": "github-actions-fpl-ingest",
+  "github_run_id": "39644787548",
+  "kind": "ci",
+  "ref": "refs/heads/main",
+  "workflow": "Scheduled Ingestion \u2014 Entry Picks"
+ },
+ "raw_contract_version": "2.8.0",
+ "run_id": "20261021T173314Z-d6b07d",
+ "source": "fpl",
+ "started_at": "2026-10-21T17:33:14.422865Z",
+ "status": "SUCCESS",
+ "totals": {
+  "attempted": 9113,
+  "bytes": 18690296,
+  "failed": 0,
+  "written": 9113
+ },
+ "trigger": "scheduled"
+}

@@ -333,3 +333,36 @@ models:
                 tags: [integration]
                 meta:
                   covers: "#95 AC1"
+
+  - name: stg_entry_picks_settlement
+    description: >
+      One row per picks settlement marker (GLOSSARY.md): fpl-ingest's
+      `_settlement/entry-picks/<gameweek>/marker.json`, a published contract
+      (#216 D2, fpl-ingest ADR 006). Its fields, unchanged (D3): event (as
+      gameweek), entries, run_id, recorded_at. Its season is its run's (the
+      key and body carry none). Not a capture, so it has no capture_key.
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, gameweek]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC7"
+    columns:
+      - name: season
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC7"
+      - name: entries
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC7"

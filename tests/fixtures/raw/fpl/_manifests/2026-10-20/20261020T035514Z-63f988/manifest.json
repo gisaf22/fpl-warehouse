@@ -1,0 +1,226 @@
+{
+ "captures": [
+  {
+   "content_length": 1391,
+   "content_sha256": "1041301c33234cdc89e9fbd9fa610dcecc6f0b42f6ed7140067d63e8482df13f",
+   "endpoint": "entry-history/2026-27/10187394",
+   "http_status": 200,
+   "key": "raw/fpl/entry-history/2026-27/10187394/2026-10-20/20261020T035514Z-63f988/payload.json",
+   "received_at": "2026-10-20T03:57:48.249280Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 2063,
+   "content_sha256": "482f958e29e54276ff52cca20a9a6d190c523d482f2816219b2d7d62f0c3ff4a",
+   "endpoint": "entry-history/2026-27/8450051",
+   "http_status": 200,
+   "key": "raw/fpl/entry-history/2026-27/8450051/2026-10-20/20261020T035514Z-63f988/payload.json",
+   "received_at": "2026-10-20T03:58:19.264075Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  }
+ ],
+ "config": {
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 185.144,
+ "ended_at": "2026-10-20T03:58:19.420810Z",
+ "endpoints": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "drift": {
+    "checked": 1,
+    "entries": [],
+    "reasons": [],
+    "status": "ok"
+   },
+   "failed": 0,
+   "failures": [],
+   "outcome": "SUCCESS",
+   "usable": 1
+  },
+  "entry-history": {
+   "attempted": 941,
+   "failed": 10,
+   "failures": [
+    {
+     "endpoint": "entry-history/2026-27/7254",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/17669",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/24589",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/28264",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/42999",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/47383",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/53148",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/54684",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/63831",
+     "reason": "TimeoutError"
+    },
+    {
+     "endpoint": "entry-history/2026-27/4298",
+     "reason": "TimeoutError"
+    }
+   ],
+   "outcome": "PARTIAL",
+   "usable": 931
+  }
+ },
+ "extraction_date": "2026-10-20",
+ "failures": [
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/7254",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/7254/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/17669",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/17669/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/24589",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/24589/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/28264",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/28264/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/42999",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/42999/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/47383",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/47383/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/53148",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/53148/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/54684",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/54684/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/63831",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/63831/history/"
+  },
+  {
+   "attempt_count": 1,
+   "endpoint": "entry-history/2026-27/4298",
+   "error_class": "TimeoutError",
+   "http_status": null,
+   "message": "",
+   "request_url": "https://fantasy.premierleague.com/api/entry/4298/history/"
+  }
+ ],
+ "git_sha": "b76a7d2bf080d62e578bd94fe45bda325836f1bd",
+ "ingest_version": "1.0.0",
+ "invalid_counts": {
+  "http_error": 0,
+  "not_found": 0,
+  "shape_invalid": 0
+ },
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1784801,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-history/2026-27/10187394": {
+   "attempted": 1,
+   "bytes": 1391,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-history/2026-27/8450051": {
+   "attempted": 1,
+   "bytes": 2063,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "origin": {
+  "aws_principal": "github-actions-fpl-ingest",
+  "github_run_id": "39366583920",
+  "kind": "ci",
+  "ref": "refs/heads/main",
+  "workflow": "Scheduled Ingestion \u2014 Manager Panel (one-off,"
+ },
+ "raw_contract_version": "2.6.0",
+ "run_id": "20261020T035514Z-63f988",
+ "source": "fpl",
+ "started_at": "2026-10-20T03:55:14.276953Z",
+ "status": "PARTIAL",
+ "totals": {
+  "attempted": 942,
+  "bytes": 3410606,
+  "failed": 10,
+  "written": 932
+ },
+ "trigger": "manual"
+}

@@ -235,6 +235,7 @@ jobs:
               "dim_team", "dim_player", "dim_fixture",
               "dim_player_status_history", "fct_player_market_snapshot",
               "dim_fixture_schedule_history", "dim_gameweek",
+              "fct_manager_pick", "fct_manager_gameweek",
           }
           models = {}
           with open("/tmp/models.json") as fh:

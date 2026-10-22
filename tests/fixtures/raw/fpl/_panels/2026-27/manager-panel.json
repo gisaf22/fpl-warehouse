@@ -1,0 +1,23 @@
+{
+ "drawn": 2000,
+ "drawn_not_kept": {
+  "no_picks": 4,
+  "not_found": 0
+ },
+ "entries": [
+  {
+   "cohort": "random",
+   "entry_id": 10187394,
+   "joined_gw": 1
+  },
+  {
+   "cohort": "self",
+   "entry_id": 8450051,
+   "joined_gw": 1
+  }
+ ],
+ "kept": 1,
+ "season": "2026-27",
+ "seed": 11393157618204230183,
+ "total_players": 11132843
+}

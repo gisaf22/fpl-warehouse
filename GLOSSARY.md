@@ -72,6 +72,31 @@ One definition per term. A term is added here before an issue, PR or check cites
   (`is_ratified`, the `ratified` doc block in `models/marts/docs.md`). Not knowable before the
   deadline.
 
+## Managers
+
+- **manager**: one FPL team, identified by FPL's `entry_id`, which fpl-ingest captures as
+  `entry-history` and `entry-picks`. Like `fpl_id`, an `entry_id` is matched within season.
+- **panel**: the season's managers fpl-ingest draws once and captures every gameweek,
+  listed in `raw/fpl/_panels/<season>/manager-panel.json` (fpl-ingest#100, #102). Only
+  managers whose history had picks are kept.
+- **cohort**: why a manager is on the panel: `random` (drawn at random from every
+  manager) or `self` (named outside the draw). A column on `fct_manager_gameweek`
+  (#216 D10).
+- **join week** (`first_active_gw`): the first gameweek in a manager's captured
+  `entry-history` `current[]`. Before it the manager had no team, and FPL answers a picks
+  request with 404 (#216 D6). The panel file's `joined_gw` is not it: it is 1 for every
+  manager.
+- **settlement marker (picks)**: `raw/fpl/_settlement/entry-picks/<gameweek>/marker.json`,
+  which fpl-ingest writes once every panel manager's picks for that gameweek are captured,
+  as a payload or as a pre-join 404 (fpl-ingest ADR 006). A **marked gameweek** has one.
+  An unmarked gameweek is not settled and is hidden (#216 D4).
+- **manager-gameweek status**: for a panel manager and a marked gameweek, one of
+  `not_yet_joined` (before the join week), `captured` (an admitted picks capture exists) or
+  `missing_after_join` (neither) (#216 D1). Held in `int_manager_gameweek_status`.
+- **slot**: a pick's position, 1–15, as FPL returns it after automatic substitutions:
+  slots 1–11 are the eleven FPL scored, 12–15 the bench. A starter that was substituted
+  sits on the bench and the substitute in a slot of 1–11.
+
 ## Serving
 
 - **served**: published to `served/` as parquet, `access: public` with an enforced contract

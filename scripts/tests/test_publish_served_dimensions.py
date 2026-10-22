@@ -113,6 +113,7 @@ def test_dimensions_exactly_at_their_expectation_publish_and_are_listed_per_seas
 
 @pytest.mark.integration
 @pytest.mark.covers("#44 AC6")
+@pytest.mark.covers("#216 AC17")
 @pytest.mark.parametrize(
     "short",
     [
@@ -125,6 +126,8 @@ def test_dimensions_exactly_at_their_expectation_publish_and_are_listed_per_seas
         {"market_snapshot_rows": 9},
         {"schedule_history_rows": 379},
         {"gameweek_dim_rows": 37},
+        {"manager_join_weeks": (1,), "marked_gameweeks": 2, "manager_pick_rows": 29},
+        {"manager_join_weeks": (1,), "marked_gameweeks": 2, "manager_gameweek_rows": 1},
     ],
     ids=list(SERVED),
 )

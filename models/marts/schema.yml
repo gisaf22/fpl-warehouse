@@ -1096,3 +1096,141 @@ models:
         description: >
           deadline_time minus last_capture_before_deadline_at, in whole
           seconds. Null when last_capture_before_deadline_at is.
+
+  - name: fct_manager_pick
+    description: >
+      One row per (season, entry_id, gameweek, slot): a panel manager's pick in
+      one slot of a marked gameweek, as FPL returned it (#216 D9). A slot is
+      after automatic substitutions (GLOSSARY.md): slots 1-11 are the eleven FPL
+      scored. The eleven the manager chose are the slot 1-11 rows not flagged
+      is_auto_sub_in, plus the rows flagged is_auto_sub_out. No points are
+      carried: join fct_player_gameweek on (season, fpl_id, gameweek). Only
+      marked gameweeks from the manager's join week on appear (D4, D5). Part of
+      the served contract, published to served/fct_manager_pick.parquet; the
+      column list below is enforced.
+    group: warehouse_internal
+    access: public
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id, gameweek, slot]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC8"
+    columns:
+      - name: season
+        data_type: VARCHAR
+        description: "{{ doc('season_scoped_key') }}"
+      - name: entry_id
+        data_type: INTEGER
+        description: FPL's id of the manager (GLOSSARY.md, manager). Match within season.
+      - name: gameweek
+        data_type: INTEGER
+        description: FPL's gameweek (event) number within the season.
+      - name: slot
+        data_type: INTEGER
+        description: The pick's position, 1-15, after automatic substitutions (GLOSSARY.md).
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC8"
+      - name: fpl_id
+        data_type: INTEGER
+        description: "The picked player. {{ doc('season_scoped_key') }}"
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC8"
+      - name: is_captain
+        data_type: BOOLEAN
+        description: The manager's captain for the gameweek.
+      - name: is_vice_captain
+        data_type: BOOLEAN
+        description: The manager's vice-captain for the gameweek.
+      - name: is_auto_sub_in
+        data_type: BOOLEAN
+        description: FPL substituted this bench player into the eleven.
+      - name: is_auto_sub_out
+        data_type: BOOLEAN
+        description: FPL substituted this chosen starter out to the bench.
+
+  - name: fct_manager_gameweek
+    description: >
+      One row per (season, entry_id, gameweek): a panel manager's captured
+      marked gameweek, from their join week on (#216 D5, D9). Absent, never a
+      NULL row, for a gameweek before the join week or without a settlement
+      marker. FPL's own points total is not served (D9). Part of the served
+      contract, published to served/fct_manager_gameweek.parquet; the column
+      list below is enforced.
+    group: warehouse_internal
+    access: public
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id, gameweek]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC10"
+    columns:
+      - name: season
+        data_type: VARCHAR
+        description: "{{ doc('season_scoped_key') }}"
+      - name: entry_id
+        data_type: INTEGER
+        description: FPL's id of the manager (GLOSSARY.md, manager). Match within season.
+      - name: gameweek
+        data_type: INTEGER
+        description: FPL's gameweek (event) number within the season.
+      - name: cohort
+        data_type: VARCHAR
+        description: Why the manager is on the panel, `random` or `self` (GLOSSARY.md, #216 D10).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["random", "self"]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC11"
+      - name: active_chip
+        data_type: VARCHAR
+        description: FPL's active chip that gameweek (e.g. `3xc`, `bboost`, `freehit`, `wildcard`); null when none.
+      - name: event_transfers
+        data_type: INTEGER
+        description: Transfers made for the gameweek.
+      - name: event_transfers_cost
+        data_type: INTEGER
+        description: Points FPL deducted for those transfers, from the season total (not from the gameweek's points).
+      - name: automatic_subs
+        data_type: STRUCT(fpl_id_out INTEGER, fpl_id_in INTEGER)[]
+        description: FPL's automatic substitutions that gameweek, each the player out and the player in; empty when none.
+
+  - name: dim_manager_panel
+    description: >
+      One row per (season, entry_id): a panel manager, their cohort and join
+      week (#216 D6). Private: not served (D9).
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC6"
+    columns:
+      - name: first_active_gw
+        description: The manager's join week (GLOSSARY.md).

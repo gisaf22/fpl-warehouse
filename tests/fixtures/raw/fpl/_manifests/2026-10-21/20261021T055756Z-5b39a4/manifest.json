@@ -1,0 +1,172 @@
+{
+ "captures": [
+  {
+   "class": "not_found",
+   "content_length": 23,
+   "content_sha256": "cacf8a32e69eabea7d57711f4ccbeed4d284e1bbd0789137936d388da707b9de",
+   "endpoint": "entry-picks/2026-27/1/10187394",
+   "expected": true,
+   "http_status": 404,
+   "key": "raw/fpl/_invalid/not_found/entry-picks/2026-27/1/10187394/2026-10-21/20261021T055756Z-5b39a4/response.body",
+   "received_at": "2026-10-21T06:14:14.819634Z",
+   "season": "2026-27",
+   "shape_ok": false,
+   "usable": false
+  },
+  {
+   "content_length": 1863,
+   "content_sha256": "8832b40583d6d4225cf0b9a0609cc7bf3b3bc373f9e846c0dbfd6c29a9d79f5a",
+   "endpoint": "entry-picks/2026-27/1/8450051",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/1/8450051/2026-10-21/20261021T055756Z-5b39a4/payload.json",
+   "received_at": "2026-10-21T06:15:50.121821Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "class": "not_found",
+   "content_length": 23,
+   "content_sha256": "cacf8a32e69eabea7d57711f4ccbeed4d284e1bbd0789137936d388da707b9de",
+   "endpoint": "entry-picks/2026-27/2/10187394",
+   "expected": true,
+   "http_status": 404,
+   "key": "raw/fpl/_invalid/not_found/entry-picks/2026-27/2/10187394/2026-10-21/20261021T055756Z-5b39a4/response.body",
+   "received_at": "2026-10-21T06:33:00.065659Z",
+   "season": "2026-27",
+   "shape_ok": false,
+   "usable": false
+  },
+  {
+   "content_length": 1870,
+   "content_sha256": "c4ce9ae20005703667ae71204e52e0a8f9e4719c1cd921f5f6c9d68b99c8dc5c",
+   "endpoint": "entry-picks/2026-27/2/8450051",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/2/8450051/2026-10-21/20261021T055756Z-5b39a4/payload.json",
+   "received_at": "2026-10-21T06:34:41.785112Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  }
+ ],
+ "config": {
+  "max_seconds": 2700.0,
+  "rate": 10.0,
+  "raw_dir": null,
+  "strict": false,
+  "verbose": false
+ },
+ "duration_seconds": 2707.569,
+ "ended_at": "2026-10-21T06:43:04.342833Z",
+ "endpoints": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "drift": {
+    "checked": 1,
+    "entries": [],
+    "reasons": [],
+    "status": "ok"
+   },
+   "failed": 0,
+   "failures": [],
+   "outcome": "SUCCESS",
+   "usable": 1
+  },
+  "entry-picks": {
+   "attempted": 4874,
+   "drift": {
+    "checked": 4246,
+    "entries": [],
+    "reasons": [],
+    "status": "ok"
+   },
+   "expected": 628,
+   "failed": 0,
+   "failures": [],
+   "non_2xx_by_gameweek": {
+    "1": 412,
+    "2": 216,
+    "3": 0
+   },
+   "outcome": "SUCCESS",
+   "throughput": {
+    "gameweeks_completed": [
+     1,
+     2
+    ],
+    "requests": 4874,
+    "requests_per_second": 1.801,
+    "total_seconds": 2705.674
+   },
+   "usable": 4246
+  }
+ },
+ "extraction_date": "2026-10-21",
+ "failures": [],
+ "git_sha": "c0fc4824355ba9f1d4c7706773b441f3425c6616",
+ "ingest_version": "1.0.0",
+ "invalid_counts": {
+  "http_error": 0,
+  "not_found": 628,
+  "shape_invalid": 0
+ },
+ "markers_withheld": [
+  {
+   "endpoint": "entry-picks",
+   "event": 3,
+   "reason": "stopped_at_budget"
+  }
+ ],
+ "objects": {
+  "bootstrap-static": {
+   "attempted": 1,
+   "bytes": 1785156,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/1/10187394": {
+   "attempted": 1,
+   "bytes": 23,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/1/8450051": {
+   "attempted": 1,
+   "bytes": 1863,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/2/10187394": {
+   "attempted": 1,
+   "bytes": 23,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/2/8450051": {
+   "attempted": 1,
+   "bytes": 1870,
+   "failed": 0,
+   "written": 1
+  }
+ },
+ "origin": {
+  "aws_principal": "github-actions-fpl-ingest",
+  "github_run_id": "39552536884",
+  "kind": "ci",
+  "ref": "refs/heads/main",
+  "workflow": "Scheduled Ingestion \u2014 Entry Picks"
+ },
+ "raw_contract_version": "2.8.0",
+ "run_id": "20261021T055756Z-5b39a4",
+ "source": "fpl",
+ "started_at": "2026-10-21T05:57:56.774092Z",
+ "status": "SUCCESS",
+ "stop_reason": "stopped_at_budget",
+ "totals": {
+  "attempted": 4875,
+  "bytes": 9866648,
+  "failed": 0,
+  "written": 4875
+ },
+ "trigger": "scheduled"
+}
