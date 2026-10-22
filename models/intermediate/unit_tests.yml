@@ -547,6 +547,33 @@ unit_tests:
         - {season: "2026-27", entry_id: 8450051, gameweek: 2, first_active_gw: 1, capture_key: null, status: missing_after_join}
         - {season: "2026-27", entry_id: 8450051, gameweek: 3, first_active_gw: 1, capture_key: "k-8450051-3", status: captured}
 
+  - name: manager_without_a_join_week_is_not_yet_joined_in_every_marked_gameweek
+    description: >
+      The no-join-week rule (#216 AC1): a panel manager with no
+      admitted capture in any marked gameweek has no join week, and every marked
+      gameweek reads not_yet_joined. The manager still has a row per marked
+      gameweek, so AC2 counts them. A capture orphaned by a killed run reads the
+      same way; only the completeness follow-up can surface it (D6's limit).
+    model: int_manager_gameweek_status
+    config:
+      tags: [unit]
+      meta:
+        covers: "#216 AC1"
+    given:
+      - input: ref('dim_manager_panel')
+        rows:
+          - {season: "2026-27", entry_id: 4685107, cohort: self, first_active_gw: null}
+      - input: ref('stg_entry_picks_settlement')
+        rows:
+          - {season: "2026-27", gameweek: 1, entries: 1}
+          - {season: "2026-27", gameweek: 2, entries: 1}
+      - input: ref('stg_entry_picks_capture')
+        rows: []
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 4685107, gameweek: 1, first_active_gw: null, capture_key: null, status: not_yet_joined}
+        - {season: "2026-27", entry_id: 4685107, gameweek: 2, first_active_gw: null, capture_key: null, status: not_yet_joined}
+
   - name: manager_gameweek_status_takes_the_latest_capture
     description: >
       Two admitted captures of the same manager-gameweek: the later observed_at
@@ -579,7 +606,7 @@ unit_tests:
 
   - name: fpl_points_rebuild_from_multiplier_and_player_points
     description: >
-      The real sample: manager 10187394, gameweek 4 of 2026-27, chip-free,
+      The real sample: manager 10187394, gameweek 4 of 2026-27, no chip,
       with one automatic sub (498 out, 41 in) and a transfer cost of 8. FPL's
       payload already applies the substitution: 41 sits in slot 5 with
       multiplier 1, 498 on the bench with multiplier 0. The captain (165, 12
@@ -635,3 +662,60 @@ unit_tests:
     expect:
       rows:
         - {season: "2026-27", entry_id: 10187394, gameweek: 4, active_chip: null, fpl_points: 56, rebuilt_points: 56}
+
+  - name: fpl_points_rebuild_on_a_chip_week
+    description: >
+      Chip weeks are checked too (#216 D7, amended by O3). The real sample:
+      manager 1012894, gameweek 1 of 2026-27, triple captain (3xc), no
+      automatic sub, no transfer cost. The captain (426, 2 points) carries
+      multiplier 3. The sum of multiplier x points is 56, which is FPL's
+      entry_history.points.
+    model: int_manager_gameweek_points
+    config:
+      tags: [unit]
+      meta:
+        covers: "#216 AC13"
+    given:
+      - input: ref('int_manager_gameweek_status')
+        rows:
+          - {season: "2026-27", entry_id: 1012894, gameweek: 1, capture_key: "k", status: captured}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "k", season: "2026-27", entry_id: 1012894, gameweek: 1, active_chip: "3xc", points: 56, event_transfers_cost: 0}
+      - input: ref('stg_entry_picks')
+        rows:
+          - {capture_key: "k", slot: 1, fpl_id: 412, multiplier: 1}
+          - {capture_key: "k", slot: 2, fpl_id: 11, multiplier: 1}
+          - {capture_key: "k", slot: 3, fpl_id: 423, multiplier: 1}
+          - {capture_key: "k", slot: 4, fpl_id: 391, multiplier: 1}
+          - {capture_key: "k", slot: 5, fpl_id: 368, multiplier: 1}
+          - {capture_key: "k", slot: 6, fpl_id: 426, multiplier: 3}
+          - {capture_key: "k", slot: 7, fpl_id: 69, multiplier: 1}
+          - {capture_key: "k", slot: 8, fpl_id: 40, multiplier: 1}
+          - {capture_key: "k", slot: 9, fpl_id: 165, multiplier: 1}
+          - {capture_key: "k", slot: 10, fpl_id: 411, multiplier: 1}
+          - {capture_key: "k", slot: 11, fpl_id: 552, multiplier: 1}
+          - {capture_key: "k", slot: 12, fpl_id: 555, multiplier: 0}
+          - {capture_key: "k", slot: 13, fpl_id: 175, multiplier: 0}
+          - {capture_key: "k", slot: 14, fpl_id: 449, multiplier: 0}
+          - {capture_key: "k", slot: 15, fpl_id: 73, multiplier: 0}
+      - input: ref('fct_player_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 1, fpl_id: 412, total_points: 1}
+          - {season: "2026-27", gameweek: 1, fpl_id: 11, total_points: 6}
+          - {season: "2026-27", gameweek: 1, fpl_id: 423, total_points: 1}
+          - {season: "2026-27", gameweek: 1, fpl_id: 391, total_points: 9}
+          - {season: "2026-27", gameweek: 1, fpl_id: 368, total_points: 8}
+          - {season: "2026-27", gameweek: 1, fpl_id: 426, total_points: 2}
+          - {season: "2026-27", gameweek: 1, fpl_id: 69, total_points: 2}
+          - {season: "2026-27", gameweek: 1, fpl_id: 40, total_points: 8}
+          - {season: "2026-27", gameweek: 1, fpl_id: 165, total_points: 11}
+          - {season: "2026-27", gameweek: 1, fpl_id: 411, total_points: 2}
+          - {season: "2026-27", gameweek: 1, fpl_id: 552, total_points: 2}
+          - {season: "2026-27", gameweek: 1, fpl_id: 555, total_points: 0}
+          - {season: "2026-27", gameweek: 1, fpl_id: 175, total_points: 1}
+          - {season: "2026-27", gameweek: 1, fpl_id: 449, total_points: 3}
+          - {season: "2026-27", gameweek: 1, fpl_id: 73, total_points: 1}
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 1012894, gameweek: 1, active_chip: "3xc", fpl_points: 56, rebuilt_points: 56}

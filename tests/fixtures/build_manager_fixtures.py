@@ -11,10 +11,10 @@ WHAT IT HOLDS
 Two real managers of the 2026-27 panel, by id only (the payloads carry no
 names):
 
-    10187394  random cohort. Joined in gameweek 3: their entry-history
-              `current[]` starts at event 3, and ingest stored a pre-join 404
-              (an expected `not_found` capture under `_invalid/`) for
-              gameweeks 1 and 2. Gameweeks 3 and 4 each have automatic subs
+    10187394  random cohort. Joined in gameweek 3: their first picks capture
+              is gameweek 3 (the join week, #216 D6 as amended by O1), and
+              ingest stored a pre-join 404 (an expected `not_found` capture
+              under `_invalid/`) for gameweeks 1 and 2. Gameweeks 3 and 4 each have automatic subs
               (gameweek 4: 498 out, 41 in) and gameweek 4 a transfer cost of 8.
               Chip-free in both. Its gameweek 4 is the reconciliation's real
               sample: the 15 picks' multiplier x points sum to 56, which is
@@ -31,12 +31,12 @@ Objects, all verbatim from S3 except where EDITED says otherwise:
     raw/fpl/entry-picks/2026-27/{gw}/{entry}/{date}/{run_id}/payload.json
     raw/fpl/_invalid/not_found/entry-picks/2026-27/{gw}/{entry}/{date}/{run_id}/
         response.body and metadata.json
-    raw/fpl/entry-history/2026-27/{entry}/{date}/{run_id}/payload.json
     raw/fpl/_settlement/entry-picks/{gw}/marker.json, gameweeks 1-4
     raw/fpl/_panels/2026-27/manager-panel.json
-    raw/fpl/_manifests/{date}/{run_id}/manifest.json for the three runs that
-        wrote them: 20261020T035514Z-63f988 (entry-history, PARTIAL),
-        20261021T055756Z-5b39a4 and 20261021T173314Z-d6b07d (entry-picks)
+    raw/fpl/_manifests/{date}/{run_id}/manifest.json for the two runs that
+        wrote them: 20261021T055756Z-5b39a4 and 20261021T173314Z-d6b07d
+
+No entry-history: the warehouse does not read it (#216 D6 as amended by O1).
 
 EDITED
 ------
@@ -73,9 +73,8 @@ SELF_COHORT = 8450051
 MANAGERS = (LATE_JOINER, SELF_COHORT)
 MARKED_GAMEWEEKS = (1, 2, 3, 4)
 UNMARKED_GAMEWEEK = 5
-MANAGER_FAMILIES = ("entry-picks", "entry-history")
+MANAGER_FAMILIES = ("entry-picks", "entry-history")  # every manager endpoint, trimmed alike
 
-HISTORY_RUN = ("2026-10-20", "20261020T035514Z-63f988")
 PICKS_RUNS = (("2026-10-21", "20261021T055756Z-5b39a4"), ("2026-10-21", "20261021T173314Z-d6b07d"))
 
 
@@ -120,7 +119,6 @@ def capture_keys() -> list[str]:
     """Every payload, invalid body and sidecar this tree copies."""
     keys = []
     for entry in MANAGERS:
-        keys += s3_list(f"raw/fpl/entry-history/{SEASON}/{entry}/")
         for gw in picks_weeks(entry):
             keys += s3_list(f"raw/fpl/entry-picks/{SEASON}/{gw}/{entry}/")
     for gw in (1, 2):
@@ -137,7 +135,7 @@ def main() -> None:
         write_bytes(key, s3_bytes(key))
 
     indexed = {k for k in keys if not k.endswith("metadata.json")}
-    for date, run_id in (HISTORY_RUN, *PICKS_RUNS):
+    for date, run_id in PICKS_RUNS:
         key = f"raw/fpl/_manifests/{date}/{run_id}/manifest.json"
         manifest = json.loads(s3_bytes(key))
         manifest["captures"] = [c for c in manifest["captures"] if c["key"] in indexed]

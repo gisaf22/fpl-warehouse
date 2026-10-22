@@ -2,12 +2,12 @@
 
 Both floors are exact, in both directions, like dim_gameweek's (#216 D13): a
 season's expected fct_manager_gameweek rows are, for every gameweek with a
-picks settlement marker, the panel managers whose join week (the first
-gameweek of their entry-history, D6) is on or before it; fct_manager_pick
-expects 15 per such row. A late joiner therefore counts only from their join
-week. The expectation is read from staging (stg_manager_panel,
-stg_entry_history, stg_entry_picks_settlement), never from the models'
-parents. The previous-publish comparison holds both like any other table.
+picks settlement marker, the panel managers whose join week (their first
+marked gameweek with an admitted picks capture, D6 as amended by O1) is on or
+before it; fct_manager_pick expects 15 per such row. A late joiner therefore
+counts only from their join week. The expectation is read from staging
+(stg_manager_panel, stg_entry_picks_capture, stg_entry_picks_settlement),
+never from the models' parents. The previous-publish comparison holds both like any other table.
 Both are new served tables, so they publish at the same contract_version.
 The harness is shared: see publish_harness.py.
 """

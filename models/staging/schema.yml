@@ -366,3 +366,37 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#216 AC7"
+
+  - name: stg_manager_panel
+    description: >
+      One row per (season, entry_id): a manager on the season's panel and
+      their cohort (GLOSSARY.md), read from fpl-ingest's
+      `_panels/<season>/manager-panel.json` with explicit columns (#216 D10,
+      O5), a published contract like the marker (fpl-ingest#127 item 3). The
+      panel's `joined_gw` is not read (D6). Not a capture, so it has no
+      capture_key.
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC11"
+    columns:
+      - name: cohort
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC11"
+          - accepted_values:
+              arguments:
+                values: ["random", "self"]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC11"

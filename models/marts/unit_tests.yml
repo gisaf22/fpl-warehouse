@@ -573,13 +573,17 @@ unit_tests:
       rows:
         - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", last_capture_before_deadline_at: "2026-10-10 09:00:00", state_age_seconds: 3600}
 
-  # --- dim_manager_panel: the join week (#216 D6) ---------------------------
+  # --- dim_manager_panel: the join week (#216 D6, amended by O1) -----------
+  # The join week is the manager's first marked gameweek with an admitted picks
+  # capture. History is not read.
 
-  - name: manager_join_week_is_the_first_history_entry_of_the_latest_capture
+  - name: manager_join_week_is_the_first_marked_gameweek_with_a_capture
     description: >
-      10187394's entry-history current[] starts at gameweek 3, so its join week
-      is 3, whatever the panel file's joined_gw says (1 for everyone; not read).
-      With two admitted history captures of one manager, the later one is read.
+      10187394 has captures for gameweeks 3, 4 and 5, so its join week is 3.
+      8450051's first capture is in gameweek 5, which has no marker: an
+      unmarked capture does not set the join week, so 8450051 has none.
+      4685107 has no capture at all, so its join week is NULL: the
+      no-join-week rule (#216 AC6).
     model: dim_manager_panel
     config:
       tags: [unit]
@@ -590,14 +594,21 @@ unit_tests:
         rows:
           - {season: "2026-27", entry_id: 10187394, cohort: random}
           - {season: "2026-27", entry_id: 8450051, cohort: self}
-      - input: ref('stg_entry_history')
+          - {season: "2026-27", entry_id: 4685107, cohort: self}
+      - input: ref('stg_entry_picks_settlement')
         rows:
-          - {capture_key: "h1", season: "2026-27", entry_id: 10187394, gameweek: 3, observed_at: "2026-10-20 04:00:00", run_id: "20261020T035514Z-63f988"}
-          - {capture_key: "h1", season: "2026-27", entry_id: 10187394, gameweek: 4, observed_at: "2026-10-20 04:00:00", run_id: "20261020T035514Z-63f988"}
-          - {capture_key: "h-old", season: "2026-27", entry_id: 8450051, gameweek: 2, observed_at: "2026-10-01 04:00:00", run_id: "20261001T035514Z-aaaaaa"}
-          - {capture_key: "h-new", season: "2026-27", entry_id: 8450051, gameweek: 1, observed_at: "2026-10-20 04:00:00", run_id: "20261020T035514Z-63f988"}
-          - {capture_key: "h-new", season: "2026-27", entry_id: 8450051, gameweek: 2, observed_at: "2026-10-20 04:00:00", run_id: "20261020T035514Z-63f988"}
+          - {season: "2026-27", gameweek: 1, entries: 3}
+          - {season: "2026-27", gameweek: 2, entries: 3}
+          - {season: "2026-27", gameweek: 3, entries: 3}
+          - {season: "2026-27", gameweek: 4, entries: 3}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "a", season: "2026-27", entry_id: 10187394, gameweek: 3}
+          - {capture_key: "b", season: "2026-27", entry_id: 10187394, gameweek: 4}
+          - {capture_key: "c", season: "2026-27", entry_id: 10187394, gameweek: 5}
+          - {capture_key: "d", season: "2026-27", entry_id: 8450051, gameweek: 5}
     expect:
       rows:
         - {season: "2026-27", entry_id: 10187394, cohort: random, first_active_gw: 3}
-        - {season: "2026-27", entry_id: 8450051, cohort: self, first_active_gw: 1}
+        - {season: "2026-27", entry_id: 8450051, cohort: self, first_active_gw: null}
+        - {season: "2026-27", entry_id: 4685107, cohort: self, first_active_gw: null}

@@ -1,5 +1,5 @@
 -- Layer: stg
--- Tests: stg_entry_picks_capture, stg_entry_picks, stg_entry_history
+-- Tests: stg_entry_picks_capture, stg_entry_picks
 -- Asserts: no staged row comes from a capture under raw/fpl/_invalid/; the
 --          fixture's index holds pre-join 404s there, so the check is not
 --          vacuous.
@@ -12,8 +12,6 @@ with staged as (
     select 'stg_entry_picks_capture' as model, capture_key from {{ ref('stg_entry_picks_capture') }}
     union all
     select 'stg_entry_picks', capture_key from {{ ref('stg_entry_picks') }}
-    union all
-    select 'stg_entry_history', capture_key from {{ ref('stg_entry_history') }}
 
 )
 

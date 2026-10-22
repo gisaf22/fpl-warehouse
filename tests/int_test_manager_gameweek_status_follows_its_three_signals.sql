@@ -1,19 +1,25 @@
 -- Layer: int
 -- Tests: int_manager_gameweek_status
 -- Asserts: every panel manager has exactly one row per marked gameweek, whose
---          status follows the join week, an admitted picks capture and the
---          marker: not_yet_joined before the join week, else captured, else
---          missing_after_join; and the fixture holds both a not_yet_joined and
---          a captured row, so the check is not vacuous.
--- Origin: new in #216 (D1, D5)
+--          status follows the join week (first marked gameweek with an
+--          admitted capture), an admitted picks capture and the marker:
+--          not_yet_joined before the join week or with no join week, else
+--          captured, else missing_after_join; and the fixture holds both a
+--          not_yet_joined and a captured row, so the check is not vacuous.
+-- Origin: new in #216 (D1, D5; D6 as amended by O1)
 -- Tier: integration
 {{ config(group='warehouse_internal', tags=['integration'], meta={'covers': '#216 AC1'}) }}
 
 with join_weeks as (
 
-    select season, entry_id, min(gameweek) as first_active_gw
-    from {{ ref('stg_entry_history') }}
-    group by season, entry_id
+    -- The join week is the first marked gameweek with an admitted capture
+    -- (D6 as amended by O1). A manager with none has no join week.
+    select captures.season, captures.entry_id, min(captures.gameweek) as first_active_gw
+    from {{ ref('stg_entry_picks_capture') }} as captures
+    inner join {{ ref('stg_entry_picks_settlement') }} as markers
+        on markers.season = captures.season
+       and markers.gameweek = captures.gameweek
+    group by captures.season, captures.entry_id
 
 ),
 
@@ -24,6 +30,8 @@ expected as (
         panel.entry_id,
         markers.gameweek,
         case
+            -- No join week: not_yet_joined in every marked gameweek (#216 AC1).
+            when join_weeks.first_active_gw is null then 'not_yet_joined'
             when markers.gameweek < join_weeks.first_active_gw then 'not_yet_joined'
             when exists (
                 select 1

@@ -150,3 +150,35 @@ def test_a_real_source_call_after_a_line_comment_on_an_earlier_line_still_fails(
     code = "select 1 -- note\nfrom {{ source('fpl_raw', 'event_status') }}"
     found = problems(manifest(model("stg_gameweek_status", "event_status", code)))
     assert len(found) == 1
+
+
+# #216 AC21 --------------------------------------------------------------------
+# The marker and panel sources fix their schema with explicit columns, as
+# run_manifests does, so their staging models may read them directly. A model
+# reading the entry_picks payload source directly still fails.
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#216 AC21")
+@pytest.mark.parametrize(
+    ("name", "table"),
+    [("stg_entry_picks_settlement", "entry_picks_settlement"), ("stg_manager_panel", "manager_panel")],
+)
+def test_the_marker_and_panel_models_may_read_their_source_directly(name, table):
+    code = f"select season from {{{{ source('fpl_raw', '{table}') }}}}"
+    found = problems(
+        manifest(
+            model("stg_gameweek_status", "event_status", VIA_MACRO),
+            model(name, table, code),
+        )
+    )
+    assert found == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#216 AC21")
+def test_an_entry_picks_model_calling_source_itself_fails():
+    code = "select unnest(picks) as pick from {{ source('fpl_raw', 'entry_picks') }}"
+    found = problems(manifest(model("stg_entry_picks_capture", "entry_picks", code)))
+    assert len(found) == 1
+    assert "stg_entry_picks_capture" in found[0] and "entry_picks" in found[0]

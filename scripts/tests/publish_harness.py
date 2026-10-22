@@ -112,11 +112,13 @@ def season(
     history row per staged fixture, and 38 gameweeks for a season with an
     admitted bootstrap-static capture (none otherwise).
 
-    `manager_join_weeks` holds each panel manager's join week, the first
-    gameweek of their entry-history, and `marked_gameweeks` the gameweeks
-    1..n with a picks settlement marker (#216). fct_manager_gameweek defaults
-    to one row per manager per marked gameweek from their join week on, and
-    fct_manager_pick to 15 per such row.
+    `manager_join_weeks` holds each panel manager's join week, and
+    `marked_gameweeks` the gameweeks 1..n with a picks settlement marker
+    (#216). Each manager has a staged picks capture for every gameweek from
+    their join week to the last marked one, so the join week is their first
+    marked gameweek with a capture (D6 as amended by O1). fct_manager_gameweek
+    defaults to one row per manager per marked gameweek from their join week
+    on, and fct_manager_pick to 15 per such row.
     """
     expected = players * finished_gameweeks
     manager_gameweeks = sum(
@@ -253,7 +255,7 @@ def make_publish(tmp_path, monkeypatch):
                 "create table stg_manager_panel (season varchar, entry_id integer)"
             )
             connection.execute(
-                "create table stg_entry_history "
+                "create table stg_entry_picks_capture "
                 "(season varchar, entry_id integer, gameweek integer)"
             )
             connection.execute(
@@ -302,12 +304,11 @@ def make_publish(tmp_path, monkeypatch):
                     connection.execute(
                         "insert into stg_manager_panel values (?, ?)", [name, entry_id]
                     )
-                    # History from the join week on; its first entry is the
-                    # join week, whatever came after.
+                    # A capture for every marked gameweek from the join week on.
                     connection.execute(
-                        "insert into stg_entry_history "
-                        "select ?, ?, gameweek from range(?, 39) as t(gameweek)",
-                        [name, entry_id, joined],
+                        "insert into stg_entry_picks_capture "
+                        "select ?, ?, gameweek from range(?, ?) as t(gameweek)",
+                        [name, entry_id, joined, shape["marked_gameweeks"] + 1],
                     )
                 connection.execute(
                     "insert into stg_entry_picks_settlement "

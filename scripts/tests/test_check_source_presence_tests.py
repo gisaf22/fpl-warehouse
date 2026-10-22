@@ -107,3 +107,37 @@ def test_a_presence_test_with_the_wrong_severity_fails_naming_it(mode, wrong):
 @pytest.mark.covers("#114 AC4")
 def test_no_payload_sources_found_fails():
     assert problems({"sources": {}, "nodes": {}}) != []
+
+
+# #216 AC21 --------------------------------------------------------------------
+# The picks settlement marker and the manager panel file are read with explicit
+# columns, like run_manifests: they are not payloads, so they carry no presence
+# tests (#216 D2, D10). A new payload source still needs both.
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#216 AC21")
+@pytest.mark.parametrize("table", ["entry_picks_settlement", "manager_panel"])
+def test_the_marker_and_panel_sources_need_no_presence_tests(table):
+    built = manifest()
+    built["sources"][source_id(table)] = {
+        "resource_type": "source",
+        "source_name": "fpl_raw",
+        "name": table,
+        "columns": {"season": {"name": "season", "meta": {}}},
+    }
+    assert problems(built) == []
+
+
+@pytest.mark.unit
+@pytest.mark.covers("#216 AC21")
+def test_the_entry_picks_payload_source_without_presence_tests_fails():
+    built = manifest()
+    built["sources"][source_id("entry_picks")] = {
+        "resource_type": "source",
+        "source_name": "fpl_raw",
+        "name": "entry_picks",
+        "columns": {"picks.element": {"name": "picks.element", "meta": {}}},
+    }
+    found = problems(built)
+    assert found and all("entry_picks" in line for line in found)
