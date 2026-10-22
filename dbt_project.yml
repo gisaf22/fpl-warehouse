@@ -102,10 +102,12 @@ models:
       +materialized: table
       # Test-only (#190): renders nothing unless the capture_cutoff var is set.
       # compacted_read (#194) sets the element-summary source's read on the
-      # model that reads it, and renders nothing on any other.
+      # model that reads it, and renders nothing on any other;
+      # entry_picks_compacted_read (#216 D8) does the same for entry-picks.
       +pre-hook:
         - "{{ capture_cutoff_files() }}"
         - "{{ compacted_read() }}"
+        - "{{ entry_picks_compacted_read() }}"
     intermediate:
       +materialized: view
     marts:

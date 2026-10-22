@@ -19,7 +19,10 @@
                       records are also declared ('$.<array>[*]') is read as a
                       list holding only those declared fields, so the array
                       can be kept whole without exposing an undeclared field
-                      (#175: element-summary's history, counted and unnested)
+                      (#175: element-summary's history, counted and unnested).
+                      Likewise a root object whose fields are declared at
+                      '$.<object>' is read as a struct holding only those
+                      fields (#216 AC22: entry-picks' entry_history)
     Any other path is a compile error naming it.
 
     Renames and casts stay in the staging model, in its own select over this
@@ -44,6 +47,8 @@
     {%- set keys = [] -%}
     {#- Root arrays with declared records: array name -> its declared keys. -#}
     {%- set arrays = {} -%}
+    {#- Root objects with declared fields: object name -> its declared keys. -#}
+    {%- set objects = {} -%}
     {%- set unit_test = execute and declared_records_passes_through(model.resource_type, graph) -%}
     {%- if execute and not unit_test -%}
         {%- for node in graph.sources.values()
@@ -60,6 +65,13 @@
                         (column.meta or {}).get('record_path', '')) -%}
                     {%- if element -%}
                         {%- do arrays.setdefault(element.group(1), []).append(
+                            column.name.split('.')[-1]) -%}
+                    {%- endif -%}
+                    {%- set member = modules.re.fullmatch(
+                        '\$\.([A-Za-z_][A-Za-z0-9_]*)',
+                        (column.meta or {}).get('record_path', '')) -%}
+                    {%- if member -%}
+                        {%- do objects.setdefault(member.group(1), []).append(
                             column.name.split('.')[-1]) -%}
                     {%- endif -%}
                 {%- endfor -%}
@@ -85,6 +97,12 @@
             "{{ field }}" := r."{{ field }}"{{ "," if not loop.last }}
             {%- endfor %}
         )) as "{{ key }}"
+        {%- elif key in objects %}
+        struct_pack(
+            {%- for field in objects[key] %}
+            "{{ field }}" := {{ record }}."{{ key }}"."{{ field }}"{{ "," if not loop.last }}
+            {%- endfor %}
+        ) as "{{ key }}"
         {%- else %}
         {{ record }}."{{ key }}" as "{{ key }}"
         {%- endif %}

@@ -333,3 +333,114 @@ models:
                 tags: [integration]
                 meta:
                   covers: "#95 AC1"
+
+  - name: stg_entry_picks_settlement
+    description: >
+      One row per picks settlement marker (GLOSSARY.md): fpl-ingest's
+      `_settlement/entry-picks/<gameweek>/marker.json`, a published contract
+      (#216 D2, fpl-ingest ADR 006). Its fields, unchanged (D3): event (as
+      gameweek), entries, run_id, recorded_at. Its season is its run's (the
+      key and body carry none). Not a capture, so it has no capture_key.
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, gameweek]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC7"
+    columns:
+      - name: season
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC7"
+      - name: entries
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC7"
+
+  - name: stg_manager_panel
+    description: >
+      One row per (season, entry_id): a manager on the season's panel and
+      their cohort (GLOSSARY.md), read from fpl-ingest's
+      `_panels/<season>/manager-panel.json` with explicit columns (#216 D10,
+      O5), a published contract like the marker (fpl-ingest#127 item 3). The
+      panel's `joined_gw` is not read (D6). Not a capture, so it has no
+      capture_key.
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC11"
+    columns:
+      - name: cohort
+        data_tests:
+          - not_null:
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC11"
+          - accepted_values:
+              arguments:
+                values: ["random", "self"]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC11"
+
+  - name: stg_entry_picks_capture
+    description: >
+      One row per admitted entry-picks capture (#216): the manager's chip,
+      transfers, FPL's points, automatic subs and the 15 picks, typed. The one
+      read of the entry-picks source; stg_entry_picks unnests from it.
+      Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+          Unique: a capture read both from compacted parquet and from the raw
+          tail would stage twice (#216 D8).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: '#216 AC16'
+
+  - name: stg_entry_picks
+    description: >
+      One row per pick (capture_key, slot): stg_entry_picks_capture's picks
+      unnested (#216). Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]

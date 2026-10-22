@@ -1,0 +1,12 @@
+{
+  "season": "2026-27",
+  "gameweek": 1,
+  "payload_files": 1,
+  "parquet_rows": 1,
+  "distinct_filenames": 1,
+  "run_ids": [
+    "20261021T055756Z-5b39a4"
+  ],
+  "compacted_at": "2026-10-22T16:03:37Z",
+  "git_sha": "66627fe5aa77a100ec9d0b9008055a8fd6016e1f"
+}

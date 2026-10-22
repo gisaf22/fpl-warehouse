@@ -38,6 +38,8 @@
     'fct_player_market_snapshot': ['season', 'fpl_id', 'capture_key'],
     'dim_fixture_schedule_history': ['season', 'fixture_id', 'valid_from'],
     'dim_gameweek': ['season', 'gameweek'],
+    'fct_manager_pick': ['season', 'entry_id', 'gameweek', 'slot'],
+    'fct_manager_gameweek': ['season', 'entry_id', 'gameweek'],
   }) }}
 {% endmacro %}
 

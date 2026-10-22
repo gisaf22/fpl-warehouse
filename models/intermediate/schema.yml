@@ -147,3 +147,38 @@ models:
                 tags: [integration]
                 meta:
                   covers: "#97 AC5"
+
+  - name: int_manager_gameweek_status
+    description: >
+      The audit grid (#216 D1, D5): one row per panel manager per marked
+      gameweek, with the manager-gameweek status (GLOSSARY.md) and, when
+      captured, the winning capture (latest observed_at, run_id breaking a
+      tie). Internal.
+    group: warehouse_internal
+    access: private
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, entry_id, gameweek]
+          config:
+            tags: [unit]
+            meta:
+              covers: "#216 AC1"
+    columns:
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["not_yet_joined", "captured", "missing_after_join"]
+              config:
+                tags: [unit]
+                meta:
+                  covers: "#216 AC1"
+
+  - name: int_manager_gameweek_points
+    description: >
+      FPL's own points total for each captured manager-gameweek beside the
+      total rebuilt from the picks: the sum of multiplier x the player's
+      fct_player_gameweek points (#216 D7). Test-only; not served (D9).
+    group: warehouse_internal
+    access: private

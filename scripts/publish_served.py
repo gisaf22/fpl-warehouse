@@ -46,6 +46,8 @@ TABLES = (
     "fct_player_market_snapshot",
     "dim_fixture_schedule_history",
     "dim_gameweek",
+    "fct_manager_pick",
+    "fct_manager_gameweek",
 )
 
 # Every staging model, as the source of which seasons the build holds. A season
@@ -122,6 +124,17 @@ PROJECT_FILE = Path("dbt_project.yml")
 # capture (#163 S11 amended), so a row more is refused as well as a row fewer
 # (EXACT below). Its seasons come from admission rather than staging (S15): a
 # season admitted but never staged must still fail here.
+#
+# fct_manager_gameweek and fct_manager_pick take none, and their expectations
+# are exact in both directions (#216 D13, AC17). For every gameweek with a
+# picks settlement marker, a season holds one fct_manager_gameweek row per
+# panel manager whose join week (their first marked gameweek with a staged
+# picks capture, D6) is on or before it, so a late joiner counts only from
+# then; fct_manager_pick holds 15 per such row. Read from stg_manager_panel,
+# stg_entry_picks_capture and stg_entry_picks_settlement, not from the models'
+# parent int_manager_gameweek_status. A missing capture after a join week
+# already fails the build (AC3), so a surplus or shortfall here is a defect in
+# the join or the export.
 TOLERANCE = {
     "fct_player_fixture": 0.15,
     "fct_player_gameweek": 0.02,
@@ -132,11 +145,13 @@ TOLERANCE = {
     "fct_player_market_snapshot": 0.0,
     "dim_fixture_schedule_history": 0.0,
     "dim_gameweek": 0.0,
+    "fct_manager_pick": 0.0,
+    "fct_manager_gameweek": 0.0,
 }
 
 # Tables whose expectation is an exact count with no legitimate surplus, so a
 # season above it is refused too.
-EXACT = {"dim_gameweek"}
+EXACT = {"dim_gameweek", "fct_manager_pick", "fct_manager_gameweek"}
 
 
 def live_season() -> str:
@@ -332,6 +347,32 @@ def expected_rows(
     expected["dim_gameweek"] = {
         season: GAMEWEEKS_PER_SEASON
         for season in admitted_bootstrap_seasons(connection)
+    }
+    manager_gameweeks = dict(
+        connection.execute(
+            """
+            with join_weeks as (
+                select captures.season, captures.entry_id,
+                       min(captures.gameweek) as first_active_gw
+                from main.stg_entry_picks_capture as captures
+                inner join main.stg_entry_picks_settlement as markers
+                    using (season, gameweek)
+                group by captures.season, captures.entry_id
+            )
+            select markers.season, count(*)
+            from main.stg_entry_picks_settlement as markers
+            inner join main.stg_manager_panel as panel using (season)
+            inner join join_weeks using (season, entry_id)
+            where join_weeks.first_active_gw <= markers.gameweek
+            group by markers.season
+            """
+        ).fetchall()
+    )
+    expected["fct_manager_gameweek"] = {
+        season: manager_gameweeks.get(season, 0) for season in seasons
+    }
+    expected["fct_manager_pick"] = {
+        season: 15 * manager_gameweeks.get(season, 0) for season in seasons
     }
     return expected
 

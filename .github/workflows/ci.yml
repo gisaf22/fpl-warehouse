@@ -171,13 +171,15 @@ jobs:
       # Every payload staging model must declare a relationships test from
       # capture_key to int_admitted_capture, so a new stg_ model cannot skip
       # the admission join unnoticed. stg_run is exempt: it is built from run
-      # manifests, not payloads, and has no capture_key.
+      # manifests, not payloads, and has no capture_key. So are
+      # stg_entry_picks_settlement and stg_manager_panel, built from the picks
+      # settlement marker and the manager panel file (#216 AC21).
       - name: Check every staging model tests capture_key against admission
         run: |
           uv run python - <<'PY'
           import json, sys
 
-          EXEMPT = {"stg_run"}
+          EXEMPT = {"stg_run", "stg_entry_picks_settlement", "stg_manager_panel"}
           with open("target/manifest.json") as fh:
               nodes = json.load(fh)["nodes"].values()
           staging = {n["name"] for n in nodes
@@ -235,6 +237,7 @@ jobs:
               "dim_team", "dim_player", "dim_fixture",
               "dim_player_status_history", "fct_player_market_snapshot",
               "dim_fixture_schedule_history", "dim_gameweek",
+              "fct_manager_pick", "fct_manager_gameweek",
           }
           models = {}
           with open("/tmp/models.json") as fh:

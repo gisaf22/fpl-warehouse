@@ -30,10 +30,11 @@ HISTORY = ("dim_player_status_history",)
 MARKET = ("fct_player_market_snapshot",)
 SCHEDULE = ("dim_fixture_schedule_history",)
 GAMEWEEK = ("dim_gameweek",)
+MANAGER = ("fct_manager_pick", "fct_manager_gameweek")
 # Everything that should be served, stated here rather than read from
 # publish_served.TABLES, so a table the script forgets to serve fails these
 # tests instead of silently dropping out of them.
-SERVED = FACTS + DIMENSIONS + HISTORY + MARKET + SCHEDULE + GAMEWEEK
+SERVED = FACTS + DIMENSIONS + HISTORY + MARKET + SCHEDULE + GAMEWEEK + MANAGER
 
 # Every served table's columns in the harness build, as the manifest records
 # them: [name, type] in order, read back from the exported parquet.
@@ -85,6 +86,10 @@ def season(
     schedule_history_rows: int | None = None,
     gameweek_dim_rows: int | None = None,
     bootstrap_admitted: bool = True,
+    manager_join_weeks: tuple[int, ...] = (),
+    marked_gameweeks: int = 0,
+    manager_gameweek_rows: int | None = None,
+    manager_pick_rows: int | None = None,
     captures: int = 1,
     fixture_captures: int = 1,
     player_fixture_rows: int = 1,
@@ -106,8 +111,22 @@ def season(
     player, one market snapshot row per player per capture, one schedule
     history row per staged fixture, and 38 gameweeks for a season with an
     admitted bootstrap-static capture (none otherwise).
+
+    `manager_join_weeks` holds each panel manager's join week, and
+    `marked_gameweeks` the gameweeks 1..n with a picks settlement marker
+    (#216). Each manager has a staged picks capture for every gameweek from
+    their join week to the last marked one, so the join week is their first
+    marked gameweek with a capture (D6 as amended by O1). fct_manager_gameweek
+    defaults to one row per manager per marked gameweek from their join week
+    on, and fct_manager_pick to 15 per such row.
     """
     expected = players * finished_gameweeks
+    manager_gameweeks = sum(
+        1
+        for gameweek in range(1, marked_gameweeks + 1)
+        for joined in manager_join_weeks
+        if joined <= gameweek
+    )
     return {
         "players": players,
         "finished_gameweeks": finished_gameweeks,
@@ -117,6 +136,16 @@ def season(
         "fixture_captures": fixture_captures,
         "player_fixture_rows": player_fixture_rows,
         "bootstrap_admitted": bootstrap_admitted,
+        "manager_join_weeks": manager_join_weeks,
+        "marked_gameweeks": marked_gameweeks,
+        "fct_manager_gameweek": (
+            manager_gameweeks
+            if manager_gameweek_rows is None
+            else manager_gameweek_rows
+        ),
+        "fct_manager_pick": (
+            15 * manager_gameweeks if manager_pick_rows is None else manager_pick_rows
+        ),
         "fct_player_fixture": expected if fixture is None else fixture,
         "fct_player_gameweek": expected if gameweek is None else gameweek,
         "dim_team": teams if team_rows is None else team_rows,
@@ -222,6 +251,17 @@ def make_publish(tmp_path, monkeypatch):
             connection.execute(
                 "create table int_admitted_capture (season varchar, endpoint varchar)"
             )
+            connection.execute(
+                "create table stg_manager_panel (season varchar, entry_id integer)"
+            )
+            connection.execute(
+                "create table stg_entry_picks_capture "
+                "(season varchar, entry_id integer, gameweek integer)"
+            )
+            connection.execute(
+                "create table stg_entry_picks_settlement "
+                "(season varchar, gameweek integer)"
+            )
             for table in SERVED:
                 ddl = (columns or {}).get(table, COLUMNS)
                 connection.execute(f"create table {table} ({ddl})")
@@ -260,6 +300,21 @@ def make_publish(tmp_path, monkeypatch):
                         "values (?, 'bootstrap-static')",
                         [name],
                     )
+                for entry_id, joined in enumerate(shape["manager_join_weeks"]):
+                    connection.execute(
+                        "insert into stg_manager_panel values (?, ?)", [name, entry_id]
+                    )
+                    # A capture for every marked gameweek from the join week on.
+                    connection.execute(
+                        "insert into stg_entry_picks_capture "
+                        "select ?, ?, gameweek from range(?, ?) as t(gameweek)",
+                        [name, entry_id, joined, shape["marked_gameweeks"] + 1],
+                    )
+                connection.execute(
+                    "insert into stg_entry_picks_settlement "
+                    "select ?, range + 1 from range(?)",
+                    [name, shape["marked_gameweeks"]],
+                )
                 connection.execute(
                     "insert into stg_gameweek select ?, 'run', timestamp '2026-09-27', "
                     "range + 1, true from range(?)",

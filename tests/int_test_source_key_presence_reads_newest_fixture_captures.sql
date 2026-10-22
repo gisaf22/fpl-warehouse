@@ -15,7 +15,9 @@
 -- there with no payload. 20260914T211204Z-a730c3 is the newest run with files,
 -- and its catalog adds a synthetic element-summary capture (fpl_id 9999, a
 -- failed revalidation, still admitted) with no payload. event-status's newest
--- run has every file.
+-- run has every file. entry-picks (#216) is read from its newest run,
+-- 20261021T173314Z-d6b07d, whose five payloads all have files
+-- (tests/fixtures/build_manager_fixtures.py).
 
 {% if target.name != 'fixtures' %}
 
@@ -27,6 +29,7 @@ with expected (source_name, run_id, latest_run_id, latest_run_missing_bytes) as 
     values
         ('bootstrap_static', '20260914T211204Z-a730c3', '20261003T052050Z-fa64a9', 1),
         ('element_summary',  '20260914T211204Z-a730c3', '20260914T211204Z-a730c3', 1),
+        ('entry_picks',      '20261021T173314Z-d6b07d', null,                      0),
         ('event_status',     '20260914T211204Z-a730c3', null,                      0),
         ('fixtures',         '20260914T211204Z-a730c3', '20261003T052050Z-fa64a9', 1)
 ),

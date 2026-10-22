@@ -35,6 +35,7 @@
 -- =============================================================================
 
 -- depends_on: {{ ref('int_admitted_capture') }}
+-- depends_on: {{ ref('stg_entry_picks_capture') }}
 -- depends_on: {{ ref('stg_fixture') }}
 -- depends_on: {{ ref('stg_gameweek') }}
 -- depends_on: {{ ref('stg_gameweek_status') }}

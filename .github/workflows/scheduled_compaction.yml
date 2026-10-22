@@ -82,6 +82,17 @@ jobs:
           --out .local/metrics/compaction.json
           --summary "$GITHUB_STEP_SUMMARY"
 
+      # Settled entry-picks gameweeks (#216 D8): every gameweek with a picks
+      # settlement marker and no compaction manifest, one parquet each. No time
+      # budget: a gameweek is about 2,000 small files, and a compacted one is
+      # never rewritten. Same production gate as the element-summary writer.
+      # Not continue-on-error: a failed gameweek fails the run.
+      - name: Compact settled entry-picks gameweeks
+        run: >-
+          uv run python scripts/compact_entry_picks.py
+          --raw-root s3://fpl-data-safari/raw
+          --dest-root s3://fpl-data-safari/compacted
+
       # The compaction record (#205 G5): the job summary always, and
       # s3://fpl-data-safari/metrics/compaction/<run_id>.json on a scheduled
       # run with a budget above 0. A failed write fails the job. A scheduled run_id with no JSON
