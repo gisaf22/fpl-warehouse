@@ -1120,7 +1120,12 @@ models:
       after automatic substitutions (GLOSSARY.md): slots 1-11 are the scored
       eleven. The chosen eleven, which #216 D7's metric sums, is the slot 1-11
       rows not flagged is_auto_sub_in plus the rows flagged is_auto_sub_out.
-      The original bench order is exact only in a week with no automatic
+      The two give two different numbers. The metric is the chosen eleven's
+      plain total_points sum, with no captain multiplier. FPL's scored total
+      (entry_history.points) is the scored eleven with the captain counted
+      twice, or three times on 3xc, and is a reconciliation check, not the
+      metric. For entry 10187394 in 2026-27 GW4 the metric is 42 and FPL's
+      total is 56. The original bench order is exact only in a week with no automatic
       substitution (about half of manager-weeks): FPL does not say which bench
       slot a replaced starter came from, so slots 12-15 in a substituted week
       are FPL's order, not the manager's. No points are
