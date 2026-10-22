@@ -109,7 +109,10 @@
             count(rec) filter (where not json_exists(rec, '$."{{ spec.key }}"'))
                                 as missing
         from (
-            {%- if spec.record_path %}
+            {%- if spec.record_path and not spec.record_path.endswith('[*]') %}
+            {#- A root object (#216 AC22): one record per payload that has it. -#}
+            select json_extract(json, '{{ spec.record_path }}') as rec from payloads
+            {%- elif spec.record_path %}
             select unnest(json_extract(json, '{{ spec.record_path }}')) as rec from payloads
             {%- else %}
             select json as rec from payloads

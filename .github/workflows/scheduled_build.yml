@@ -373,6 +373,50 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           jq -r '.show[] | "::error::history count mismatch: \(.season), run \(.run_id): \(.capture_key) expected \(.expected_rows), staged \(.staged_rows)"' history_mismatch.json
 
+      # Picks reconciliation (#216 D7, D13): FPL's entry_history.points against
+      # the sum of multiplier x player points over the 15 picks, every captured
+      # week. The warn test in the build names differences only in the dbt
+      # log; this puts each in the job summary and raises an annotation, as for
+      # missed pre-deadline captures (#80, #111). continue-on-error, as above.
+      - name: Report picks reconciliation differences
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 200 --output json -q --inline "
+            select season, entry_id, gameweek, fpl_points, rebuilt_points
+            from {{ ref('int_manager_gameweek_points') }}
+            where rebuilt_points is distinct from fpl_points
+            order by season, gameweek, entry_id" > picks_reconciliation.json
+          {
+            echo "### Picks reconciliation (first 200 differences)"
+            jq -r '.show as $r | if ($r | length) == 0
+              then "- every captured manager-gameweek rebuilds FPL'"'"'s points"
+              else $r[] | "- \(.season) gameweek \(.gameweek), entry \(.entry_id): FPL \(.fpl_points), rebuilt \(.rebuilt_points)" end' picks_reconciliation.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.show[] | "::warning::picks reconciliation: \(.season) gameweek \(.gameweek), entry \(.entry_id): FPL \(.fpl_points), rebuilt \(.rebuilt_points)"' picks_reconciliation.json
+
+      # Panel managers without a join week (#216 N1): kept on the panel, so they
+      # had picks at the draw, but with no admitted capture in any marked
+      # gameweek: a capture is missing (D6's limit). Same pattern as above.
+      - name: Report panel managers without a join week
+        if: always()
+        continue-on-error: true
+        run: |
+          uv run dbt show --limit 200 --output json -q --inline "
+            select panel.season, panel.entry_id, panel.cohort
+            from {{ ref('dim_manager_panel') }} as panel
+            where panel.first_active_gw is null
+              and exists (select 1 from {{ ref('stg_entry_picks_settlement') }} as markers
+                          where markers.season = panel.season)
+            order by panel.season, panel.entry_id" > no_join_week.json
+          {
+            echo "### Panel managers without a join week (first 200)"
+            jq -r '.show as $r | if ($r | length) == 0
+              then "- every panel manager has a join week"
+              else $r[] | "- \(.season): entry \(.entry_id) (\(.cohort))" end' no_join_week.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.show[] | "::warning::panel manager without a join week: \(.season) entry \(.entry_id) (\(.cohort))"' no_join_week.json
+
       # Publishes the served fact and dimension tables to s3://fpl-data-safari/served/,
       # overwriting in place — no dated keys, no versioning. Consumers read the
       # current objects; there is no published history to pin to.

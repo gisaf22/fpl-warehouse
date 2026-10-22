@@ -69,8 +69,10 @@ def test_one_row_per_manager_per_marked_gameweek_from_their_join_week_publishes(
     assert_published(result)
     _, s3 = result
     published = s3.published_manifest()
-    assert published["row_counts_by_season"][GAMEWEEK_TABLE] == {CLOSED: 0, LIVE: 10}
-    assert published["row_counts_by_season"][PICK_TABLE] == {CLOSED: 0, LIVE: 150}
+    # The manifest counts what the parquet holds, so 2025-26 (no panel, no
+    # rows) is absent rather than 0, as for dim_gameweek.
+    assert published["row_counts_by_season"][GAMEWEEK_TABLE] == {LIVE: 10}
+    assert published["row_counts_by_season"][PICK_TABLE] == {LIVE: 150}
     assert published["contract_version"] == 1
 
 

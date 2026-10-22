@@ -57,7 +57,7 @@ KEY_PREFIX = f"raw/fpl/{ENDPOINT}/"
 # Concurrent GETs for sha256 verification; DuckDB's read_blob was serial (#203 F1).
 SHA_WORKERS = 32
 # Both run the writer: this module directly, and the compaction step (#198).
-WRITER_SCRIPTS = ("compact_element_summary", "compaction_step")
+WRITER_SCRIPTS = ("compact_element_summary", "compaction_step", "compact_entry_picks")
 MANIFEST_FIELDS = (
     "capture_day",
     "payload_files",

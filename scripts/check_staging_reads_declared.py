@@ -7,7 +7,8 @@ read any field, and a field nobody declared escapes the presence test (#114 D4).
 
 `run_manifests` and `backfill_catalog` are exempt (#115 D3): their
 `read_json(columns = struct_pack(...))` in sources.yml already fixes the
-schema, so a field outside that list cannot be read.
+schema, so a field outside that list cannot be read. So are
+`entry_picks_settlement` and `manager_panel`, read the same way (#216 AC21).
 
 Run after `dbt parse`: `python scripts/check_staging_reads_declared.py`.
 """
@@ -20,7 +21,7 @@ import sys
 from pathlib import Path
 
 SOURCE_PREFIX = "source.fpl_warehouse.fpl_raw."
-NOT_PAYLOAD = {"run_manifests", "backfill_catalog"}
+NOT_PAYLOAD = {"run_manifests", "backfill_catalog", "entry_picks_settlement", "manager_panel"}
 
 DIRECT_SOURCE_CALL = re.compile(r"\bsource\s*\(")
 # SQL line and block comments and Jinja comments, so prose naming source( in a

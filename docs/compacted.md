@@ -212,3 +212,41 @@ gh workflow run ci.yml --ref main -f compaction_dry_run=2026-09-06,2026-09-14
 
 Record the per-day `seconds`, `peak_rss_mib` and the run URL on #78, then size the
 budget by W16.
+
+## Entry-picks (#216 D8)
+
+Settled entry-picks gameweeks are compacted too, by `scripts/compact_entry_picks.py`, in
+the same scheduled workflow, after the element-summary step.
+
+```
+s3://fpl-data-safari/compacted/fpl/entry-picks/season=<S>/gameweek=<G>/part.parquet
+s3://fpl-data-safari/compacted/fpl/entry-picks/_manifest/season=<S>/gameweek=<G>.json
+```
+
+- **Which gameweeks:** every gameweek with a picks settlement marker
+  (`raw/fpl/_settlement/entry-picks/<gw>/marker.json`) and no compaction manifest. The
+  marker's season is the one season of its run's indexed entry-picks captures for that
+  gameweek (#216 D14). No time budget: a gameweek is about 2,000 small files.
+- **Never rewritten:** a gameweek with a manifest is skipped. Its picks cannot change once
+  settled.
+- **Parquet:** `select * from read_json(<the gameweek's payload files>, union_by_name =
+  true, filename = true)`, as for element-summary. Invalid captures under `_invalid/` are
+  not payloads and are never included.
+- **Checks:** payload files = parquet rows = distinct `filename`, and the files equal the
+  index keys of their runs, sha256 matching. The manifest is written last. A failed
+  gameweek fails that gameweek only, and the run exits 1.
+- **Manifest fields:** `season`, `gameweek`, `payload_files`, `parquet_rows`,
+  `distinct_filenames`, `run_ids`, `compacted_at`, `git_sha`.
+- **Staging's read:** the `entry_picks_compacted_read` pre-hook reads each compacted
+  gameweek's parquet and the raw tail (every payload whose season and gameweek have no
+  manifest). Types are inferred per read, so a gameweek whose `active_chip` or
+  `automatic_subs` are all empty reads them as JSON where another reads VARCHAR or STRUCT.
+  Each part is therefore typed separately from the source's declared fields
+  (`entry_picks_typed`) before the union. `staging_read_mode: raw` reads every payload from
+  raw.
+- **Who writes:** the element-summary writer's gate. A destination under
+  `s3://fpl-data-safari/compacted/` is written only when `GITHUB_EVENT_NAME == schedule`,
+  and the workflow scan covers this writer too (`WRITER_SCRIPTS`).
+- **Fixture:** `tests/fixtures/compacted/fpl/entry-picks` holds 2026-27 gameweeks 1 and 3,
+  built by `tests/fixtures/build_compacted_picks_fixture.py`; gameweeks 2, 4 and 5 are the
+  raw tail.

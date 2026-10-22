@@ -338,6 +338,22 @@ not silently corrected.
   manual dispatch only. The source is therefore readable only by
   `stg_player_history_capture`, and a test that needs the payloads directly reads
   `element_summary_raw_read()`. Details: `docs/compacted.md`, "Staging's read".
+- **Entry-picks is read the same way** (#216 D8). The `entry_picks_compacted_read`
+  pre-hook reads each settled gameweek compacted by `scripts/compact_entry_picks.py`
+  from parquet and every other payload from raw, typing each part separately from the
+  source's declared fields (`entry_picks_typed`), because types are inferred per read.
+  A test reads `entry_picks_raw_read()`. The source has no `capture_glob`, so
+  `capture_cutoff` does not cut it.
+- **Two non-capture sources are read with explicit columns** (#216 D2, D10): the picks
+  settlement marker (`_settlement/entry-picks/<gw>/marker.json`, into
+  `stg_entry_picks_settlement`) and the manager panel file
+  (`_panels/<season>/manager-panel.json`, into `stg_manager_panel`). Both are published
+  contracts on the ingest side (gisaf22/fpl-ingest#127). They have no `capture_key`, so
+  CI's capture_key, declared-reads and presence checks exempt them by name (#216 AC21).
+  The marker's key has no season; its season is its run's (#216 D14).
+- **A root object is read as a struct of its declared fields** (#216 AC22): a field
+  declared with `record_path: '$.<object>'` is read through `declared_records` at `$`,
+  and its presence checked once per payload.
 - **A payload with no index entry is excluded silently** (#88 E7). That is normally one
   whose run was still in progress when the build started. It has no finalized manifest
   yet, and the next build picks it up. Counting such payloads would need a second read of
@@ -384,8 +400,8 @@ not silently corrected.
   layer otherwise.
 - Only the served models — the two `fct_` facts, the three `dim_` dimensions,
   `dim_player_status_history`, `fct_player_market_snapshot`,
-  `dim_fixture_schedule_history` and `dim_gameweek` — are for external
-  consumption. There is no `agg_` layer:
+  `dim_fixture_schedule_history`, `dim_gameweek`, `fct_manager_pick` and
+  `fct_manager_gameweek` — are for external consumption. There is no `agg_` layer:
   `fct_player_gameweek` is a fact table at gameweek grain, not a separate category.
 
 ## Served contract
@@ -393,7 +409,8 @@ not silently corrected.
 fpl-intelligence must never query staging directly — only the served models:
 `fct_player_fixture`, `fct_player_gameweek`, `dim_team`, `dim_player`, `dim_fixture`,
 `dim_player_status_history`, `fct_player_market_snapshot`,
-`dim_fixture_schedule_history` and `dim_gameweek`.
+`dim_fixture_schedule_history`, `dim_gameweek`, `fct_manager_pick` and
+`fct_manager_gameweek`.
 
 Three concepts recur across served columns and are each defined once, as a doc block in
 `models/marts/docs.md`: `ratified`, `season_scoped_key` and `pre_kickoff`. Every served
@@ -402,7 +419,7 @@ column's description.
 
 ### Where the served tables live
 
-All nine served models are published as parquet to fixed keys, overwritten in place after
+All eleven served models are published as parquet to fixed keys, overwritten in place after
 every successful scheduled build (see "Scheduled build"):
 
 ```
@@ -415,6 +432,8 @@ s3://fpl-data-safari/served/dim_player_status_history.parquet
 s3://fpl-data-safari/served/fct_player_market_snapshot.parquet
 s3://fpl-data-safari/served/dim_fixture_schedule_history.parquet
 s3://fpl-data-safari/served/dim_gameweek.parquet
+s3://fpl-data-safari/served/fct_manager_pick.parquet
+s3://fpl-data-safari/served/fct_manager_gameweek.parquet
 s3://fpl-data-safari/served/_manifest.json
 ```
 
@@ -506,6 +525,20 @@ count changes again the next time a season is ported.
 Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it. From #74 on, each entry states the `contract_version` it ships in.
+
+- **2026-10-22 — `fct_manager_pick` and `fct_manager_gameweek` served (#216). Additive,
+  `contract_version` 2.** Two new objects under `served/`, each with an enforced contract,
+  and two new table keys in the manifest's `row_counts`, `row_counts_by_season` and
+  `columns`. `fct_manager_pick` is one row per `(season, entry_id, gameweek, slot)` for a
+  panel manager's captured gameweek: the pick in each of the 15 slots as FPL returns it,
+  after automatic substitutions, with captain flags and `is_auto_sub_in` /
+  `is_auto_sub_out`. The chosen eleven is the slot 1–11 rows not subbed in plus the rows
+  subbed out (#216 D7). `fct_manager_gameweek` is one row per
+  `(season, entry_id, gameweek)`: `cohort`, `active_chip`, transfers, transfer cost and
+  `automatic_subs`. Neither carries points; join `fct_player_gameweek`. A gameweek before
+  a manager's join week, or without a picks settlement marker, has no row. Every existing
+  table and manifest field is unchanged, so no bump. The column lists are fixed from the
+  first publish.
 
 - **2026-10-14 — `fct_player_gameweek`: unobserved measures NULL, `deadline_time`
   dropped (#186). Breaking, `contract_version` 2.** Two changes under one bump (#133 S1).
@@ -654,8 +687,12 @@ capture, which the model selects 1:1, so it guards the export (#143).
 `dim_fixture_schedule_history` takes 0% against a lower bound, the season's distinct
 `fixture_id` in `stg_fixture`: every staged fixture has at least one row, and each schedule
 change adds one (#154). `dim_gameweek` takes 0% against an exact count, 38 per admitted
-season, and is the one table also refused **above** its expectation: a season has 38
-gameweeks, so a 39th row is a defect, not growth (#170). Double gameweeks push the
+season, and is refused **above** its expectation too: a season has 38
+gameweeks, so a 39th row is a defect, not growth (#170). `fct_manager_gameweek` and
+`fct_manager_pick` are also exact in both directions (#216 D13): for every gameweek with a
+picks settlement marker, one row (15 picks) per panel manager whose join week is on or
+before it, read from `stg_manager_panel`, `stg_entry_picks_capture` and
+`stg_entry_picks_settlement`. Double gameweeks push the
 other way and nothing caps the upside of any other table — a table larger than expected is
 not the failure this guards against.
 
@@ -753,7 +790,7 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   Verified 2026-09-03 with a throwaway model in `models/marts/`:
   `attempted to reference node model.fpl_warehouse.int_player_gameweek_spine, which is not
   allowed because the referenced node is private to the 'warehouse_internal' group`.
-- The nine served models are `access: public` with `contract: enforced: true` and a full
+- The eleven served models are `access: public` with `contract: enforced: true` and a full
   explicit column list in `models/marts/schema.yml`. Adding, dropping, renaming or
   retyping a served column now fails the build until the contract is updated, which makes
   every breaking change to the served shape a deliberate, reviewed edit.
@@ -763,7 +800,7 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
 - The served models are group members themselves — dbt allows a `ref()` of a private model
   only from inside the same group, and they must read staging to be built at all. Their
   `access: public` is what keeps them referenceable from outside.
-- CI's `validate` job checks the boundary from what dbt resolved: exactly the nine served
+- CI's `validate` job checks the boundary from what dbt resolved: exactly the eleven served
   models are public, and every `stg_`/`int_`/`base_` model is private (#44 AC3, #95). A new served model
   must be added to that step's list as well as to `publish_served.py`, the
   `fpl_intelligence` exposure and `served_diff_tables()` in `macros/served_diff.sql`.
@@ -774,11 +811,11 @@ calls, so a reader can in principle catch one updated and the other not. Accepte
   parse time. `stg_player_fixture` is a real table in the same DuckDB schema, so anything
   holding the built `.duckdb` file can run `select * from main.stg_player_fixture` — the
   boundary is enforced against dbt models and is a convention for everything else.
-  Publishing narrows this in practice rather than by enforcement: only the nine served
+  Publishing narrows this in practice rather than by enforcement: only the eleven served
   parquet files are uploaded, so a consumer reading `served/` has no path to staging at
   all. That is a property of what the publish step happens to write, not a grant, and it
   holds only as long as nothing else is added under that prefix.
-- The `fpl_intelligence` exposure in `models/exposures.yml` declares the nine served models
+- The `fpl_intelligence` exposure in `models/exposures.yml` declares the eleven served models
   as its dependencies. That documents the contract and puts it in the DAG; it enforces
   nothing.
 
@@ -1163,7 +1200,7 @@ request that touches `models/`, `macros/`, `tests/`, `seeds/`, `dbt_project.yml`
 with the PR's head commit (#194 D2). A newer push cancels a running diff.
 
 - **Two builds, neither publishes.** Two parallel jobs build `main` and `head_ref` with a full
-  `dbt build`. Each exports the nine served tables and a `build.json` (build seconds, and the
+  `dbt build`. Each exports the eleven served tables and a `build.json` (build seconds, and the
   newest run_id its staging read) through the `served_diff_export` run-operation.
 - **One connection for both sides.** The `diff` job loads both exports into one DuckDB, the
   credential-free `served_diff` target, as schemas `served_before` and `served_after`.
@@ -1305,14 +1342,17 @@ above leaves it buying nothing yet.
 **Failure is loud by construction.** `dbt build` exits 1 when any model errors or any test
 fails, Actions' default `bash -e` propagates it, and the run is marked failed. Verified
 2026-09-10: a deliberately failing singular test returned exit 1 from `dbt build`. Every
-test is `error` severity except seven deliberate warnings: the input-freshness warn over 6h
+test is `error` severity except nine deliberate warnings: the input-freshness warn over 6h
 (#103), the two admission warnings (#104, see "Layering"), the partial-presence warning on
 each payload source (#114, see "Layering"), the two `stg_player` warnings from #126 (a
 player missing from the season's next capture, and a `player_code` mapping to more than
 one `fpl_id` in a season), and the missed pre-deadline
 capture warning (#111): a deadline from 2026-09-24 on with no admitted capture in
 `[deadline - 125m, deadline)`. That window is the `pre_deadline_gate_minutes` var, which
-mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer. Each of those reports a condition that must not block a
+mirrors fpl-ingest's `PRE_DEADLINE_WINDOW` and must move with it, plus a 5-minute buffer.
+#216 adds two: the picks reconciliation (FPL's points against the picks rebuilt, D7) and
+a panel manager with no join week (N1), each also in the job summary and an annotation.
+Each of those reports a condition that must not block a
 publish. Every other assertion fails the build, so no real failure can land as a passing
 warning. `dbt build` is used rather than `dbt run` then
 `dbt test` so each model's tests gate its own dependents in DAG order.
@@ -1367,6 +1407,10 @@ above 0. A failure alerts
 through GitHub's failed-run email only; it never touches a build. `live-tests`'
 `compaction_dry_run` input runs it to a local destination for measurement. Selection,
 config, the record, the sizing rule and the runbook: `docs/compacted.md`.
+The same workflow then compacts settled entry-picks gameweeks with
+`scripts/compact_entry_picks.py` (#216 D8): every gameweek with a picks settlement
+marker and no compaction manifest, one parquet each, with no budget. A compacted gameweek
+is never rewritten. It writes no record. Layout: `docs/compacted.md`, "Entry-picks".
 
 ### Build metrics
 
@@ -1465,7 +1509,7 @@ Before `dbt build`, the scheduled build checks how old each live input is (#39, 
   normally.
 
 **It publishes.** After a successful `dbt build`, the `Publish served tables to S3` step
-runs `scripts/publish_served.py`, which exports the nine served tables to parquet and uploads
+runs `scripts/publish_served.py`, which exports the eleven served tables to parquet and uploads
 them to `s3://fpl-data-safari/served/` alongside a `_manifest.json`. Layout, format and the
 publish-on-success guarantee are specified under "Served contract" — this section covers
 only how the workflow invokes it.

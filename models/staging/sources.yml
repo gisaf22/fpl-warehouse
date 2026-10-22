@@ -589,6 +589,123 @@ sources:
                 tags: ['integration']
                 meta: {covers: '#114 AC8'}
 
+      - name: entry_picks
+        description: >
+          One panel manager's picks for one gameweek (#216), as FPL's
+          entry/{id}/event/{gw}/picks returns it: `active_chip`,
+          `automatic_subs`, `entry_history` (a root object) and the 15 `picks`,
+          after automatic substitutions. One object per manager per gameweek, at
+          `fpl/entry-picks/{season}/{gw}/{entry_id}/{date}/{run_id}/payload.json`.
+          The entry id is not in the body; staging takes it, with every capture
+          column, from the capture index (int_admitted_capture).
+
+          The read is set by the entry_picks_compacted_read pre-hook (#216 D8):
+          compacted gameweeks from parquet, every other payload from raw.
+          `staging_read_mode: raw` reads every payload from raw. There is no
+          `capture_glob`: the test-only capture cutoff (#190) does not cut
+          picks, so a cutoff before the first picks capture still reads them.
+        meta:
+          endpoint: entry-picks
+          external_location: >-
+            {%- set mode = var("staging_read_mode", "") | string -%}
+            {%- if mode != "raw" -%}
+            query(getvariable('entry_picks_read'))
+            {%- else -%}
+            read_json('{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/entry-picks/*/*/*/*/*/payload.json', union_by_name = true, filename = true)
+            {%- endif -%}
+        columns:
+          - name: active_chip
+          - name: automatic_subs
+          - name: automatic_subs.element_in
+            meta:
+              record_path: '$.automatic_subs[*]'
+          - name: automatic_subs.element_out
+            meta:
+              record_path: '$.automatic_subs[*]'
+          - name: entry_history
+          - name: entry_history.event
+            meta:
+              record_path: '$.entry_history'
+          - name: entry_history.points
+            meta:
+              record_path: '$.entry_history'
+          - name: entry_history.event_transfers
+            meta:
+              record_path: '$.entry_history'
+          - name: entry_history.event_transfers_cost
+            meta:
+              record_path: '$.entry_history'
+          - name: picks
+          - name: picks.element
+            meta:
+              record_path: '$.picks[*]'
+          - name: picks.position
+            meta:
+              record_path: '$.picks[*]'
+          - name: picks.multiplier
+            meta:
+              record_path: '$.picks[*]'
+          - name: picks.is_captain
+            meta:
+              record_path: '$.picks[*]'
+          - name: picks.is_vice_captain
+            meta:
+              record_path: '$.picks[*]'
+        data_tests:
+          # Every declared column must still be a key in the latest admitted
+          # live run (#114). Declaring a column above is enough to cover it.
+          - consumed_keys_present:
+              arguments:
+                mode: removed
+              config:
+                severity: error
+                tags: ['integration']
+                meta: {covers: '#114 AC1'}
+          - consumed_keys_present:
+              arguments:
+                mode: partial
+              config:
+                severity: warn
+                tags: ['integration']
+                meta: {covers: '#114 AC8'}
+
+      - name: entry_picks_settlement
+        description: >
+          fpl-ingest's picks settlement marker, one object per gameweek at
+          `_settlement/entry-picks/{gw}/marker.json` (#216 D2; fpl-ingest ADR
+          006). A published contract read with explicit columns, the D3 fields
+          only: event, entries, run_id, recorded_at. Not a capture, so it has no
+          index entry and no presence test. Its season is its run's (D14).
+        meta:
+          external_location: >-
+            read_json(
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/_settlement/entry-picks/*/marker.json',
+              columns = struct_pack(
+                event := 'INTEGER',
+                entries := 'INTEGER',
+                run_id := 'VARCHAR',
+                recorded_at := 'VARCHAR'
+              )
+            )
+
+      - name: manager_panel
+        description: >
+          fpl-ingest's manager panel, one object per season at
+          `_panels/{season}/manager-panel.json` (#216 D10, O5;
+          gisaf22/fpl-ingest#127 item 3). A published contract read with
+          explicit columns: the season and each entry's entry_id and cohort.
+          `joined_gw` is not read (D6). Not a capture, so it has no index entry
+          and no presence test.
+        meta:
+          external_location: >-
+            read_json(
+              '{{ "tests/fixtures/raw" if target.name == "fixtures" else var("raw_root") }}/fpl/_panels/*/manager-panel.json',
+              columns = struct_pack(
+                season := 'VARCHAR',
+                entries := 'STRUCT(entry_id BIGINT, cohort VARCHAR)[]'
+              )
+            )
+
       - name: run_manifests
         description: >
           fpl-ingest's run manifest, one object per run at

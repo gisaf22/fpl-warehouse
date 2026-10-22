@@ -11,6 +11,7 @@ build, since the macro reads the source alone.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -222,10 +223,30 @@ def test_reading_an_undeclared_root_field_fails_naming_the_field():
 PICKS_ROOT = "with r as ({{ declared_records('entry_picks', '$') }}) "
 
 
+def show_picks(query: str) -> subprocess.CompletedProcess:
+    """`show` reading entry-picks from raw, as a local run would.
+
+    The source's default read is a variable the staging pre-hook sets on its
+    model's connection, which a `dbt show` connection never has (as for
+    element-summary, #194). `staging_read_mode: raw` is allowed only with
+    GITHUB_EVENT_NAME unset or workflow_dispatch, so it is cleared here.
+    """
+    (REPO / ".local").mkdir(exist_ok=True)
+    return subprocess.run(
+        ["dbt", "--no-use-colors", "show", "--target", "fixtures"]
+        + ["--vars", "{staging_read_mode: raw}"]
+        + ["--inline", query, "--limit", "5", "--output", "json"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "GITHUB_EVENT_NAME": ""},
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.covers("#216 AC22")
 def test_a_declared_field_of_a_root_object_is_read():
-    result = show(PICKS_ROOT + "select r.capture_key, r.entry_history.points as points from r")
+    result = show_picks(PICKS_ROOT + "select r.capture_key, r.entry_history.points as points from r")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"points"' in result.stdout
@@ -236,7 +257,7 @@ def test_a_declared_field_of_a_root_object_is_read():
 def test_reading_an_undeclared_field_of_a_root_object_fails_naming_it():
     # `rank_sort` is in every entry-picks payload's entry_history but is not
     # declared in sources.yml.
-    result = show(PICKS_ROOT + "select r.entry_history.rank_sort from r")
+    result = show_picks(PICKS_ROOT + "select r.entry_history.rank_sort from r")
 
     assert result.returncode != 0
     assert "rank_sort" in result.stdout + result.stderr

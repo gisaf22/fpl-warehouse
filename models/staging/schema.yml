@@ -400,3 +400,47 @@ models:
                 tags: [unit]
                 meta:
                   covers: "#216 AC11"
+
+  - name: stg_entry_picks_capture
+    description: >
+      One row per admitted entry-picks capture (#216): the manager's chip,
+      transfers, FPL's points, automatic subs and the 15 picks, typed. The one
+      read of the entry-picks source; stg_entry_picks unnests from it.
+      Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        description: >
+          The capture's key in the capture index. Must exist in
+          int_admitted_capture: staging holds admitted captures only (#104).
+          Unique: a capture read both from compacted parquet and from the raw
+          tail would stage twice (#216 D8).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]
+          - unique:
+              config:
+                tags: [integration]
+                meta:
+                  covers: '#216 AC16'
+
+  - name: stg_entry_picks
+    description: >
+      One row per pick (capture_key, slot): stg_entry_picks_capture's picks
+      unnested (#216). Internal: not part of the served contract.
+    group: warehouse_internal
+    access: private
+    columns:
+      - name: capture_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('int_admitted_capture')
+                field: capture_key
+              config:
+                tags: [integration]

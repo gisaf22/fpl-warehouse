@@ -4,7 +4,9 @@ Every fpl_raw payload source must carry the presence test twice (#114 D1):
 `mode: removed` at error severity and `mode: partial` at warn. A declared
 column can opt out only through `meta.presence_exempt` with a non-empty reason.
 `run_manifests` and `backfill_catalog` are not payloads: they are read with
-explicit columns and are not captures in the admission index.
+explicit columns and are not captures in the admission index. Nor are
+`entry_picks_settlement` and `manager_panel`, the picks settlement marker and
+the manager panel file (#216 D2, D10, AC21).
 
 Run after `dbt parse`: `python scripts/check_source_presence_tests.py`.
 """
@@ -16,7 +18,7 @@ import sys
 from pathlib import Path
 
 SOURCE_NAME = "fpl_raw"
-NOT_PAYLOAD = {"run_manifests", "backfill_catalog"}
+NOT_PAYLOAD = {"run_manifests", "backfill_catalog", "entry_picks_settlement", "manager_panel"}
 TEST_NAME = "consumed_keys_present"
 SEVERITY = {"removed": "error", "partial": "warn"}
 
