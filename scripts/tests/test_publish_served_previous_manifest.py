@@ -34,8 +34,16 @@ def publish(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.covers("#63 AC1")
+@pytest.mark.covers("#216 AC17")
 def test_a_season_lost_upstream_of_staging_is_refused(publish, capsys):
-    previous = manifest(**{CLOSED: season(10, 38), LIVE: season(10, 4)})
+    # The live season has a panel (#216), so every served table, the manager
+    # tables included, held rows for it in the previous publish.
+    previous = manifest(
+        **{
+            CLOSED: season(10, 38),
+            LIVE: season(10, 4, manager_join_weeks=(1, 2), marked_gameweeks=3),
+        }
+    )
 
     result = publish({CLOSED: season(10, 38)}, previous)
 
