@@ -569,6 +569,8 @@ unit_tests:
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k1", run_id: "r1", observed_at: "2026-10-10 09:00:00"}
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k2", run_id: "r2", observed_at: "2026-10-10 10:00:00"}
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k3", run_id: "r3", observed_at: "2026-10-10 11:00:00"}
+      - input: ref('int_gameweek_status')
+        rows: []
     expect:
       rows:
         - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", last_capture_before_deadline_at: "2026-10-10 09:00:00", state_age_seconds: 3600}

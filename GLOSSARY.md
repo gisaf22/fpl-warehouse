@@ -102,6 +102,15 @@ One definition per term. A term is added here before an issue, PR or check cites
 - **chosen eleven**: the eleven the manager picked before the deadline: the slot 1–11
   picks not substituted in, plus the picks substituted out (#216 D7, amended by O4).
   The metric #216 serves sums it.
+- **overall rank** (`overall_rank`): a manager's overall rank at the end of a gameweek,
+  from FPL's `entry_history.overall_rank` (#219 D1). Served on `fct_manager_gameweek`, NULL
+  where FPL reports no valid rank: FPL reports such a team as null or 0, cause unknown.
+  Staging keeps the 0.
+- **ranked count** (`ranked_count`): FPL's count of ranked teams for a gameweek,
+  `events[].ranked_count` in `bootstrap-static` (#219 D2). Served on `dim_gameweek` once
+  the gameweek is ratified, and NULL before: FPL reads 0 for a gameweek not yet played and a
+  provisional, too-high count for one in progress. It is the denominator of an overall rank
+  for the same gameweek. NULL for 2025-26, which is not served (D3).
 
 ## Serving
 

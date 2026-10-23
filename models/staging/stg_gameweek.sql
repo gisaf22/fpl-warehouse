@@ -47,7 +47,11 @@ select
     -- Lifecycle
     cast(raw."finished" as boolean)            as finished,
     cast(raw."data_checked" as boolean)        as data_checked,
-    cast(raw."is_current" as boolean)          as is_current
+    cast(raw."is_current" as boolean)          as is_current,
+
+    -- Ranking: FPL's count of ranked teams, 0 until computed and provisional
+    -- until the gameweek is ratified (#219 D2; resolved in dim_gameweek)
+    cast(raw."ranked_count" as integer)        as ranked_count
 
 from raw
 inner join {{ ref('int_admitted_capture') }} as admitted

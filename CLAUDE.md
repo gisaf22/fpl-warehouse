@@ -526,6 +526,23 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it. From #74 on, each entry states the `contract_version` it ships in.
 
+- **2026-10-23 — `dim_gameweek.ranked_count INTEGER`, appended last (#219). Additive,
+  `contract_version` 2.** FPL's count of ranked teams for the gameweek, from the season's
+  newest capture, served only once the gameweek is ratified (`int_gameweek_status`). It is
+  NULL before then, because FPL reads 0 for an unplayed gameweek and a provisional,
+  too-high count for one in progress. 2026-27 gameweek 1 predates capture history and
+  counts as ratified by a dated fallback, the same 2026-08-29 cutoff `fct_player_fixture`
+  uses for `is_ratified`; delete both together. NULL for every 2025-26 gameweek: that
+  season has no ratification signal and no consumer. A test checks the value against
+  the first capture at or after ratification. Every existing column keeps its name, type
+  and position, so no bump.
+- **2026-10-23 — `fct_manager_gameweek.overall_rank INTEGER`, appended last (#219).
+  Additive, `contract_version` 2.** The manager's overall rank at the end of the gameweek,
+  from `entry_history.overall_rank`. NULL means no valid rank: FPL reports such a team as
+  null or 0, cause unknown. It is keyed to the same gameweek as `dim_gameweek.ranked_count`,
+  so a rank and its denominator join on `(season, gameweek)`; any lag is the consumer's.
+  Every existing column keeps its name, type and position, so no bump.
+
 - **2026-10-22 — `fct_manager_pick` and `fct_manager_gameweek` served (#216). Additive,
   `contract_version` 2.** Two new objects under `served/`, each with an enforced contract,
   and two new table keys in the manifest's `row_counts`, `row_counts_by_season` and

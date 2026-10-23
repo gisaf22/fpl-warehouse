@@ -377,6 +377,9 @@ sources:
           - name: events.data_checked
             meta:
               record_path: '$.events[*]'
+          - name: events.ranked_count
+            meta:
+              record_path: '$.events[*]'
           - name: teams.id
             meta:
               record_path: '$.teams[*]'
@@ -633,6 +636,9 @@ sources:
             meta:
               record_path: '$.entry_history'
           - name: entry_history.event_transfers_cost
+            meta:
+              record_path: '$.entry_history'
+          - name: entry_history.overall_rank
             meta:
               record_path: '$.entry_history'
           - name: picks
