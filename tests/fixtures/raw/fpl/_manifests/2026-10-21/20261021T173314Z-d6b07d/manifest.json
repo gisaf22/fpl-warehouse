@@ -23,6 +23,17 @@
    "usable": true
   },
   {
+   "content_length": 1919,
+   "content_sha256": "57c143b6fdeb46b2fe7788a14da7dff53d060c574e9bcf67de36a6e60608259c",
+   "endpoint": "entry-picks/2026-27/4/1276382",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/4/1276382/2026-10-21/20261021T173314Z-d6b07d/payload.json",
+   "received_at": "2026-10-21T17:35:34.438525Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
    "content_length": 1928,
    "content_sha256": "f9c446752f910cc52ee49cbd1de1003fc4d76b585b181006a33224df0db1ebfd",
    "endpoint": "entry-picks/2026-27/4/10187394",
@@ -144,6 +155,12 @@
   "entry-picks/2026-27/4/10187394": {
    "attempted": 1,
    "bytes": 1928,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/4/1276382": {
+   "attempted": 1,
+   "bytes": 1919,
    "failed": 0,
    "written": 1
   },

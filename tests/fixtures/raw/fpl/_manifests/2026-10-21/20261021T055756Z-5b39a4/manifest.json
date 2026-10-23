@@ -1,6 +1,17 @@
 {
  "captures": [
   {
+   "content_length": 1927,
+   "content_sha256": "d7159db3813170bfff59f8addef494c324c3ed71d51a44e511e5503abef1b5ee",
+   "endpoint": "entry-picks/2026-27/1/1276382",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/1/1276382/2026-10-21/20261021T055756Z-5b39a4/payload.json",
+   "received_at": "2026-10-21T05:59:50.339209Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
    "class": "not_found",
    "content_length": 23,
    "content_sha256": "cacf8a32e69eabea7d57711f4ccbeed4d284e1bbd0789137936d388da707b9de",
@@ -25,6 +36,17 @@
    "usable": true
   },
   {
+   "content_length": 1979,
+   "content_sha256": "c29825f96647d53649d0c241bf4e7eb5188cecc5d08dc1f6588a73683a413afd",
+   "endpoint": "entry-picks/2026-27/2/1276382",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/2/1276382/2026-10-21/20261021T055756Z-5b39a4/payload.json",
+   "received_at": "2026-10-21T06:17:57.773241Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
    "class": "not_found",
    "content_length": 23,
    "content_sha256": "cacf8a32e69eabea7d57711f4ccbeed4d284e1bbd0789137936d388da707b9de",
@@ -44,6 +66,17 @@
    "http_status": 200,
    "key": "raw/fpl/entry-picks/2026-27/2/8450051/2026-10-21/20261021T055756Z-5b39a4/payload.json",
    "received_at": "2026-10-21T06:34:41.785112Z",
+   "season": "2026-27",
+   "shape_ok": true,
+   "usable": true
+  },
+  {
+   "content_length": 1917,
+   "content_sha256": "a2b2cae65665bf5dcd450ebcbaa638d4702072c4707ed393316cfee7fb633cf4",
+   "endpoint": "entry-picks/2026-27/3/1276382",
+   "http_status": 200,
+   "key": "raw/fpl/entry-picks/2026-27/3/1276382/2026-10-21/20261021T055756Z-5b39a4/payload.json",
+   "received_at": "2026-10-21T06:36:52.731114Z",
    "season": "2026-27",
    "shape_ok": true,
    "usable": true
@@ -130,6 +163,12 @@
    "failed": 0,
    "written": 1
   },
+  "entry-picks/2026-27/1/1276382": {
+   "attempted": 1,
+   "bytes": 1927,
+   "failed": 0,
+   "written": 1
+  },
   "entry-picks/2026-27/1/8450051": {
    "attempted": 1,
    "bytes": 1863,
@@ -142,9 +181,21 @@
    "failed": 0,
    "written": 1
   },
+  "entry-picks/2026-27/2/1276382": {
+   "attempted": 1,
+   "bytes": 1979,
+   "failed": 0,
+   "written": 1
+  },
   "entry-picks/2026-27/2/8450051": {
    "attempted": 1,
    "bytes": 1870,
+   "failed": 0,
+   "written": 1
+  },
+  "entry-picks/2026-27/3/1276382": {
+   "attempted": 1,
+   "bytes": 1917,
    "failed": 0,
    "written": 1
   }
