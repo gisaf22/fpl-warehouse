@@ -7,6 +7,11 @@
  "entries": [
   {
    "cohort": "random",
+   "entry_id": 1276382,
+   "joined_gw": 1
+  },
+  {
+   "cohort": "random",
    "entry_id": 10187394,
    "joined_gw": 1
   },
@@ -16,7 +21,7 @@
    "joined_gw": 1
   }
  ],
- "kept": 1,
+ "kept": 2,
  "season": "2026-27",
  "seed": 11393157618204230183,
  "total_players": 11132843

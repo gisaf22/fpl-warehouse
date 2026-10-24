@@ -113,6 +113,8 @@
 --   with a kickoff on or after the cutoff reads false, never fallback. When raw
 --   history for 2026-27 is superseded the clause becomes dead and should be
 --   deleted rather than re-dated. See CLAUDE.md, "Gameweek ratification".
+--   dim_gameweek holds the same cutoff for ranked_count (#219 D2): delete
+--   both clauses together.
 --
 --   The fallback is scoped to season 2026-27 explicitly. It is a statement
 --   about that season's capture history, and every closed season's fixtures

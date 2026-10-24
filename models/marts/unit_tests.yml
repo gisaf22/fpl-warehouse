@@ -569,9 +569,101 @@ unit_tests:
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k1", run_id: "r1", observed_at: "2026-10-10 09:00:00"}
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k2", run_id: "r2", observed_at: "2026-10-10 10:00:00"}
           - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", capture_key: "k3", run_id: "r3", observed_at: "2026-10-10 11:00:00"}
+      - input: ref('int_gameweek_status')
+        rows: []
     expect:
       rows:
         - {season: "2026-27", gameweek: 6, deadline_time: "2026-10-10 10:00:00", last_capture_before_deadline_at: "2026-10-10 09:00:00", state_age_seconds: 3600}
+
+  # --- dim_gameweek: ranked_count (#219 D2, D3) -------------------------------
+  # Real values from the fixture's 2026-27 captures and the 2025-26 history.
+
+  - name: ranked_count_is_the_newest_captures_for_a_ratified_gameweek
+    description: >
+      GW2 is ratified. Its oldest capture reads a provisional 9,907,576; the
+      newest reads 9,904,815, which is served. GW4 is in event-status but not
+      ratified: its newest capture's provisional 10,674,677 is not served.
+    model: dim_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#219 AC3"
+    given:
+      - input: ref('stg_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 2, deadline_time: "2026-08-28 17:30:00", capture_key: "k1", run_id: "r1", observed_at: "2026-08-29 19:11:08", ranked_count: 9907576}
+          - {season: "2026-27", gameweek: 2, deadline_time: "2026-08-28 17:30:00", capture_key: "k2", run_id: "r2", observed_at: "2026-09-14 21:12:04", ranked_count: 9904815}
+          - {season: "2026-27", gameweek: 4, deadline_time: "2026-09-12 12:30:00", capture_key: "k1", run_id: "r1", observed_at: "2026-08-29 19:11:08", ranked_count: 0}
+          - {season: "2026-27", gameweek: 4, deadline_time: "2026-09-12 12:30:00", capture_key: "k2", run_id: "r2", observed_at: "2026-09-14 21:12:04", ranked_count: 10674677}
+      - input: ref('int_gameweek_status')
+        rows:
+          - {season: "2026-27", gameweek: 2, is_ratified: true}
+          - {season: "2026-27", gameweek: 4, is_ratified: false}
+    expect:
+      rows:
+        - {season: "2026-27", gameweek: 2, ranked_count: 9904815}
+        - {season: "2026-27", gameweek: 4, ranked_count: null}
+
+  - name: ranked_count_fallback_only_for_a_gameweek_before_capture_history
+    description: >
+      Neither GW1 nor GW5 is in any event-status capture. GW1's deadline is
+      before 2026-08-29, so it counts as ratified and serves 8,903,411. GW5's
+      deadline is after it, so its 0 is not served. 2025-26 GW1 has a deadline
+      before the cutoff and no event-status either, but 2025-26 is not served
+      (D3), so its 9,469,118 is not served.
+    model: dim_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#219 AC6"
+    given:
+      - input: ref('stg_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 1, deadline_time: "2026-08-21 17:30:00", capture_key: "k1", run_id: "r1", observed_at: "2026-08-29 19:11:08", ranked_count: 8903411}
+          - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", capture_key: "k1", run_id: "r1", observed_at: "2026-08-29 19:11:08", ranked_count: 0}
+          - {season: "2025-26", gameweek: 1, deadline_time: "2025-08-15 17:30:00", capture_key: "h1", run_id: "h1", observed_at: "2026-05-26 03:46:26", ranked_count: 9469118}
+      - input: ref('int_gameweek_status')
+        rows: []
+    expect:
+      rows:
+        - {season: "2026-27", gameweek: 1, ranked_count: 8903411}
+        - {season: "2026-27", gameweek: 5, ranked_count: null}
+        - {season: "2025-26", gameweek: 1, ranked_count: null}
+
+  # --- fct_manager_gameweek: overall_rank (#219 D1) ---------------------------
+
+  - name: overall_rank_zero_and_null_are_served_as_null
+    description: >
+      1276382's real captures: 7,960,655 in GW1, 0 in GW2 and GW3, null in GW4.
+      FPL reports a team with no valid rank as null or 0, so GW2-4 serve NULL
+      and GW1's rank passes through.
+    model: fct_manager_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#219 AC1"
+    given:
+      - input: ref('int_manager_gameweek_status')
+        rows:
+          - {season: "2026-27", entry_id: 1276382, gameweek: 1, capture_key: "c1", status: captured}
+          - {season: "2026-27", entry_id: 1276382, gameweek: 2, capture_key: "c2", status: captured}
+          - {season: "2026-27", entry_id: 1276382, gameweek: 3, capture_key: "c3", status: captured}
+          - {season: "2026-27", entry_id: 1276382, gameweek: 4, capture_key: "c4", status: captured}
+      - input: ref('stg_entry_picks_capture')
+        rows:
+          - {capture_key: "c1", season: "2026-27", entry_id: 1276382, gameweek: 1, overall_rank: 7960655}
+          - {capture_key: "c2", season: "2026-27", entry_id: 1276382, gameweek: 2, overall_rank: 0}
+          - {capture_key: "c3", season: "2026-27", entry_id: 1276382, gameweek: 3, overall_rank: 0}
+          - {capture_key: "c4", season: "2026-27", entry_id: 1276382, gameweek: 4, overall_rank: null}
+      - input: ref('dim_manager_panel')
+        rows:
+          - {season: "2026-27", entry_id: 1276382, cohort: random}
+    expect:
+      rows:
+        - {season: "2026-27", entry_id: 1276382, gameweek: 1, overall_rank: 7960655}
+        - {season: "2026-27", entry_id: 1276382, gameweek: 2, overall_rank: null}
+        - {season: "2026-27", entry_id: 1276382, gameweek: 3, overall_rank: null}
+        - {season: "2026-27", entry_id: 1276382, gameweek: 4, overall_rank: null}
 
   # --- dim_manager_panel: the join week (#216 D6, amended by O1) -----------
   # The join week is the manager's first marked gameweek with an admitted picks

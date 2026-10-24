@@ -27,6 +27,10 @@
 --   `points` is FPL's entry_history.points: the sum of multiplier x player
 --   points over the 15 picks, without the transfer cost (#216 D7). It feeds
 --   the reconciliation only and is not served.
+--
+-- Overall rank:
+--   `overall_rank` is FPL's entry_history.overall_rank as raw has it: 0 stays
+--   0 and null stays null (#219 D1). fct_manager_gameweek serves both as NULL.
 -- =============================================================================
 
 with raw as (
@@ -51,6 +55,8 @@ select
     cast(raw."entry_history"."points" as integer)                 as points,
     cast(raw."entry_history"."event_transfers" as integer)        as event_transfers,
     cast(raw."entry_history"."event_transfers_cost" as integer)   as event_transfers_cost,
+    -- As raw has it: FPL reports no valid rank as null or 0 (#219 D1)
+    cast(raw."entry_history"."overall_rank" as integer)           as overall_rank,
     list_transform(raw."automatic_subs", lambda s: struct_pack(
         fpl_id_out := cast(s."element_out" as integer),
         fpl_id_in := cast(s."element_in" as integer)

@@ -1096,6 +1096,22 @@ models:
         description: >
           deadline_time minus last_capture_before_deadline_at, in whole
           seconds. Null when last_capture_before_deadline_at is.
+      - name: ranked_count
+        data_type: INTEGER
+        description: >
+          FPL's count of ranked teams for the gameweek (GLOSSARY.md, ranked
+          count), from the season's newest staged capture (#219 D2). NULL until
+          the gameweek is ratified: before then FPL reads 0 for a gameweek not
+          yet played and a provisional, too-high count for one in progress.
+          NULL for every 2025-26 gameweek, which is not served because it has
+          no ratification signal and no consumer (D3). Gameweek 1 of 2026-27
+          predates capture history, so it appears in no event-status capture
+          and counts as ratified by a dated fallback (a 2026-27 gameweek in no
+          event-status capture with a deadline before 2026-08-29); its value
+          cannot be checked against a ratification moment. Keyed to the same
+          gameweek as fct_manager_gameweek.overall_rank: the count after this
+          gameweek's ratification. Any lag, such as banding by the previous
+          gameweek's rank, is the consumer's to apply.
 
   - name: fct_manager_pick
     description: >
@@ -1104,7 +1120,12 @@ models:
       after automatic substitutions (GLOSSARY.md): slots 1-11 are the scored
       eleven. The chosen eleven, which #216 D7's metric sums, is the slot 1-11
       rows not flagged is_auto_sub_in plus the rows flagged is_auto_sub_out.
-      The original bench order is exact only in a week with no automatic
+      The two give two different numbers. The metric is the chosen eleven's
+      plain total_points sum, with no captain multiplier. FPL's scored total
+      (entry_history.points) is the scored eleven with the captain counted
+      twice, or three times on 3xc, and is a reconciliation check, not the
+      metric. For entry 10187394 in 2026-27 GW4 the metric is 42 and FPL's
+      total is 56. The original bench order is exact only in a week with no automatic
       substitution (about half of manager-weeks): FPL does not say which bench
       slot a replaced starter came from, so slots 12-15 in a substituted week
       are FPL's order, not the manager's. No points are
@@ -1220,6 +1241,16 @@ models:
       - name: automatic_subs
         data_type: STRUCT(fpl_id_out INTEGER, fpl_id_in INTEGER)[]
         description: FPL's automatic substitutions that gameweek, each the player out and the player in; empty when none.
+      - name: overall_rank
+        data_type: INTEGER
+        description: >
+          The manager's overall rank at the end of the gameweek (GLOSSARY.md,
+          overall rank), from FPL's entry_history.overall_rank (#219 D1). NULL
+          means no valid rank: FPL reports such a team as null or 0, and the
+          cause is unknown. Keyed to the same gameweek as
+          dim_gameweek.ranked_count, so a rank and its denominator join on
+          (season, gameweek). Any lag, such as banding by the previous
+          gameweek's rank, is the consumer's to apply.
 
   - name: dim_manager_panel
     description: >

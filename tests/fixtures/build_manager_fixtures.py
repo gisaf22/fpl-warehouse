@@ -8,7 +8,7 @@ the bucket.
 
 WHAT IT HOLDS
 -------------
-Two real managers of the 2026-27 panel, by id only (the payloads carry no
+Three real managers of the 2026-27 panel, by id only (the payloads carry no
 names):
 
     10187394  random cohort. Joined in gameweek 3: their first picks capture
@@ -21,6 +21,11 @@ names):
               `entry_history.points`; the cost is not taken out of it
               (measured 2026-10-22 over every one of 13,090 captures).
     8450051   self cohort. Joined in gameweek 1, captured for gameweeks 1-4.
+    1276382   random cohort. Captured for gameweeks 1-4, with no valid
+              `entry_history.overall_rank` after gameweek 1: 7,960,655 in
+              gameweek 1, 0 in gameweeks 2 and 3, null in gameweek 4 (#219 D1;
+              read from live 2026-10-23). FPL reports a team with no valid
+              rank both ways.
 
 Plus 10187394's gameweek 5 picks capture, with no gameweek 5 marker in the
 tree: a captured gameweek whose settlement marker is absent, which the models
@@ -45,10 +50,10 @@ EDITED
   endpoint identity (one per manager and gameweek), keep this tree's managers
   and every other family. Every other field, status and origin included, is
   the run's own.
-- The panel's `entries` keeps the two managers, and `kept` (the random
-  cohort's count) is set to 1 to match. `seed`, `drawn` and the rest are the
+- The panel's `entries` keeps the three managers, and `kept` (the random
+  cohort's count) is set to 2 to match. `seed`, `drawn` and the rest are the
   real panel's.
-- Each marker's `entries` is set to 2, the panel managers this tree holds; the
+- Each marker's `entries` is set to 3, the panel managers this tree holds; the
   real markers say 1,998. A marker vouches for every kept manager, so with a
   trimmed panel the real count would describe managers the tree does not have.
   This is the one synthetic value.
@@ -70,7 +75,8 @@ OUT_ROOT = Path(__file__).parent / "raw"
 
 LATE_JOINER = 10187394
 SELF_COHORT = 8450051
-MANAGERS = (LATE_JOINER, SELF_COHORT)
+UNRANKED = 1276382
+MANAGERS = (LATE_JOINER, SELF_COHORT, UNRANKED)
 MARKED_GAMEWEEKS = (1, 2, 3, 4)
 UNMARKED_GAMEWEEK = 5
 MANAGER_FAMILIES = ("entry-picks", "entry-history")  # every manager endpoint, trimmed alike
