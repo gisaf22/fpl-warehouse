@@ -526,6 +526,18 @@ Newest first. Each entry is a change to the enforced column list in
 `models/marts/schema.yml`, which is the authoritative contract; this log is where a consumer
 learns of it. From #74 on, each entry states the `contract_version` it ships in.
 
+- **2026-10-24 — `fct_player_gameweek.fixture_count_at_deadline INTEGER`, appended last
+  (#221). Additive, `contract_version` 2.** The number of fixtures the player's club had
+  scheduled in the gameweek as the schedule stood at the deadline: the club from
+  `dim_player_status_history`, the schedule from `dim_fixture_schedule_history`, both as of
+  strictly before `dim_gameweek.deadline_time`. `fixture_count` stays the realised count, so
+  a fixture postponed after the deadline reads 1 here and 0 there. NULL when unknowable: no
+  staged capture before the deadline (all of 2025-26, 2026-27 GW1–2), no schedule row in
+  the season before it, or no status row for the player before it. 0 is an observed blank.
+  It is not in `null_exactly_when(fixture_count = 0)`. A departed player keeps their last
+  club's count (#123). The club is not served (#43). `fct_test_manager_pick_players_have_fixture_count_at_deadline`
+  (e2e, error) fails on a pick from GW3 on with a NULL or no row. Every existing column
+  keeps its name, type and position, so no bump.
 - **2026-10-23 — `dim_gameweek.ranked_count INTEGER`, appended last (#219). Additive,
   `contract_version` 2.** FPL's count of ranked teams for the gameweek, from the season's
   newest capture, served only once the gameweek is ratified (`int_gameweek_status`). It is

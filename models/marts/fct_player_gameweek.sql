@@ -69,6 +69,31 @@
 --   consumers needing them must read fct_player_fixture at fixture grain.
 --   first_kickoff_time / last_kickoff_time are carried instead, as those stay
 --   well defined across any fixture_count and support as-of filtering.
+--
+-- fixture_count_at_deadline (#221):
+--   The number of fixtures the player's club had scheduled in the gameweek as
+--   the schedule stood at the gameweek's deadline (dim_gameweek). Both the
+--   club (dim_player_status_history.team_fpl_id) and the schedule
+--   (dim_fixture_schedule_history) are looked up strictly before the deadline
+--   through as_of (ADR 0002), and a fixture counts for its club on either
+--   side. fixture_count is realised, from element-summary history; this is
+--   what a manager could know at the deadline, so a fixture postponed after
+--   it still counts here while fixture_count reads 0 (D2).
+--   NULL when it is unknowable (D4): the gameweek has no staged capture
+--   before its deadline (dim_gameweek.last_capture_before_deadline_at is
+--   null: all of 2025-26 and 2026-27 GW1-2), the season has no schedule row
+--   opened before the deadline (the first rule reads bootstrap-static, the
+--   schedule the fixtures endpoint), or the player has no status row before
+--   it. 0 is an observed blank: the club had no fixture in the gameweek.
+--   Not part of null_exactly_when(fixture_count = 0): a 1 here beside a 0
+--   there is the postponement this column exists to show.
+--   A departed player keeps their last club's count, because status rows
+--   never close on absence (#123); such a player cannot be picked.
+--   The club is used here only and is not served: a player transferred
+--   between the two fixtures of a double has no single club (#43).
+--   Both lookups join after the fixture aggregation, one row per
+--   (season, fpl_id, gameweek) and per (season, gameweek, team), so they
+--   cannot fan out the sums above (D3).
 -- =============================================================================
 
 with spine as (
@@ -81,7 +106,9 @@ fixtures as (
 
     select * from {{ ref('fct_player_fixture') }}
 
-)
+),
+
+player_gameweek as (
 
 select
     -- Keys
@@ -162,3 +189,97 @@ group by
     spine.fpl_id,
     spine.gameweek,
     spine.web_name
+
+),
+
+-- Gameweeks whose deadline count is knowable (D4): a staged capture and a
+-- schedule row both precede the deadline.
+computable_gameweeks as (
+
+    select gameweek.season, gameweek.gameweek, gameweek.deadline_time
+    from {{ ref('dim_gameweek') }} as gameweek
+    where gameweek.last_capture_before_deadline_at is not null
+      and exists (
+          select 1
+          from {{ ref('dim_fixture_schedule_history') }} as schedule
+          where schedule.season = gameweek.season
+            and schedule.valid_from < gameweek.deadline_time
+      )
+
+),
+
+club_requests as (
+
+    select
+        player_gameweek.season,
+        player_gameweek.fpl_id,
+        player_gameweek.gameweek,
+        computable_gameweeks.deadline_time as as_of_time
+    from player_gameweek
+    inner join computable_gameweeks
+        on computable_gameweeks.season = player_gameweek.season
+       and computable_gameweeks.gameweek = player_gameweek.gameweek
+
+),
+
+club_at_deadline as (
+
+    {{ player_status_as_of('club_requests') }}
+
+),
+
+-- Every fixture of the season, at each computable deadline. The request's
+-- gameweek is deadline_gameweek, so it cannot clash with the schedule's own.
+schedule_requests as (
+
+    select
+        computable_gameweeks.season,
+        computable_gameweeks.gameweek as deadline_gameweek,
+        computable_gameweeks.deadline_time as as_of_time,
+        season_fixtures.fixture_id
+    from computable_gameweeks
+    inner join (
+        select distinct season, fixture_id
+        from {{ ref('dim_fixture_schedule_history') }}
+    ) as season_fixtures
+        on season_fixtures.season = computable_gameweeks.season
+
+),
+
+schedule_at_deadline as (
+
+    {{ as_of('schedule_requests', ref('dim_fixture_schedule_history'), 'valid_from',
+             ['gameweek', 'team_h_fpl_id', 'team_a_fpl_id'],
+             keys=['season', 'fixture_id']) }}
+
+),
+
+team_fixtures_at_deadline as (
+
+    select
+        season,
+        deadline_gameweek as gameweek,
+        sides.team_fpl_id,
+        count(*) as fixture_count
+    from schedule_at_deadline,
+        unnest([team_h_fpl_id, team_a_fpl_id]) as sides (team_fpl_id)
+    where schedule_at_deadline.gameweek = schedule_at_deadline.deadline_gameweek
+    group by season, deadline_gameweek, sides.team_fpl_id
+
+)
+
+select
+    player_gameweek.*,
+    case
+        when club_at_deadline.valid_from is not null
+        then cast(coalesce(team_fixtures_at_deadline.fixture_count, 0) as integer)
+    end as fixture_count_at_deadline
+from player_gameweek
+left join club_at_deadline
+    on club_at_deadline.season = player_gameweek.season
+   and club_at_deadline.fpl_id = player_gameweek.fpl_id
+   and club_at_deadline.gameweek = player_gameweek.gameweek
+left join team_fixtures_at_deadline
+    on team_fixtures_at_deadline.season = player_gameweek.season
+   and team_fixtures_at_deadline.gameweek = player_gameweek.gameweek
+   and team_fixtures_at_deadline.team_fpl_id = club_at_deadline.team_fpl_id

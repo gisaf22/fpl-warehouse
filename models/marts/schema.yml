@@ -222,6 +222,11 @@ models:
       **deadline_time is not on this table** (#133 S19, contract_version 2).
       Read a gameweek's deadline from dim_gameweek, joined on (season,
       gameweek).
+
+      **fixture_count is realised; fixture_count_at_deadline is scheduled**
+      (#221). The first counts the fixtures the player has history for, the
+      second the fixtures their club had in the schedule as it stood at the
+      deadline. They differ when a fixture is postponed after the deadline.
     group: warehouse_internal
     access: public
     config:
@@ -391,6 +396,24 @@ models:
         data_type: INTEGER
       - name: transfers_balance
         data_type: INTEGER
+      - name: fixture_count_at_deadline
+        data_type: INTEGER
+        description: >
+          The number of fixtures the player's club had scheduled in this
+          gameweek as the schedule stood at the gameweek's deadline
+          (dim_gameweek.deadline_time): the club from dim_player_status_history
+          and the schedule from dim_fixture_schedule_history, both as of
+          strictly before the deadline, a fixture counting on either side.
+          fixture_count is realised; this is what a manager could know at the
+          deadline, so a fixture postponed after the deadline counts here
+          while fixture_count reads 0. NULL when unknowable: no staged capture
+          before the deadline (all of 2025-26 and 2026-27 gameweeks 1-2), no
+          schedule row in the season before it, or no status row for the
+          player before it. 0 means the club had no fixture. A departed player
+          keeps the count of the club in their last status row, because
+          status rows never close on absence (#123); such a player cannot be
+          picked. The club itself is not served (#43). Added 2026-10-24 (#221)
+          as the last column, an additive change.
 
 
   - name: dim_team

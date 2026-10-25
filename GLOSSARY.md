@@ -66,6 +66,11 @@ One definition per term. A term is added here before an issue, PR or check cites
   measures the other.
 - **fixture schedule**: which gameweek a fixture is in, its kickoff time, its home and away
   teams, and each side's difficulty rating. Not its result: a score is a ratified outcome.
+- **fixture count at deadline** (`fixture_count_at_deadline`): for a player and a gameweek,
+  the number of fixtures the player's club had in the gameweek's fixture schedule as of its
+  deadline, the club also as of the deadline (#221). Not the realised `fixture_count`: a
+  fixture postponed after the deadline still counts. NULL when no staged capture, no
+  schedule row, or no status row for the player precedes the deadline.
 - **reschedule**: FPL changing a fixture's kickoff time after publishing it. A reschedule moves
   the fixture; the fixture keeps its id.
 - **ratified outcome**: a gameweek's results after FPL has ratified its points and bonus
