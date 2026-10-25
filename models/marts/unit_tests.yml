@@ -704,3 +704,158 @@ unit_tests:
         - {season: "2026-27", entry_id: 10187394, cohort: random, first_active_gw: 3}
         - {season: "2026-27", entry_id: 8450051, cohort: self, first_active_gw: null}
         - {season: "2026-27", entry_id: 4685107, cohort: self, first_active_gw: null}
+
+  # --- fct_player_gameweek: fixture_count_at_deadline (#221) ------------------
+  # Constructed cases: the fixture tree has no postponement, no gameweek move,
+  # no club change and no player first listed after a computable deadline.
+  # Gameweek 5's deadline is 2026-09-18 17:30, gameweek 2's 2026-08-28 17:30,
+  # as in 2026-27. Mocks list only the columns the model reads.
+
+  - name: postponement_first_observed_after_the_deadline_keeps_the_deadline_count
+    description: >
+      Club 10's gameweek 5 fixture 50 is postponed (gameweek and kickoff null)
+      at a capture two days after the deadline. Player 700 has no fixture row,
+      so the realised fixture_count is 0, but the count as the schedule stood
+      at the deadline stays 1.
+    model: fct_player_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#221 AC4"
+    given:
+      - input: ref('int_player_gameweek_spine')
+        rows:
+          - {season: "2026-27", fpl_id: 700, gameweek: 5, web_name: "A"}
+      - input: ref('fct_player_fixture')
+        rows: []
+      - input: ref('dim_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", last_capture_before_deadline_at: "2026-09-18 15:12:00"}
+      - input: ref('dim_player_status_history')
+        rows:
+          - {season: "2026-27", fpl_id: 700, valid_from: "2026-08-29 19:11:00", valid_to: null, team_fpl_id: 10}
+      - input: ref('dim_fixture_schedule_history')
+        rows:
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-08-29 19:11:00", valid_to: "2026-09-20 19:13:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-09-20 19:13:00", valid_to: null, gameweek: null, kickoff_time: null, team_h_fpl_id: 10, team_a_fpl_id: 11}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 700, gameweek: 5, fixture_count: 0, fixture_count_at_deadline: 1}
+
+  - name: postponement_observed_before_the_deadline_changes_the_deadline_count
+    description: >
+      The same postponement of fixture 50, observed at a capture eight days
+      before the deadline. A manager could know it, so the count at the
+      deadline is 0. The positive control for the case above.
+    model: fct_player_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#221 AC5"
+    given:
+      - input: ref('int_player_gameweek_spine')
+        rows:
+          - {season: "2026-27", fpl_id: 700, gameweek: 5, web_name: "A"}
+      - input: ref('fct_player_fixture')
+        rows: []
+      - input: ref('dim_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", last_capture_before_deadline_at: "2026-09-18 15:12:00"}
+      - input: ref('dim_player_status_history')
+        rows:
+          - {season: "2026-27", fpl_id: 700, valid_from: "2026-08-29 19:11:00", valid_to: null, team_fpl_id: 10}
+      - input: ref('dim_fixture_schedule_history')
+        rows:
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-08-29 19:11:00", valid_to: "2026-09-10 19:13:00", gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-09-10 19:13:00", valid_to: null, gameweek: null, kickoff_time: null, team_h_fpl_id: 10, team_a_fpl_id: 11}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 700, gameweek: 5, fixture_count: 0, fixture_count_at_deadline: 0}
+
+  - name: club_change_before_the_deadline_counts_the_new_clubs_fixtures
+    description: >
+      Player 702 moves from club 10 (one gameweek 5 fixture) to club 12 (a
+      double: fixtures 51 and 52) before the deadline, and plays both, 90 and
+      45 minutes. The count follows club 12: 2. The sums are unchanged by the
+      new join, so it adds no rows: minutes 135, fixture_count 2. Player 703's
+      move opens exactly at the deadline, which is not before it, so their
+      count is still club 10's: 1.
+    model: fct_player_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#221 AC6"
+    given:
+      - input: ref('int_player_gameweek_spine')
+        rows:
+          - {season: "2026-27", fpl_id: 702, gameweek: 5, web_name: "B"}
+          - {season: "2026-27", fpl_id: 703, gameweek: 5, web_name: "C"}
+      - input: ref('fct_player_fixture')
+        rows:
+          - {season: "2026-27", fpl_id: 702, gameweek: 5, fixture_id: 51, kickoff_time: "2026-09-19 14:00:00", minutes: 90}
+          - {season: "2026-27", fpl_id: 702, gameweek: 5, fixture_id: 52, kickoff_time: "2026-09-21 19:00:00", minutes: 45}
+      - input: ref('dim_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", last_capture_before_deadline_at: "2026-09-18 15:12:00"}
+      - input: ref('dim_player_status_history')
+        rows:
+          - {season: "2026-27", fpl_id: 702, valid_from: "2026-08-29 19:11:00", valid_to: "2026-09-01 19:13:00", team_fpl_id: 10}
+          - {season: "2026-27", fpl_id: 702, valid_from: "2026-09-01 19:13:00", valid_to: null, team_fpl_id: 12}
+          - {season: "2026-27", fpl_id: 703, valid_from: "2026-08-29 19:11:00", valid_to: "2026-09-18 17:30:00", team_fpl_id: 10}
+          - {season: "2026-27", fpl_id: 703, valid_from: "2026-09-18 17:30:00", valid_to: null, team_fpl_id: 12}
+      - input: ref('dim_fixture_schedule_history')
+        rows:
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-08-29 19:11:00", valid_to: null, gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2026-27", fixture_id: 51, valid_from: "2026-08-29 19:11:00", valid_to: null, gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 12, team_a_fpl_id: 13}
+          - {season: "2026-27", fixture_id: 52, valid_from: "2026-08-29 19:11:00", valid_to: null, gameweek: 5, kickoff_time: "2026-09-21 19:00:00", team_h_fpl_id: 14, team_a_fpl_id: 12}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 702, gameweek: 5, fixture_count: 2, minutes: 135, fixture_count_at_deadline: 2}
+        - {season: "2026-27", fpl_id: 703, gameweek: 5, fixture_count: 0, minutes: null, fixture_count_at_deadline: 1}
+
+  - name: deadline_count_is_null_when_unknowable_and_zero_only_when_observed
+    description: >
+      Player 704 is first listed after gameweek 5's deadline: NULL. Player
+      705's club has a gameweek 2 fixture in a schedule row opened before the
+      deadline, but gameweek 2 has no staged capture before its deadline:
+      NULL. Player 706's club 15 has no gameweek 5 fixture in a known
+      schedule: 0, an observed blank. Player 707 is listed before 2027-28
+      gameweek 3's deadline, which has a capture before it, but that season's
+      first fixtures-schedule row opens after the deadline: NULL, not a false
+      0 (D4, third rule).
+    model: fct_player_gameweek
+    config:
+      tags: [unit]
+      meta:
+        covers: "#221 AC2"
+    given:
+      - input: ref('int_player_gameweek_spine')
+        rows:
+          - {season: "2026-27", fpl_id: 704, gameweek: 5, web_name: "D"}
+          - {season: "2026-27", fpl_id: 705, gameweek: 2, web_name: "E"}
+          - {season: "2026-27", fpl_id: 706, gameweek: 5, web_name: "F"}
+          - {season: "2027-28", fpl_id: 707, gameweek: 3, web_name: "G"}
+      - input: ref('fct_player_fixture')
+        rows: []
+      - input: ref('dim_gameweek')
+        rows:
+          - {season: "2026-27", gameweek: 2, deadline_time: "2026-08-28 17:30:00", last_capture_before_deadline_at: null}
+          - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", last_capture_before_deadline_at: "2026-09-18 15:12:00"}
+          - {season: "2027-28", gameweek: 3, deadline_time: "2027-08-27 17:30:00", last_capture_before_deadline_at: "2027-08-27 15:12:00"}
+      - input: ref('dim_player_status_history')
+        rows:
+          - {season: "2026-27", fpl_id: 704, valid_from: "2026-09-19 07:00:00", valid_to: null, team_fpl_id: 10}
+          - {season: "2026-27", fpl_id: 705, valid_from: "2026-08-01 12:00:00", valid_to: null, team_fpl_id: 10}
+          - {season: "2026-27", fpl_id: 706, valid_from: "2026-08-29 19:11:00", valid_to: null, team_fpl_id: 15}
+          - {season: "2027-28", fpl_id: 707, valid_from: "2027-08-01 12:00:00", valid_to: null, team_fpl_id: 10}
+      - input: ref('dim_fixture_schedule_history')
+        rows:
+          - {season: "2026-27", fixture_id: 20, valid_from: "2026-08-01 12:00:00", valid_to: null, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2026-27", fixture_id: 50, valid_from: "2026-08-29 19:11:00", valid_to: null, gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2027-28", fixture_id: 30, valid_from: "2027-08-28 19:11:00", valid_to: null, gameweek: 3, kickoff_time: "2027-08-28 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+    expect:
+      rows:
+        - {season: "2026-27", fpl_id: 704, gameweek: 5, fixture_count_at_deadline: null}
+        - {season: "2026-27", fpl_id: 705, gameweek: 2, fixture_count_at_deadline: null}
+        - {season: "2026-27", fpl_id: 706, gameweek: 5, fixture_count_at_deadline: 0}
+        - {season: "2027-28", fpl_id: 707, gameweek: 3, fixture_count_at_deadline: null}
