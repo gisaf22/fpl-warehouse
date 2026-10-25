@@ -819,7 +819,10 @@ unit_tests:
       705's club has a gameweek 2 fixture in a schedule row opened before the
       deadline, but gameweek 2 has no staged capture before its deadline:
       NULL. Player 706's club 15 has no gameweek 5 fixture in a known
-      schedule: 0, an observed blank.
+      schedule: 0, an observed blank. Player 707 is listed before 2027-28
+      gameweek 3's deadline, which has a capture before it, but that season's
+      first fixtures-schedule row opens after the deadline: NULL, not a false
+      0 (D4, third rule).
     model: fct_player_gameweek
     config:
       tags: [unit]
@@ -831,23 +834,28 @@ unit_tests:
           - {season: "2026-27", fpl_id: 704, gameweek: 5, web_name: "D"}
           - {season: "2026-27", fpl_id: 705, gameweek: 2, web_name: "E"}
           - {season: "2026-27", fpl_id: 706, gameweek: 5, web_name: "F"}
+          - {season: "2027-28", fpl_id: 707, gameweek: 3, web_name: "G"}
       - input: ref('fct_player_fixture')
         rows: []
       - input: ref('dim_gameweek')
         rows:
           - {season: "2026-27", gameweek: 2, deadline_time: "2026-08-28 17:30:00", last_capture_before_deadline_at: null}
           - {season: "2026-27", gameweek: 5, deadline_time: "2026-09-18 17:30:00", last_capture_before_deadline_at: "2026-09-18 15:12:00"}
+          - {season: "2027-28", gameweek: 3, deadline_time: "2027-08-27 17:30:00", last_capture_before_deadline_at: "2027-08-27 15:12:00"}
       - input: ref('dim_player_status_history')
         rows:
           - {season: "2026-27", fpl_id: 704, valid_from: "2026-09-19 07:00:00", valid_to: null, team_fpl_id: 10}
           - {season: "2026-27", fpl_id: 705, valid_from: "2026-08-01 12:00:00", valid_to: null, team_fpl_id: 10}
           - {season: "2026-27", fpl_id: 706, valid_from: "2026-08-29 19:11:00", valid_to: null, team_fpl_id: 15}
+          - {season: "2027-28", fpl_id: 707, valid_from: "2027-08-01 12:00:00", valid_to: null, team_fpl_id: 10}
       - input: ref('dim_fixture_schedule_history')
         rows:
           - {season: "2026-27", fixture_id: 20, valid_from: "2026-08-01 12:00:00", valid_to: null, gameweek: 2, kickoff_time: "2026-08-29 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
           - {season: "2026-27", fixture_id: 50, valid_from: "2026-08-29 19:11:00", valid_to: null, gameweek: 5, kickoff_time: "2026-09-19 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
+          - {season: "2027-28", fixture_id: 30, valid_from: "2027-08-28 19:11:00", valid_to: null, gameweek: 3, kickoff_time: "2027-08-28 14:00:00", team_h_fpl_id: 10, team_a_fpl_id: 11}
     expect:
       rows:
         - {season: "2026-27", fpl_id: 704, gameweek: 5, fixture_count_at_deadline: null}
         - {season: "2026-27", fpl_id: 705, gameweek: 2, fixture_count_at_deadline: null}
         - {season: "2026-27", fpl_id: 706, gameweek: 5, fixture_count_at_deadline: 0}
+        - {season: "2027-28", fpl_id: 707, gameweek: 3, fixture_count_at_deadline: null}

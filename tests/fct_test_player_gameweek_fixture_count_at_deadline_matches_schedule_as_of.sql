@@ -24,8 +24,14 @@
 with gameweeks as (
 
     select season, gameweek, deadline_time
-    from {{ ref('dim_gameweek') }}
+    from {{ ref('dim_gameweek') }} as gameweek
     where last_capture_before_deadline_at is not null
+      and exists (
+          select 1
+          from {{ ref('dim_fixture_schedule_history') }} as schedule
+          where schedule.season = gameweek.season
+            and schedule.valid_from < gameweek.deadline_time
+      )
 
 ),
 
