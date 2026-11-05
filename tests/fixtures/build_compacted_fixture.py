@@ -11,7 +11,10 @@ DAYS
     2026-08-31  parquet, no manifest: a failed day    (the gap, "day 2"; read from raw)
     2026-09-02  compacted: parquet + manifest         (the "day 3"; its one capture is
                                                        07eb06's, never admitted)
-    2026-09-06, 2026-09-10, 2026-09-14                not compacted: the raw tail
+    2026-09-10  compacted: parquet + manifest         (its one capture, fpl_id 655 before
+                                                       debut, has an empty history, so
+                                                       the day's history is JSON[]: #225)
+    2026-09-06, 2026-09-14                            not compacted: the raw tail
 
 Every payload of a compacted day in tests/fixtures/raw stays there, so a reader that
 read both would stage each of that day's captures twice.
@@ -60,7 +63,7 @@ DEST = REPO / "tests/fixtures/compacted"
 PROD = "s3://fpl-data-safari/compacted"
 PROD_RAW = "s3://fpl-data-safari/raw"
 
-MANIFEST_DAYS = ("2026-08-29", "2026-09-02")
+MANIFEST_DAYS = ("2026-08-29", "2026-09-02", "2026-09-10")
 UNREFERENCED_DAYS = ("2026-08-31",)
 
 

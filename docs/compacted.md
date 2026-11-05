@@ -99,8 +99,9 @@ union all by name read_json(<history seasons' glob>, union_by_name = true, filen
   (`s3://fpl-data-safari/compacted`), or `tests/fixtures/compacted` under `fixtures`.
 - **Not used with `capture_cutoff`:** a cutoff build reads raw and history only.
 - **Fixture:** `tests/fixtures/compacted` holds trimmed production objects, built by
-  `tests/fixtures/build_compacted_fixture.py`. Compacted days are 2026-08-29 and
-  2026-09-02. 2026-08-31 has a parquet but no manifest.
+  `tests/fixtures/build_compacted_fixture.py`. Compacted days are 2026-08-29, 2026-09-02
+  and 2026-09-10, whose one capture has an empty history, so its parquet infers
+  `history` as `JSON[]` (#225). 2026-08-31 has a parquet but no manifest.
 
 ## Who writes
 

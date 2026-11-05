@@ -389,3 +389,22 @@ def test_a_filename_in_both_parquet_and_the_raw_tail_fails_the_build(tmp_path):
 
     assert tested.returncode != 0
     assert "FAIL" in output and "unique_stg_player_history_capture_capture_key" in output
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#225 AC1")
+def test_the_fixture_holds_a_compacted_day_whose_only_capture_has_an_empty_history():
+    """AC1's case, so its dbt test cannot pass vacuously: production's 2026-09-10
+    parquet, whose one capture (fpl_id 655 before debut) has an empty history and so
+    infers it as JSON[], compacted beside days whose history is a typed struct."""
+    con = duckdb.connect()
+    days = sorted(p.stem.removeprefix("date=") for p in (DAYS / "_manifest").glob("date=*.json"))
+    shapes = {
+        day: con.sql(
+            "select count(*), any_value(typeof(history)), max(len(history)) "
+            f"from read_parquet('{DAYS}/date={day}/part.parquet', hive_partitioning = false)"
+        ).fetchone()
+        for day in days
+    }
+    assert shapes.pop("2026-09-10") == (1, "JSON[]", 0)
+    assert any(history_type.startswith("STRUCT(") for _, history_type, _ in shapes.values()), shapes
