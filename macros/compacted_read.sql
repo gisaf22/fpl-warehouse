@@ -38,11 +38,15 @@
     fpl_raw.element_summary, it sets the DuckDB variable `element_summary_read`
     to the SQL the source runs through query():
 
-        read_parquet(<compaction manifest's days>, union_by_name = true)
-        union all by name read_json(<raw tail>, union_by_name = true, filename = true)
-        union all by name read_json(<history seasons' glob>, ...)
+        declared_typed(read_parquet(<each compaction manifest day>))
+        union all declared_typed(read_json(<raw tail>, union_by_name = true, filename = true))
+        union all declared_typed(read_json(<history seasons' glob>, ...))
 
     Only parts with files are included: DuckDB fails a read of zero files.
+    Each part is typed separately, through declared_typed(), before the union
+    (#225): types are inferred per read, so a day whose captures all have an
+    empty `history` reads it as JSON[], and a union with it widens every day's
+    `history` to JSON[], whose extraction ran the build out of memory.
 
     - The manifest is `_manifest/date=<D>.json` under the compacted root
       (`compacted_root`; default `tests/fixtures/compacted` under `fixtures`,
@@ -107,20 +111,19 @@
         {%- set tail = run_query("select coalesce(len(getvariable('element_summary_raw_tail')), 0)").columns[0].values()[0] -%}
 
         {%- set parts = [] -%}
-        {%- if parquets -%}
-            {%- do parts.append("select * from read_parquet(getvariable('element_summary_compacted'), union_by_name = true, hive_partitioning = false)") -%}
-        {%- endif -%}
+        {%- for path in parquets -%}
+            {%- do parts.append(declared_typed("element_summary", "read_parquet('" ~ path ~ "', hive_partitioning = false)")) -%}
+        {%- endfor -%}
         {%- if tail > 0 -%}
-            {%- do parts.append("select * from read_json(getvariable('element_summary_raw_tail'), union_by_name = true, filename = true)") -%}
+            {%- do parts.append(declared_typed("element_summary", "read_json(getvariable('element_summary_raw_tail'), union_by_name = true, filename = true)")) -%}
         {%- endif -%}
         {%- if roots.history -%}
-            {%- do parts.append("select * from read_json('" ~ roots.history ~ "/" ~ glob ~ "', union_by_name = true, filename = true)") -%}
+            {%- do parts.append(declared_typed("element_summary", "read_json('" ~ roots.history ~ "/" ~ glob ~ "', union_by_name = true, filename = true)")) -%}
         {%- endif -%}
         {%- if not parts -%}
             {{ exceptions.raise_compiler_error("compacted read: element-summary has no compacted day, raw payload or history capture to read") }}
         {%- endif %}
-set variable element_summary_compacted = {{ sql_list(parquets) }};
-set variable element_summary_read = '{{ parts | join(" union all by name ") | replace("'", "''") }}';
+set variable element_summary_read = '{{ parts | join(" union all ") | replace("'", "''") }}';
     {%- endif -%}
 {% endmacro %}
 
@@ -162,7 +165,7 @@ set variable element_summary_read = '{{ parts | join(" union all by name ") | re
     - The raw tail is every payload whose (season, gameweek) has no manifest:
       unsettled gameweeks and settled ones not yet compacted.
     - Not with `staging_read_mode: raw`: the source then reads raw directly.
-    - Each part is typed separately, through entry_picks_typed(), before the
+    - Each part is typed separately, through declared_typed(), before the
       union: types are inferred per read, so a gameweek whose `active_chip` or
       `automatic_subs` are all empty reads them as JSON where another reads
       VARCHAR or STRUCT, and DuckDB cannot union the two.
@@ -215,10 +218,10 @@ set variable element_summary_read = '{{ parts | join(" union all by name ") | re
 
         {%- set parts = [] -%}
         {%- for path in parquets -%}
-            {%- do parts.append(entry_picks_typed("read_parquet('" ~ path ~ "', hive_partitioning = false)")) -%}
+            {%- do parts.append(declared_typed("entry_picks", "read_parquet('" ~ path ~ "', hive_partitioning = false)")) -%}
         {%- endfor -%}
         {%- if tail > 0 -%}
-            {%- do parts.append(entry_picks_typed("read_json(getvariable('entry_picks_raw_tail'), union_by_name = true, filename = true)")) -%}
+            {%- do parts.append(declared_typed("entry_picks", "read_json(getvariable('entry_picks_raw_tail'), union_by_name = true, filename = true)")) -%}
         {%- endif -%}
         {%- if not parts -%}
             {{ exceptions.raise_compiler_error("compacted read: entry-picks has no compacted gameweek or raw payload to read") }}
@@ -229,18 +232,18 @@ set variable entry_picks_read = '{{ parts | join(" union all ") | replace("'", "
 
 
 {#
-    entry_picks_typed(read)
+    declared_typed(source_name, read)
 
-    `read` (a relation over entry-picks payloads, with `filename`) as one row
-    per payload with exactly the declared fields, every leaf VARCHAR, through
-    json_transform. The shape is built from the entry_picks source's declared
-    columns (#114, #115): a root column with no record_path is a leaf, its
-    fields declared at '$.<name>[*]' make it a list of structs, and at
-    '$.<name>' a struct (#216 AC22). Staging casts every leaf. An undeclared
-    field is not in the shape, so it cannot be read.
+    `read` (a relation over one fpl_raw source's payloads, with `filename`) as
+    one row per payload with exactly the source's declared fields, every leaf
+    VARCHAR, through json_transform (#216 D8; #225 D2, D3). The shape is built
+    from the source's declared columns (#114, #115): a root column with no
+    record_path is a leaf, its fields declared at '$.<name>[*]' make it a list
+    of structs, and at '$.<name>' a struct (#216 AC22). Staging casts every
+    leaf. An undeclared field is not in the shape, so it cannot be read.
 #}
-{% macro entry_picks_typed(read) -%}
-    {%- set node = graph.sources["source.fpl_warehouse.fpl_raw.entry_picks"] -%}
+{% macro declared_typed(source_name, read) -%}
+    {%- set node = graph.sources["source.fpl_warehouse.fpl_raw." ~ source_name] -%}
     {%- set roots = [] -%}
     {%- set children = {} -%}
     {%- for column in node.columns.values() -%}

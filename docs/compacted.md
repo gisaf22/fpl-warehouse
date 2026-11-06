@@ -74,9 +74,10 @@ W10). The `compacted_read` pre-hook (`macros/compacted_read.sql`) runs on
 source runs, `query(getvariable('element_summary_read'))`:
 
 ```
-read_parquet(<each manifest day's part.parquet>, union_by_name = true, hive_partitioning = false)
-union all by name read_json(<raw tail>, union_by_name = true, filename = true)
-union all by name read_json(<history seasons' glob>, union_by_name = true, filename = true)
+declared_typed(read_parquet(<manifest day D1's part.parquet>, hive_partitioning = false))
+union all declared_typed(read_parquet(<manifest day D2's part.parquet>, ...))  -- one per day
+union all declared_typed(read_json(<raw tail>, union_by_name = true, filename = true))
+union all declared_typed(read_json(<history seasons' glob>, union_by_name = true, filename = true))
 ```
 
 - **Which days come from parquet:** exactly the days with a manifest. A parquet with no
@@ -91,16 +92,23 @@ union all by name read_json(<history seasons' glob>, union_by_name = true, filen
   with no manifests at all is a fresh start: every day is read from raw.
 - **No capture is read twice.** `stg_player_history_capture.capture_key` is unique (B2).
   A filename in both a parquet and the raw tail fails the build.
-- **Types follow each read.** A day's parquet keeps the types inferred over that day.
-  So the raw `history` struct in `stg_player_history_capture` can be wider than one
-  all-raw read would give (`bps` `17.0`, not `17`). `stg_player_fixture` casts every
-  field, so nothing downstream sees it (#78 W8's residual risk).
+- **Each part is typed before the union (#225).** Types are inferred per read, so a day
+  whose captures all have an empty `history` reads it as `JSON[]`, and a union with that
+  day widens every day's `history` to `JSON[]`. Extracting the fields from `JSON` ran
+  the scheduled build out of memory. `declared_typed` (#225 D3, shared with entry-picks)
+  types each day's parquet, the raw tail and the history seasons separately to the
+  declared `history` fields, every leaf `VARCHAR` (#225 D2), so the raw `history`
+  struct in `stg_player_history_capture` is the same on every day. `stg_player_fixture`
+  casts every field. This supersedes #78 W8's residual risk, under which a day's
+  inferred types reached staging. The emergency all-raw read (`staging_read_mode: raw`)
+  and a `capture_cutoff` read are one `read_json` each and are not typed.
 - **Roots:** `compacted_root`. It defaults to `dev_compacted_root`
   (`s3://fpl-data-safari/compacted`), or `tests/fixtures/compacted` under `fixtures`.
 - **Not used with `capture_cutoff`:** a cutoff build reads raw and history only.
 - **Fixture:** `tests/fixtures/compacted` holds trimmed production objects, built by
-  `tests/fixtures/build_compacted_fixture.py`. Compacted days are 2026-08-29 and
-  2026-09-02. 2026-08-31 has a parquet but no manifest.
+  `tests/fixtures/build_compacted_fixture.py`. Compacted days are 2026-08-29, 2026-09-02
+  and 2026-09-10, whose one capture has an empty history, so its parquet infers
+  `history` as `JSON[]` (#225). 2026-08-31 has a parquet but no manifest.
 
 ## Who writes
 
@@ -242,7 +250,7 @@ s3://fpl-data-safari/compacted/fpl/entry-picks/_manifest/season=<S>/gameweek=<G>
   manifest). Types are inferred per read, so a gameweek whose `active_chip` or
   `automatic_subs` are all empty reads them as JSON where another reads VARCHAR or STRUCT.
   Each part is therefore typed separately from the source's declared fields
-  (`entry_picks_typed`) before the union. `staging_read_mode: raw` reads every payload from
+  (`declared_typed`) before the union. `staging_read_mode: raw` reads every payload from
   raw.
 - **Who writes:** the element-summary writer's gate. A destination under
   `s3://fpl-data-safari/compacted/` is written only when `GITHUB_EVENT_NAME == schedule`,

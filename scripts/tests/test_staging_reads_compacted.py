@@ -1,8 +1,9 @@
 """Staging reads compacted element-summary days from parquet and the rest from raw (#194).
 
 The element-summary source is the compaction manifest's days read from
-`compacted/`, union all by name the raw tail (every capture day the manifest
-does not list), union all by name the 2025-26 history-port captures (#78 W8, W10).
+`compacted/`, union all the raw tail (every capture day the manifest does not
+list), union all the 2025-26 history-port captures (#78 W8, W10), each part
+typed to the declared fields first (#225).
 A staging pre-hook derives the tail from the manifest. Compacted days must be
 read: an unreadable manifest or a listed day without its parquet fails the build
 (D1). `staging_read_mode: raw` forces the all-raw read, only on a manual dispatch.
@@ -92,11 +93,9 @@ def built(result: subprocess.CompletedProcess) -> None:
 def typed_rows(db: Path, table: str) -> list[tuple]:
     """Every column with its type, but stg_player_history_capture's raw `history`.
 
-    That list keeps the types the source read inferred (docs/compacted.md: the
-    schema follows the source). A production day's parquet infers them over the
-    whole day, so a trimmed fixture day can be wider than the same payloads read
-    alone (`bps` 17.0, not 17: #78 W8's residual risk). stg_player_fixture casts
-    every field of it, and is compared typed.
+    The compacted read types its fields VARCHAR (#225 D2), while the all-raw read
+    keeps the types read_json infers, so the two lists differ in type by design.
+    stg_player_fixture casts every field of it, and is compared typed.
     """
     con = duckdb.connect(str(db), read_only=True)
     columns = [c for (c,) in con.sql(
@@ -389,3 +388,22 @@ def test_a_filename_in_both_parquet_and_the_raw_tail_fails_the_build(tmp_path):
 
     assert tested.returncode != 0
     assert "FAIL" in output and "unique_stg_player_history_capture_capture_key" in output
+
+
+@pytest.mark.integration
+@pytest.mark.covers("#225 AC1")
+def test_the_fixture_holds_a_compacted_day_whose_only_capture_has_an_empty_history():
+    """AC1's case, so its dbt test cannot pass vacuously: production's 2026-09-10
+    parquet, whose one capture (fpl_id 655 before debut) has an empty history and so
+    infers it as JSON[], compacted beside days whose history is a typed struct."""
+    con = duckdb.connect()
+    days = sorted(p.stem.removeprefix("date=") for p in (DAYS / "_manifest").glob("date=*.json"))
+    shapes = {
+        day: con.sql(
+            "select count(*), any_value(typeof(history)), max(len(history)) "
+            f"from read_parquet('{DAYS}/date={day}/part.parquet', hive_partitioning = false)"
+        ).fetchone()
+        for day in days
+    }
+    assert shapes.pop("2026-09-10") == (1, "JSON[]", 0)
+    assert any(history_type.startswith("STRUCT(") for _, history_type, _ in shapes.values()), shapes

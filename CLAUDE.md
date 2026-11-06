@@ -337,11 +337,15 @@ not silently corrected.
   the build. `staging_read_mode: raw` reads every day from raw on a local run or a
   manual dispatch only. The source is therefore readable only by
   `stg_player_history_capture`, and a test that needs the payloads directly reads
-  `element_summary_raw_read()`. Details: `docs/compacted.md`, "Staging's read".
+  `element_summary_raw_read()`. Each part (every compacted day, the raw tail, the
+  history seasons) is typed to the declared `history` fields before the union, every
+  leaf `VARCHAR`, by `declared_typed` (#225): a day whose captures all have an empty
+  `history` infers it as `JSON[]`, which widened every day and ran the build out of
+  memory. Details: `docs/compacted.md`, "Staging's read".
 - **Entry-picks is read the same way** (#216 D8). The `entry_picks_compacted_read`
   pre-hook reads each settled gameweek compacted by `scripts/compact_entry_picks.py`
   from parquet and every other payload from raw, typing each part separately from the
-  source's declared fields (`entry_picks_typed`), because types are inferred per read.
+  source's declared fields (`declared_typed`), because types are inferred per read.
   A test reads `entry_picks_raw_read()`. The source has no `capture_glob`, so
   `capture_cutoff` does not cut it.
 - **Two non-capture sources are read with explicit columns** (#216 D2, D10): the picks
