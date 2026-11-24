@@ -175,6 +175,9 @@ def test_the_scheduled_build_ping_and_outcome_steps_are_unchanged():
         "env": {
             "HEALTHCHECKS_PING_URL": "${{ secrets.HEALTHCHECKS_PING_URL_SCHEDULED_BUILD }}",
             "JOB_STATUS": "${{ steps.build_outcome.outputs.status }}",
+            # #229: the ping body's failed steps and first failing dbt test.
+            "GITHUB_TOKEN": "${{ github.token }}",
+            "DBT_RUN_RESULTS": ".local/metrics/run_results.json",
         },
         "run": 'bash scripts/healthchecks_ping.sh "$JOB_STATUS"',
     }
