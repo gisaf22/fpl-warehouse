@@ -1419,9 +1419,16 @@ fpl-ingest's two checks are documented in that repo.
   logs a notice and sends nothing when the secret is empty (a fork or fresh clone), and it
   logs a warning when the request fails. The step is also `continue-on-error` with a
   2-minute timeout. A lost ping reads as absence and alerts after the grace, which is the
-  accepted false positive. The script is plain bash and curl, duplicated from fpl-ingest's
+  accepted false positive. The script is plain bash, curl and jq, duplicated byte for byte from fpl-ingest's
   `.github/scripts/healthchecks_ping.sh` rather than shared, so it runs even when `uv sync`
   failed. Keep the two in step.
+- **Every ping carries a plain-text body** (#229): the workflow, the job status and the run
+  URL, and on `/fail` the job's failed or cancelled steps and the build's first failing dbt
+  test from `.local/metrics/run_results.json`. The step names come from the GitHub jobs API,
+  read with the job's `GITHUB_TOKEN`; that is the workflow's `actions: read` permission. A
+  detail that cannot be read is written as `unavailable (...)` and the ping is still sent.
+  The body never holds the ping URL or a credential. healthchecks.io shows it on the ping's
+  event in the check's log.
 - **The ping URL is a secret, not a variable.** The repo is public, and anyone holding the
   URL could send a false success ping. Never paste it into an issue, PR or log.
 - **Grace sizing:** 1 h 30 min covers about 25 minutes of scheduler lag plus the 45-minute

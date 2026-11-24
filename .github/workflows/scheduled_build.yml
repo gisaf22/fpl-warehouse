@@ -90,6 +90,9 @@ on:
 permissions:
   id-token: write
   contents: read
+  # Read-only: the healthchecks.io ping names this job's failed steps from the
+  # jobs API.
+  actions: read
 
 # A build reads ~74k S3 objects and takes 7-16 minutes (measured 2026-09-15/16;
 # see the timeout comment below for the spread and why it is a spread).
@@ -493,6 +496,11 @@ jobs:
       # env, not interpolated into the script. The script is duplicated from
       # fpl-ingest's and needs no uv environment, so it still runs when
       # `uv sync` has failed. See CLAUDE.md, "Scheduled build".
+      #
+      # The ping's body carries the workflow, status and run URL, and on a
+      # non-success the failed steps (jobs API, via GITHUB_TOKEN's actions:
+      # read) and the build's first failing dbt test (DBT_RUN_RESULTS, kept by
+      # timed_build.sh). Never the ping URL or a credential.
       - name: Ping healthchecks.io
         if: always() && github.event_name == 'schedule'
         continue-on-error: true
@@ -500,4 +508,6 @@ jobs:
         env:
           HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL_SCHEDULED_BUILD }}
           JOB_STATUS: ${{ steps.build_outcome.outputs.status }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DBT_RUN_RESULTS: .local/metrics/run_results.json
         run: bash scripts/healthchecks_ping.sh "$JOB_STATUS"
