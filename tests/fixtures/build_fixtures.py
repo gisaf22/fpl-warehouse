@@ -227,6 +227,14 @@ WHAT EACH PLAYER COVERS
           could not fail (#175 AC3). Every model selects history fields by
           name, so the key is otherwise inert.
 
+          611 also carries a SYNTHETIC `n` status in R3's bootstrap-static
+          element only, so the captures read a -> a -> n -> a (see
+          SYNTHETIC_STATUS_N). FPL first published `n` on 2026-11-21, after
+          this tree was cut, for a loanee ineligible to face their parent
+          club. It gives the status accepted_values test a fixture row with
+          that value. Team and every other field are as captured, so the
+          player's club and fixture counts do not move.
+
 4         Departed player — SYNTHETIC removal, the second edited case in this
           tree. Played rounds 1 and 2 for real (90 min / 5 pts, 76 min /
           6 pts), is present in `elements` for R1 and R2, and is then removed
@@ -450,7 +458,8 @@ PLAYERS = {
          "the spine gives them a row in both finished rounds, but their "
          "history carries no round-1 fixture. fct_player_gameweek must show "
          "round 1 with fixture_count 0, not drop the row. Feeds "
-         "fct_test_player_gameweek_blank_gameweek_is_zero.",
+         "fct_test_player_gameweek_blank_gameweek_is_zero. Also the "
+         "SYNTHETIC status `n` in bootstrap-static (R3 only).",
 }
 
 # The synthetic departure, stated in one place so the edit is auditable.
@@ -496,6 +505,23 @@ SYNTHETIC_STATUS = {
         "chance_of_playing_next_round": 75,
         "news": "Knock - 75% chance of playing",
         "news_added": "2026-08-30T10:00:00.000000Z",
+    },
+}
+
+# The synthetic `n` status, stated in one place so the edit is auditable.
+# Player 611 is `a` in every real capture. In `run_id`'s `elements` these
+# fields are replaced, so the captures read a -> a -> n -> a; every other run's
+# element, and every other field of this one, is as captured. The fields copy
+# the first live `n` (fpl_id 501, 2026-11-21): chance next round 0, this round
+# left as captured. news_added sits between R2 and R3.
+SYNTHETIC_STATUS_N = {
+    "fpl_id": 611,
+    "run_id": "20260906T191056Z-6d5820",
+    "fields": {
+        "status": "n",
+        "chance_of_playing_next_round": 0,
+        "news": "Ineligible to face parent club",
+        "news_added": "2026-09-05T10:00:00.000000Z",
     },
 }
 
@@ -899,6 +925,28 @@ def mark_synthetic_status(elements: list, events: list, run_id: str) -> list:
     ]
 
 
+def mark_synthetic_status_n(elements: list, run_id: str) -> list:
+    """Set one player's status to `n` in one capture — see SYNTHETIC_STATUS_N."""
+    if run_id != SYNTHETIC_STATUS_N["run_id"]:
+        return elements
+    if run_id == RUNS[-1][0]:
+        sys.exit("SYNTHETIC_STATUS_N is on the final run, so the player never "
+                 "returns to `a`")
+    target = [e for e in elements if e["id"] == SYNTHETIC_STATUS_N["fpl_id"]]
+    if not target:
+        sys.exit(f"player {SYNTHETIC_STATUS_N['fpl_id']} is not in {run_id}'s "
+                 "`elements` — the synthetic `n` has nothing to set")
+    if target[0]["status"] != "a":
+        sys.exit(f"player {SYNTHETIC_STATUS_N['fpl_id']} is already "
+                 f"{target[0]['status']!r} in {run_id} as captured, so the "
+                 "synthetic change is no longer a -> n -> a")
+    return [
+        dict(e, **SYNTHETIC_STATUS_N["fields"])
+        if e["id"] == SYNTHETIC_STATUS_N["fpl_id"] else e
+        for e in elements
+    ]
+
+
 def is_departed(fpl_id: int, run_id: str) -> bool:
     """True once the synthetic departure has taken effect for this run."""
     if fpl_id != DEPARTED["fpl_id"]:
@@ -970,6 +1018,13 @@ def main() -> None:
             "read a -> d -> a. See SYNTHETIC_STATUS in build_fixtures.py."
             if run_id == SYNTHETIC_STATUS["run_id"] else ""
         )
+        status_n_note = (
+            f" Player {SYNTHETIC_STATUS_N['fpl_id']}'s status fields are "
+            "SYNTHETIC: set to `n` (not available) in this capture only, so "
+            "the captures read a -> a -> n -> a. See SYNTHETIC_STATUS_N in "
+            "build_fixtures.py."
+            if run_id == SYNTHETIC_STATUS_N["run_id"] else ""
+        )
         write(
             OUT_ROOT / "bootstrap-static" / date / run_id / "payload.json",
             {
@@ -984,13 +1039,18 @@ def main() -> None:
                     + departure_note
                     + finished_note
                     + status_note
+                    + status_n_note
                 ),
-                "elements": mark_synthetic_status(
-                    [
-                        e for e in boot["elements"]
-                        if e["id"] in PLAYERS and not is_departed(e["id"], run_id)
-                    ],
-                    boot["events"],
+                "elements": mark_synthetic_status_n(
+                    mark_synthetic_status(
+                        [
+                            e for e in boot["elements"]
+                            if e["id"] in PLAYERS
+                            and not is_departed(e["id"], run_id)
+                        ],
+                        boot["events"],
+                        run_id,
+                    ),
                     run_id,
                 ),
                 "events": mark_synthetic_finished(boot["events"], run_id),
