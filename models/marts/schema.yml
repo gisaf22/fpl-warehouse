@@ -858,11 +858,14 @@ models:
           accepted; a new one fails the build until it is classified (#123).
         data_tests:
           # The allowed set is exactly the values observed in both seasons'
-          # captures as of #125 (2026-10-09). A value outside it failing the
-          # build is deliberate: classify it, then add it here.
+          # captures: a, u, i, d and s as of #125 (2026-10-09), and n from
+          # 2026-11-21. n is not available: fpl_id 501 in 2026-27, news
+          # "Ineligible to face parent club", chance next round 0. A value
+          # outside it failing the build is deliberate: classify it, then add
+          # it here.
           - accepted_values:
               arguments:
-                values: ["a", "u", "i", "d", "s"]
+                values: ["a", "u", "i", "d", "s", "n"]
               config:
                 tags: [integration]
                 meta:
